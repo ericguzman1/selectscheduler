@@ -3,80 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tech Innovation Hub</title>
+    <title>Tech Innovation Hub (Azure)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --dark-bg: #111827;
-            --dark-card: #1f2937;
-            --dark-column: #161e2b;
-            --dark-border: #374151;
-            --text-primary: #e5e7eb;
-            --text-secondary: #9ca3af;
-            --accent-blue: #3b82f6;
-            --accent-purple: #8b5cf6;
-            --accent-green: #10b981;
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--dark-bg);
-            color: var(--text-primary);
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #2a374a; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #6b7280; }
-
-        .glow-button {
-            transition: all 0.3s ease;
-            box-shadow: 0 0 5px rgba(59, 130, 246, 0.5), 0 0 10px rgba(59, 130, 246, 0.3);
-        }
-        .glow-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7), 0 0 25px rgba(59, 130, 246, 0.5);
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95) translateY(10px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        .modal-fade-in { animation: fadeIn 0.3s ease-out; }
-        
-        .dark input, .dark select, .dark textarea {
-            background-color: #374151;
-            border-color: #4b5563;
-            color: var(--text-primary);
-        }
-        .dark input::placeholder { color: #9ca3af; }
-        .dark input:focus, .dark select:focus, .dark textarea:focus {
-             border-color: var(--accent-blue);
-             box-shadow: 0 0 0 1px var(--accent-blue);
-             background-color: #4b5563;
-        }
-        
-        /* Calendar Specific */
-        .calendar-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-        .calendar-day { min-height: 140px; }
-        .event-chip { font-size: 0.8rem; padding: 4px 8px; border-left-width: 4px; transition: all 0.2s ease-in-out; }
-        .event-chip:hover { transform: translateX(4px); filter: brightness(1.2); }
-        .today-marker { background-color: var(--accent-blue); box-shadow: 0 0 8px var(--accent-blue); }
-
-        /* Kanban Board Specific */
-        .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
-        .kanban-column { background-color: var(--dark-column); border-radius: 0.75rem; padding: 1rem; border: 1px solid var(--dark-border); }
-        .kanban-column.drag-over { border-color: var(--accent-blue); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
-        .kanban-cards { min-height: 200px; display: flex; flex-direction: column; gap: 1rem; }
-        .kanban-card { background-color: var(--dark-card); border-radius: 0.5rem; padding: 1rem; border-left: 4px solid var(--accent-purple); cursor: grab; transition: all 0.2s ease; }
-        .kanban-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-        .kanban-card.dragging { opacity: 0.5; transform: rotate(3deg); }
-        .nav-tab { cursor: pointer; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s ease; }
-        .nav-tab.active { background-color: var(--accent-blue); color: white; }
+        /* --- Styles (original version) --- */
+        :root{--dark-bg:#111827;--dark-card:#1f2937;--dark-column:#161e2b;--dark-border:#374151;--text-primary:#e5e7eb;--text-secondary:#9ca3af;--accent-blue:#3b82f6;--accent-purple:#8b5cf6;--accent-green:#10b981}body{font-family:'Roboto',sans-serif;background-color:var(--dark-bg);color:var(--text-primary);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}.custom-scrollbar::-webkit-scrollbar{width:8px}.custom-scrollbar::-webkit-scrollbar-track{background:#2a374a}.custom-scrollbar::-webkit-scrollbar-thumb{background:#4b5563;border-radius:4px}.custom-scrollbar::-webkit-scrollbar-thumb:hover{background:#6b7280}.glow-button{transition:all .3s ease;box-shadow:0 0 5px rgba(59,130,246,.5),0 0 10px rgba(59,130,246,.3)}.glow-button:hover{transform:translateY(-2px);box-shadow:0 0 15px rgba(59,130,246,.7),0 0 25px rgba(59,130,246,.5)}@keyframes fadeIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}.modal-fade-in{animation:fadeIn .3s ease-out}.dark input,.dark select,.dark textarea{background-color:#374151;border-color:#4b5563;color:var(--text-primary)}.dark input::placeholder{color:#9ca3af}.dark input:focus,.dark select:focus,.dark textarea:focus{border-color:var(--accent-blue);box-shadow:0 0 0 1px var(--accent-blue);background-color:#4b5563}.calendar-grid{grid-template-columns:repeat(7,minmax(0,1fr))}.calendar-day{min-height:140px}.event-chip{font-size:.8rem;padding:4px 8px;border-left-width:4px;transition:all .2s ease-in-out}.event-chip:hover{transform:translateX(4px);filter:brightness(1.2)}.today-marker{background-color:var(--accent-blue);box-shadow:0 0 8px var(--accent-blue)}.kanban-board{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem}.kanban-column{background-color:var(--dark-column);border-radius:.75rem;padding:1rem;border:1px solid var(--dark-border)}.kanban-column.drag-over{border-color:var(--accent-blue);box-shadow:0 0 15px rgba(59,130,246,.4)}.kanban-cards{min-height:200px;display:flex;flex-direction:column;gap:1rem}.kanban-card{background-color:var(--dark-card);border-radius:.5rem;padding:1rem;border-left:4px solid var(--accent-purple);cursor:grab;transition:all .2s ease}.kanban-card:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.3)}.kanban-card.dragging{opacity:.5;transform:rotate(3deg)}.nav-tab{cursor:pointer;padding:.5rem 1rem;border-radius:.5rem;transition:all .2s ease}.nav-tab.active{background-color:var(--accent-blue);color:#fff}
     </style>
 </head>
 <body class="dark">
@@ -85,31 +18,26 @@
         <header class="mb-6 flex justify-between items-start flex-wrap gap-4">
             <div>
                 <h1 id="main-title" class="text-3xl font-bold text-white tracking-wider"></h1>
-                <p class="text-sm text-gray-400 mt-1">Tech Innovation Hub</p>
-                <p class="text-xs text-gray-500 mt-2">User ID: <span id="userId" class="font-mono"></span></p>
+                <p class="text-sm text-gray-400 mt-1">Tech Innovation Hub (Azure)</p>
             </div>
             <div class="flex items-center gap-4">
-                <!-- View Switcher -->
                 <div class="flex items-center bg-gray-900/50 p-1 rounded-lg border border-gray-700">
                     <div id="calendar-tab" class="nav-tab active"><i class="fas fa-calendar-alt mr-2"></i>Calendar</div>
                     <div id="projects-tab" class="nav-tab"><i class="fas fa-tasks mr-2"></i>Projects</div>
                 </div>
-                <div id="header-buttons" class="flex items-center gap-3">
-                    <!-- Buttons will be dynamically added here -->
-                </div>
+                <div id="header-buttons" class="flex items-center gap-3"></div>
             </div>
         </header>
 
-        <!-- Main Content Area -->
         <div id="calendar-view">
-             <main class="bg-gray-800 rounded-xl shadow-2xl p-4 md:p-6 border border-gray-700">
+            <main class="bg-gray-800 rounded-xl shadow-2xl p-4 md:p-6 border border-gray-700">
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center space-x-2">
                         <button id="prev-month-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors"><i class="fas fa-chevron-left"></i></button>
                         <button id="next-month-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors"><i class="fas fa-chevron-right"></i></button>
                         <h2 id="current-month-year" class="text-2xl font-semibold w-56 text-center text-white"></h2>
                     </div>
-                     <div id="calendar-legend" class="flex flex-wrap gap-x-4 gap-y-2 text-sm items-center"></div>
+                    <div id="calendar-legend" class="flex flex-wrap gap-x-4 gap-y-2 text-sm items-center"></div>
                 </div>
                 <div id="calendar-grid-header" class="grid calendar-grid border-b-2 border-gray-700">
                     <div class="py-2 text-center font-bold text-gray-400">Sun</div> <div class="py-2 text-center font-bold text-gray-400">Mon</div> <div class="py-2 text-center font-bold text-gray-400">Tue</div> <div class="py-2 text-center font-bold text-gray-400">Wed</div> <div class="py-2 text-center font-bold text-gray-400">Thu</div> <div class="py-2 text-center font-bold text-gray-400">Fri</div> <div class="py-2 text-center font-bold text-gray-400">Sat</div>
@@ -119,42 +47,30 @@
         </div>
 
         <div id="projects-view" class="hidden">
-             <main class="kanban-board"></main>
+            <main class="kanban-board"></main>
         </div>
         
         <footer class="mt-8 text-xs text-gray-600 text-center">
-             <p>&copy; 2025 Tech Innovation Team. All rights reserved.</p>
+            <p>&copy; 2025 Tech Innovation Team. All rights reserved.</p>
         </footer>
     </div>
     
-    <!-- Modals -->
     <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden"></div>
     <div id="project-modal" class="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden"></div>
     <div id="custom-alert" class="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden"></div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, addDoc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
         // --- App Config & State ---
-        const firebaseConfig = typeof __firebase_config__ !== 'undefined' ? JSON.parse(__firebase_config__) : { apiKey: "DEMO_KEY", authDomain: "demo-project.firebaseapp.com", projectId: "demo-project" };
-        const isDemoMode = firebaseConfig.apiKey === "DEMO_KEY";
-        const appId = typeof __app_id__ !== 'undefined' ? __app_id__ : 'tech-hub-app';
-        let userId = null, currentView = 'calendar', currentDate = new Date();
+        const API_BASE_URL = "/data-api/rest"; 
+        
+        let currentView = 'calendar', currentDate = new Date();
         let events = [], projects = [];
-        let eventsUnsubscribe = null, projectsUnsubscribe = null;
         
         const sessionTypes = { "Client Meeting": "blue", "Internal Meeting": "green", "Tech Innovation Meeting": "purple", "Demo": "yellow", "CIC Meeting": "red" };
         const colorMap = { blue: "blue-500", green: "green-500", purple: "purple-500", yellow: "yellow-500", red: "red-500", gray: "gray-500"};
         const pocEmails = { "Eric Guzman": "eric.guzman@accenture.com", "Tommy Finch": "tommy.flinch@accenture.com", "Donald Salazar": "donald.salazar@accenture.com", "Christopher Lathen": "christopher.lathen@accenture.com" };
         const demoResourceOptions = ["Surface Hubs", "Proto", "Spot", "Hypervsn", "GenAI", "Vestaboard", "Loaner Laptop", "Clicker", "Teams Call", "Vu AI", "Other"];
         const projectColumns = { "todo": "To Do", "in-progress": "In Progress", "done": "Done" };
-
-        // --- Firebase Init ---
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
 
         // --- DOM Elements ---
         const mainTitle = document.getElementById('main-title');
@@ -166,88 +82,104 @@
         const calendarGridBody = document.getElementById('calendar-grid-body');
         const currentMonthYearEl = document.getElementById('current-month-year');
         
-        // --- Core Functions (Auth, UI Switching) ---
-        const setupAuth = async () => {
-             onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    userId = user.uid;
-                    document.getElementById('userId').textContent = userId;
-                    setupFirestoreListeners();
-                } else {
-                    if (eventsUnsubscribe) eventsUnsubscribe();
-                    if (projectsUnsubscribe) projectsUnsubscribe();
-                    if (isDemoMode) {
-                         document.getElementById('userId').textContent = 'Local Demo';
-                         setupFirestoreListeners(); // Still render UI in demo
-                         return;
-                    }
-                    try {
-                        if (typeof __initial_auth_token__ !== 'undefined' && __initial_auth_token__) {
-                            await signInWithCustomToken(auth, __initial_auth_token__);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                        console.error("Auth Error:", error);
-                        showAlert("Could not connect to the database. Running in local demo mode.");
-                        document.getElementById('userId').textContent = 'Offline';
-                        setupFirestoreListeners();
-                    }
-                }
-            });
+        // --- Core Helper Functions (showAlert, fetchData, saveData, deleteData) ---
+        // These are defined early as they are fundamental and called by many other functions.
+        const showAlert = (message, isLongText = false) => {
+            const container = document.getElementById('custom-alert');
+            const maxWidthClass = isLongText ? 'max-w-2xl' : 'max-w-sm';
+            const textAlignClass = isLongText ? 'text-left' : 'text-center';
+            container.innerHTML = `<div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full ${maxWidthClass} p-8 modal-fade-in"><div class="text-gray-200 mb-6 text-lg ${textAlignClass} custom-scrollbar" style="max-height: 60vh; overflow-y: auto;">${message}</div><div class="text-center"><button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg glow-button ok-btn">OK</button></div></div>`;
+            container.classList.remove('hidden');
+            container.querySelector('.ok-btn').onclick = () => container.classList.add('hidden');
         };
 
-        const setupFirestoreListeners = () => {
-            if (!userId && !isDemoMode) return;
-            // Events Listener
-            const eventsRef = collection(db, `artifacts/${appId}/public/data/events`);
-            eventsUnsubscribe = onSnapshot(eventsRef, snap => {
-                events = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if(currentView === 'calendar') renderCalendar();
-            }, err => console.error("Events listener error:", err));
-            // Projects Listener
-            const projectsRef = collection(db, `artifacts/${appId}/public/data/projects`);
-            projectsUnsubscribe = onSnapshot(projectsRef, snap => {
-                projects = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if(currentView === 'projects') renderKanbanBoard();
-            }, err => console.error("Projects listener error:", err));
-        };
+        async function fetchData(itemType) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${itemType}`);
+                if (!response.ok) throw new Error(`Failed to fetch ${itemType}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching data for ${itemType}:`, error);
+                showAlert(`Could not load ${itemType}.`); 
+                return [];
+            }
+        }
+
+        async function saveData(itemType, data) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${itemType}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (!response.ok) throw new Error(`Failed to save ${itemType}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`Error saving data for ${itemType}:`, error);
+                showAlert(`Could not save ${itemType}.`); 
+                return null;
+            }
+        }
+
+        async function deleteData(itemType, id) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${itemType}/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error(`Failed to delete ${itemType}`);
+                return true;
+            } catch (error) {
+                console.error(`Error deleting data for ${itemType}:`, error);
+                showAlert(`Could not delete ${itemType}.`); 
+                return false;
+            }
+        }
         
-        const switchView = (view) => {
-            currentView = view;
-            calendarView.classList.toggle('hidden', view !== 'calendar');
-            projectsView.classList.toggle('hidden', view !== 'projects');
-            calendarTab.classList.toggle('active', view === 'calendar');
-            projectsTab.classList.toggle('active', view === 'projects');
-            mainTitle.textContent = view === 'calendar' ? 'Event Scheduler' : 'Project Tracker';
-            renderHeaderButtons();
-            if(view === 'calendar') renderCalendar();
-            else renderKanbanBoard();
-        };
+        // --- Template Functions for Modals (Defined before openModal uses them) ---
+        const getEventModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-5xl modal-fade-in custom-scrollbar overflow-y-auto" style="max-height: 90vh;"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Event</h3> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> <div><label class="block text-sm text-gray-300">Event Name</label><input type="text" name="eventName" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Event POC</label><input type="text" name="eventPoc" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Session Type</label><select name="sessionType" class="mt-1 block w-full rounded-md" required>${Object.keys(sessionTypes).map(e=>`<option>${e}</option>`).join("")}</select></div><div><label class="block text-sm text-gray-300">Start Date</label><input type="date" name="startDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">End Date</label><input type="date" name="endDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Select POC</label><select name="selectPoc" class="mt-1 block w-full rounded-md">${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Location</label><input type="text" name="location" value="NYIH" class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Event Location (Room)</label><input type="text" name="eventLocation" placeholder="Enter room..." class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Classification</label><select name="classification" class="mt-1 block w-full rounded-md"><option>Unclassified</option><option>Confidential</option><option>Secret</option></select></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Attendees (comma-separated)</label><input type="text" name="attendees" class="mt-1 block w-full rounded-md"></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Demo Resources</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/50">${demoResourceOptions.map(e=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="demoResources" value="${e}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Event</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+        const getProjectModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl modal-fade-in"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Project</h3> <div><label class="block text-sm text-gray-300">Project Title</label><input type="text" name="title" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Description</label><textarea name="description" rows="3" class="mt-1 block w-full rounded-md"></textarea></div><div class="grid grid-cols-1 md:grid-cols-2 gap-6"> <div><label class="block text-sm text-gray-300">Assign To</label><select name="assignee" class="mt-1 block w-full rounded-md"><option value="">Unassigned</option>${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Due Date</label><input type="date" name="dueDate" class="mt-1 block w-full rounded-md"></div></div><div><label class="block text-sm text-gray-300">Tag Users for Notifications</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 gap-4 bg-gray-900/50">${Object.entries(pocEmails).map(([e,t])=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="taggedUsers" value="${t}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Project</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
 
-        const renderHeaderButtons = () => {
-            if (currentView === 'calendar') {
-                headerButtons.innerHTML = `
-                    <button id="weekly-summary-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-magic mr-2"></i>Weekly Summary</button>
-                    <button id="export-events-week-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-file-csv mr-2"></i>Export Week</button>
-                    <button id="export-events-month-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-file-csv mr-2"></i>Export Month</button>
-                    <button id="add-event-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-plus mr-2"></i>Add Event</button>`;
-                document.getElementById('add-event-btn').onclick = () => openModal('event');
-                document.getElementById('export-events-week-btn').onclick = () => exportToCSV('events', 'week');
-                document.getElementById('export-events-month-btn').onclick = () => exportToCSV('events', 'month');
-                document.getElementById('weekly-summary-btn').onclick = generateWeeklySummary;
-            } else {
-                headerButtons.innerHTML = `
-                    <button id="monthly-summary-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-magic mr-2"></i>Monthly Summary</button>
-                    <button id="export-projects-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-file-csv mr-2"></i>Export Projects</button>
-                    <button id="add-project-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg glow-button"><i class="fas fa-plus mr-2"></i>Add Project</button>`;
-                document.getElementById('add-project-btn').onclick = () => openModal('project');
-                document.getElementById('export-projects-btn').onclick = () => exportToCSV('projects');
-                document.getElementById('monthly-summary-btn').onclick = generateMonthlyProjectSummary;
+
+        // --- Modals & Form Handling Functions (Defined before functions that call them, like openModal) ---
+        const handleFormSubmit = async (e, type) => {
+            e.preventDefault();
+            const form = e.target;
+            let id = form.dataset.id; // This gets the existing ID if editing
+            
+            // --- NEW: Add crypto.randomUUID() for new items ---
+            if (!id) {
+                id = crypto.randomUUID(); 
+            }
+            // --- END NEW ---
+            const data = Object.fromEntries(new FormData(form).entries());
+            data.id = id; // This is the old line, we will add crypto.randomUUID() later
+
+            data.attendees = form.elements.attendees ? form.elements.attendees.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+            data.demoResources = Array.from(form.querySelectorAll('input[name="demoResources"]:checked')).map(cb => cb.value);
+            if(type === 'project') {
+                data.taggedUsers = Array.from(form.querySelectorAll('input[name="taggedUsers"]:checked')).map(cb => cb.value);
+                if (!id) data.status = 'todo'; 
+            }
+            
+            const savedData = await saveData(type + 's', data);
+            if (savedData) {
+                document.getElementById(`${type}-modal`).classList.add('hidden');
+                switchView(currentView);
             }
         };
 
-        // --- Modals & Alert ---
+        const handleDelete = async (type, id) => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/${type}s/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error(`Failed to delete ${type}`);
+                document.getElementById(`${type}-modal`).classList.add('hidden');
+                switchView(currentView); 
+                return true;
+            } catch (error) {
+                console.error(`Error deleting data for ${type}:`, error);
+                showAlert(`Could not delete ${type}.`);
+                return false;
+            }
+        };
+        
         const openModal = (type, id = null) => {
             const modalContainer = document.getElementById(`${type}-modal`);
             modalContainer.innerHTML = type === 'event' ? getEventModalHTML() : getProjectModalHTML();
@@ -260,328 +192,868 @@
                 const data = type === 'event' ? events.find(i => i.id === id) : projects.find(i => i.id === id);
                 if (!data) return;
                 form.querySelector('.modal-title').textContent = `Edit ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-                form.dataset.id = id;
+                form.dataset.id = id; 
                 Object.entries(data).forEach(([key, value]) => {
                     const el = form.elements[key];
                     if (!el) return;
-                    
                     if (Array.isArray(value)) {
-                         if (key === 'demoResources') value.forEach(v => { const cb = form.querySelector(`input[name="demoResources"][value="${v}"]`); if (cb) cb.checked = true; });
-                         else if (key === 'taggedUsers') value.forEach(v => { const cb = form.querySelector(`input[name="taggedUsers"][value="${v}"]`); if(cb) cb.checked = true; });
-                         else el.value = value.join(', ');
-                    } else if (el.type === 'checkbox') {
-                         el.checked = value;
-                    }
-                    else {
-                        el.value = value;
-                    }
+                        if (key === 'demoResources') value.forEach(v => { const cb = form.querySelector(`input[name="demoResources"][value="${v}"]`); if (cb) cb.checked = true; });
+                        else if (key === 'taggedUsers') value.forEach(v => { const cb = form.querySelector(`input[name="taggedUsers"][value="${v}"]`); if(cb) cb.checked = true; });
+                        else el.value = value.join(', ');
+                    } else el.value = value;
                 });
                 const deleteBtn = form.querySelector('.delete-btn');
                 deleteBtn.classList.remove('hidden');
                 deleteBtn.onclick = () => handleDelete(type, id);
             } else {
-                 if (type === 'event') {
+                if (type === 'event') {
                     form.elements.startDate.value = new Date().toISOString().split('T')[0];
                     form.elements.endDate.value = new Date().toISOString().split('T')[0];
-                 }
+                }
             }
         };
-        const handleFormSubmit = async (e, type) => {
-            e.preventDefault();
-            if (isDemoMode) { showAlert(`Cannot save ${type} in demo mode.`); return; }
-            const form = e.target;
-            const id = form.dataset.id;
-            const data = {};
-            new FormData(form).forEach((value, key) => {
-                 if(!data[key]) data[key] = value;
+
+        const getEventModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-5xl modal-fade-in custom-scrollbar overflow-y-auto" style="max-height: 90vh;"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Event</h3> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> <div><label class="block text-sm text-gray-300">Event Name</label><input type="text" name="eventName" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Event POC</label><input type="text" name="eventPoc" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Session Type</label><select name="sessionType" class="mt-1 block w-full rounded-md" required>${Object.keys(sessionTypes).map(e=>`<option>${e}</option>`).join("")}</select></div><div><label class="block text-sm text-gray-300">Start Date</label><input type="date" name="startDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">End Date</label><input type="date" name="endDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Select POC</label><select name="selectPoc" class="mt-1 block w-full rounded-md">${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Location</label><input type="text" name="location" value="NYIH" class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Event Location (Room)</label><input type="text" name="eventLocation" placeholder="Enter room..." class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Classification</label><select name="classification" class="mt-1 block w-full rounded-md"><option>Unclassified</option><option>Confidential</option><option>Secret</option></select></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Attendees (comma-separated)</label><input type="text" name="attendees" class="mt-1 block w-full rounded-md"></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Demo Resources</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/50">${demoResourceOptions.map(e=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="demoResources" value="${e}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Event</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+        const getProjectModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl modal-fade-in"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Project</h3> <div><label class="block text-sm text-gray-300">Project Title</label><input type="text" name="title" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Description</label><textarea name="description" rows="3" class="mt-1 block w-full rounded-md"></textarea></div><div class="grid grid-cols-1 md:grid-cols-2 gap-6"> <div><label class="block text-sm text-gray-300">Assign To</label><select name="assignee" class="mt-1 block w-full rounded-md"><option value="">Unassigned</option>${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Due Date</label><input type="date" name="dueDate" class="mt-1 block w-full rounded-md"></div></div><div><label class="block text-sm text-gray-300">Tag Users for Notifications</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 gap-4 bg-gray-900/50">${Object.entries(pocEmails).map(([e,t])=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="taggedUsers" value="${t}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Project</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+
+
+        // --- UI Logic & Event Listeners ---
+        const setupEventListeners = () => {
+            calendarTab.onclick = () => switchView("calendar");
+            projectsTab.onclick = () => switchView("projects");
+            document.getElementById("prev-month-btn").onclick = () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); };
+            document.getElementById("next-month-btn").onclick = () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); };
+            
+            // Add Event/Project buttons in header (Ensure these exist in your HTML)
+            document.getElementById('add-event-btn').onclick = () => openModal('event');
+            document.getElementById('export-events-week-btn').onclick = () => exportToCSV('events','week');
+            document.getElementById('export-events-month-btn').onclick = () => exportToCSV('events','month');
+            document.getElementById('weekly-summary-btn').onclick = generateWeeklySummary;
+
+            document.getElementById('add-project-btn').onclick = () => openModal('project');
+            document.getElementById('export-projects-btn').onclick = () => exportToCSV('projects');
+            document.getElementById('monthly-summary-btn').onclick = generateMonthlyProjectSummary;
+
+
+            // Event delegation for opening modals from calendar/kanban cards
+            calendarGridBody.addEventListener("click", e => {
+                const eventChip = e.target.closest(".event-chip");
+                if (eventChip) openModal("event", eventChip.dataset.id);
             });
-
-            data.attendees = form.elements.attendees ? form.elements.attendees.value.split(',').map(s => s.trim()).filter(Boolean) : [];
-            data.demoResources = Array.from(form.querySelectorAll('input[name="demoResources"]:checked')).map(cb => cb.value);
-            data.taggedUsers = Array.from(form.querySelectorAll('input[name="taggedUsers"]:checked')).map(cb => cb.value);
-            data.authorId = userId;
-            if(!id && type === 'project') data.status = 'todo';
-
-            try {
-                const ref = id ? doc(db, `artifacts/${appId}/public/data/${type}s`, id) : doc(collection(db, `artifacts/${appId}/public/data/${type}s`));
-                await setDoc(ref, data, { merge: true });
-                document.getElementById(`${type}-modal`).classList.add('hidden');
-            } catch (error) {
-                console.error(`Error saving ${type}:`, error);
-                showAlert(`Could not save ${type}.`);
-            }
-        };
-        const handleDelete = async (type, id) => {
-            if(isDemoMode) { showAlert(`Cannot delete in demo mode.`); return; }
-            if (!id) return;
-            try {
-                await deleteDoc(doc(db, `artifacts/${appId}/public/data/${type}s`, id));
-                document.getElementById(`${type}-modal`).classList.add('hidden');
-            } catch (err) {
-                console.error(`Error deleting ${type}:`, err);
-                showAlert(`Could not delete ${type}.`);
-            }
-        };
-        const showAlert = (message, isLongText = false) => {
-            const container = document.getElementById('custom-alert');
-            const maxWidthClass = isLongText ? 'max-w-2xl' : 'max-w-sm';
-            const textAlignClass = isLongText ? 'text-left' : 'text-center';
-            container.innerHTML = `<div class="bg-gray-800 border border-gray-600 rounded-lg shadow-2xl w-full ${maxWidthClass} p-8 modal-fade-in"><div class="text-gray-200 mb-6 text-lg ${textAlignClass} custom-scrollbar" style="max-height: 60vh; overflow-y: auto;">${message}</div><div class="text-center"><button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-lg glow-button ok-btn">OK</button></div></div>`;
-            container.classList.remove('hidden');
-            container.querySelector('.ok-btn').onclick = () => container.classList.add('hidden');
+            projectsView.addEventListener("click", e => {
+                const kanbanCard = e.target.closest(".kanban-card");
+                if (kanbanCard) openModal("project", kanbanCard.dataset.id);
+            });
+            
+            // Close modals with Escape key
+            window.onkeydown = e => {
+                if ("Escape" === e.key) {
+                    document.getElementById("event-modal").classList.add("hidden");
+                    document.getElementById("project-modal").classList.add("hidden");
+                    document.getElementById("custom-alert").classList.add("hidden"); 
+                }
+            };
         };
 
-        // --- Calendar Rendering ---
+
+        // --- Rendering Functions ---
         const renderCalendar = () => {
-             if (!calendarGridBody) return;
-             calendarGridBody.innerHTML = '';
-             const year = currentDate.getFullYear(), month = currentDate.getMonth();
-             currentMonthYearEl.textContent = `${currentDate.toLocaleString('default', { month: 'long' })} ${year}`;
-             const firstDayOfMonth = new Date(year, month, 1).getDay();
-             const daysInMonth = new Date(year, month + 1, 0).getDate();
-             for (let i = 0; i < firstDayOfMonth; i++) calendarGridBody.innerHTML += `<div class="p-2 border-t border-r border-gray-700 opacity-50"></div>`;
-             for (let i = 1; i <= daysInMonth; i++) {
-                 const date = new Date(year, month, i);
-                 const isToday = date.toDateString() === new Date().toDateString();
-                 const dayEvents = events.filter(e => new Date(e.startDate + 'T00:00:00') <= date && new Date(e.endDate + 'T00:00:00') >= date);
-                 let dayCellHTML = `<div class="calendar-day p-2 border-t border-r border-gray-700 relative flex flex-col gap-1 custom-scrollbar overflow-y-auto" data-date="${date.toISOString().split('T')[0]}">
-                    <span class="font-semibold text-sm mb-1 ${isToday ? 'today-marker text-white rounded-full w-7 h-7 flex items-center justify-center' : ''}">${i}</span>`;
-                 dayEvents.forEach(event => {
-                     const color = sessionTypes[event.sessionType] || "gray";
-                     dayCellHTML += `<div class="event-chip rounded truncate cursor-pointer border-${colorMap[color]} bg-${colorMap[color]}/20 text-${colorMap[color].replace('-500', '-300')}" data-id="${event.id}">${event.eventName}</div>`;
-                 });
-                 dayCellHTML += `</div>`;
-                 calendarGridBody.innerHTML += dayCellHTML;
-             }
-        };
+            if (!calendarGridBody) return;
+            calendarGridBody.innerHTML = '';
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            currentMonthYearEl.textContent = `${currentDate.toLocaleString("default", { month: "long" })} ${year}`;
 
-        // --- Kanban Rendering & Drag-Drop ---
-        const renderKanbanBoard = () => {
-            const board = document.querySelector('.kanban-board');
-            if(!board) return;
-            board.innerHTML = '';
-            for (const [colId, colName] of Object.entries(projectColumns)) {
-                const colProjects = projects.filter(p => p.status === colId);
-                let colHTML = `<div id="col-${colId}" class="kanban-column" data-col-id="${colId}">
-                                <h3 class="text-lg font-bold mb-4 text-white">${colName} <span class="text-sm font-normal text-gray-400">${colProjects.length}</span></h3>
-                                <div class="kanban-cards custom-scrollbar pr-2" data-col-id="${colId}">`;
-                colProjects.forEach(project => {
-                    colHTML += `<div class="kanban-card" draggable="true" data-id="${project.id}">
-                                    <h4 class="font-bold text-white">${project.title}</h4>
-                                    <p class="text-sm text-gray-400 mt-1">${project.description || ''}</p>
-                                    ${project.dueDate ? `<p class="text-xs text-blue-400 mt-3"><i class="fas fa-clock mr-1"></i>${project.dueDate}</p>` : ''}
-                                    ${project.assignee ? `<p class="text-xs text-purple-400 mt-1"><i class="fas fa-user mr-1"></i>${project.assignee}</p>` : ''}
-                               </div>`;
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Add empty divs for leading blank days
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                calendarGridBody.innerHTML += '<div class="p-2 border-t border-r border-gray-700 opacity-50"></div>';
+            }
+
+            // Add days of the month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const fullDate = new Date(year, month, day); 
+                const isToday = fullDate.toDateString() === new Date().toDateString();
+                const dayEvents = events.filter(e => {
+                    const eventStartDate = new Date(e.startDate + "T00:00:00"); 
+                    const eventEndDate = new Date(e.endDate + "T00:00:00");
+                    return fullDate >= eventStartDate && fullDate <= eventEndDate;
                 });
-                colHTML += `</div></div>`;
-                board.innerHTML += colHTML;
+
+                // Corrected template literal syntax in dayHtml
+                let dayHtml = `<div class="calendar-day p-2 border-t border-r border-gray-700 relative flex flex-col gap-1 custom-scrollbar overflow-y-auto" data-date="${fullDate.toISOString().split("T")[0]}">
+                                <span class="font-semibold text-sm mb-1 ${isToday ? 'today-marker text-white rounded-full w-7 h-7 flex items-center justify-center' : ''}">${day}</span>`;
+                
+                dayEvents.forEach(event => {
+                    const typeColor = sessionTypes[event.sessionType] || "gray";
+                    // Corrected template literal syntax
+                    dayHtml += `<div class="event-chip rounded truncate cursor-pointer border-${colorMap[typeColor]} bg-${colorMap[typeColor]}/20 text-${colorMap[typeColor].replace("-500","-300")}" data-id="${event.id}">${event.eventName}</div>`;
+                });
+                dayHtml += `</div>`; // Corrected: This div closes the .calendar-day
+                calendarGridBody.innerHTML += dayHtml;
             }
         };
 
+
+        const renderKanbanBoard = () => {
+            const kanbanBoardEl = document.querySelector(".kanban-board");
+            if (!kanbanBoardEl) return;
+            kanbanBoardEl.innerHTML = ""; 
+
+            for (const [colId, colName] of Object.entries(projectColumns)) {
+                const columnProjects = projects.filter(p => p.status === colId);
+                // Corrected template literal syntax
+                let columnHtml = `<div id="col-${colId}" class="kanban-column" data-col-id="${colId}">
+                                    <h3 class="text-lg font-bold mb-4 text-white">${colName} <span class="text-sm font-normal text-gray-400">${columnProjects.length}</span></h3>
+                                    <div class="kanban-cards custom-scrollbar pr-2" data-col-id="${colId}">`;
+                columnProjects.forEach(project => {
+                    // Corrected template literal syntax
+                    columnHtml += `<div class="kanban-card" draggable="true" data-id="${project.id}">
+                                    <h4 class="font-bold text-white">${project.title}</h4>
+                                    <p class="text-sm text-gray-400 mt-1">${project.description || ""}</p>
+                                    ${project.dueDate ? `<p class="text-xs text-blue-400 mt-3"><i class="fas fa-clock mr-1"></i>${project.dueDate}</p>` : ""}
+                                    ${project.assignee ? `<p class="text-xs text-purple-400 mt-1"><i class="fas fa-user mr-1"></i>${project.assignee}</p>` : ""}
+                                </div>`;
+                });
+                columnHtml += `</div></div>`;
+                kanbanBoardEl.innerHTML += columnHtml;
+            }
+        };
+
+        // Drag and Drop Logic
         let draggedItemId = null;
-        document.addEventListener('dragstart', e => { if (e.target.classList.contains('kanban-card')) { draggedItemId = e.target.dataset.id; e.target.classList.add('dragging'); } });
-        document.addEventListener('dragend', e => { if (e.target.classList.contains('kanban-card')) { draggedItemId = null; e.target.classList.remove('dragging'); } });
-        document.addEventListener('dragover', e => { e.preventDefault(); const c = e.target.closest('.kanban-column'); if(c) { document.querySelectorAll('.kanban-column').forEach(i => i.classList.remove('drag-over')); c.classList.add('drag-over'); }});
-        document.addEventListener('dragleave', e => { const c = e.target.closest('.kanban-column'); if(c) c.classList.remove('drag-over'); });
-        document.addEventListener('drop', async e => {
+        document.addEventListener("dragstart", e => {
+            if (e.target.classList.contains("kanban-card")) {
+                draggedItemId = e.target.dataset.id;
+                e.target.classList.add("dragging");
+            }
+        });
+        document.addEventListener("dragend", e => {
+            if (e.target.classList.contains("kanban-card")) {
+                draggedItemId = null;
+                e.target.classList.remove("dragging");
+            }
+        });
+        document.addEventListener("dragover", e => {
+            e.preventDefault(); 
+            const column = e.target.closest(".kanban-column");
+            if (column) {
+                document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+                col.classList.add("drag-over");
+            }
+        });
+        document.addEventListener("dragleave", e => {
+            const column = e.target.closest(".kanban-column");
+            if (column) {
+                column.classList.remove("drag-over");
+            }
+        });
+        document.addEventListener("drop", async e => {
             e.preventDefault();
-            document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
-            const column = e.target.closest('.kanban-column');
-            if (column && draggedItemId) {
-                try {
-                    await setDoc(doc(db, `artifacts/${appId}/public/data/projects`, draggedItemId), { status: column.dataset.colId }, { merge: true });
-                } catch (error) { showAlert("Failed to move project."); }
+            document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+            const targetColumn = e.target.closest(".kanban-column");
+            if (targetColumn && draggedItemId) {
+                const success = await saveData("projects", { id: draggedItemId, status: targetColumn.dataset.colId });
+                if (success) {
+                    switchView("projects"); 
+                }
             }
         });
 
-        // --- Data Export & AI Summary ---
-        const exportToCSV = (type, period) => {
-            const dataToExport = type === 'events' ? events : projects;
-            if (dataToExport.length === 0) { showAlert(`No ${type} to export.`); return; }
-            
-            let filteredData = dataToExport;
-            if (type === 'events' && period) {
-                 const now = new Date();
-                 let startDate, endDate;
-                 if (period === 'month') {
-                     startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-                     endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                 } else { // week
-                     const firstDayOfWeek = now.getDate() - now.getDay();
-                     startDate = new Date(new Date().setDate(firstDayOfWeek));
-                     endDate = new Date(new Date().setDate(firstDayOfWeek + 6));
-                 }
-                 startDate.setHours(0, 0, 0, 0);
-                 endDate.setHours(23, 59, 59, 999);
-                 filteredData = events.filter(e => new Date(e.startDate + 'T00:00:00') >= startDate && new Date(e.startDate + 'T00:00:00') <= endDate);
+        // CSV Export Logic
+        const exportToCSV = (itemType, period = null) => {
+            let dataToExport = itemType === 'events' ? events : projects;
+
+            if (dataToExport.length === 0) {
+                return showAlert(`No ${itemType} to export.`);
             }
-            if (filteredData.length === 0) { showAlert(`No ${type} to export for this period.`); return; }
 
-            const headers = type === 'events' ? 
-                ['eventName', 'startDate', 'endDate', 'eventPoc', 'selectPoc', 'location', 'eventLocation', 'classification', 'sessionType', 'attendees', 'demoResources'] :
-                ['title', 'description', 'assignee', 'dueDate', 'status', 'taggedUsers'];
-            const csvRows = [headers.join(',')];
+            if (itemType === 'events' && period) {
+                const now = new Date();
+                let startDateFilter, endDateFilter;
 
-            for (const item of filteredData) {
+                if (period === 'month') {
+                    startDateFilter = new Date(now.getFullYear(), now.getMonth(), 1);
+                    endDateFilter = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                } else if (period === 'week') {
+                    startDateFilter = new Date(now.setDate(now.getDate() - now.getDay())); 
+                    endDateFilter = new Date(now.setDate(now.getDate() - now.getDay() + 6)); 
+                }
+                startDateFilter.setHours(0, 0, 0, 0);
+                endDateFilter.setHours(23, 59, 59, 999);
+
+                dataToExport = events.filter(event => {
+                    const eventDate = new Date(event.startDate + "T00:00:00"); 
+                    return eventDate >= startDateFilter && eventDate <= endDateFilter;
+                });
+            }
+
+            if (dataToExport.length === 0) {
+                return showAlert(`No ${itemType} to export for this period.`);
+            }
+
+            const headers = itemType === 'events' ? 
+                ["eventName", "startDate", "endDate", "eventPoc", "selectPoc", "location", "eventLocation", "classification", "sessionType", "attendees", "demoResources"] :
+                ["title", "description", "assignee", "dueDate", "status", "taggedUsers"];
+
+            const csvRows = [headers.join(',')]; 
+
+            for (const item of dataToExport) {
                 const values = headers.map(header => {
-                    let value = item[header] || '';
-                    if (Array.isArray(value)) value = value.join('; ');
-                    return `"${(value).toString().replace(/"/g, '""')}"`;
+                    let value = item[header] || ''; 
+                    if (Array.isArray(value)) {
+                        value = value.join('; '); 
+                    }
+                    return `"${value.toString().replace(/"/g, '""')}"`;
                 });
                 csvRows.push(values.join(','));
             }
 
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            link.href = URL.createObjectURL(new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' }));
-            link.download = `${type}_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.href = URL.createObjectURL(blob);
+            // Corrected template literal syntax
+            link.download = `${itemType}_export_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
         };
-        
-        const generateWeeklySummary = async () => {
-             showAlert("Generating weekly event summary...", false);
-             const now = new Date();
-             const firstDayOfWeek = now.getDate() - now.getDay();
-             const startDate = new Date(new Date().setDate(firstDayOfWeek));
-             const endDate = new Date(new Date().setDate(firstDayOfWeek + 6));
-             startDate.setHours(0, 0, 0, 0);
-             endDate.setHours(23, 59, 59, 999);
 
-             const weeklyEvents = events.filter(e => {
-                const eventStart = new Date(e.startDate + 'T00:00:00');
-                return eventStart >= startDate && eventStart <= endDate;
-             }).sort((a,b) => new Date(a.startDate) - new Date(b.startDate));
-             
-             if (weeklyEvents.length === 0) {
-                 showAlert("No events scheduled for the current week.");
-                 return;
-             }
-             
-             const eventDataString = weeklyEvents.map(e => `- Event: ${e.eventName} on ${e.startDate} (Type: ${e.sessionType}), POC: ${e.selectPoc || e.eventPoc || 'N/A'}`).join('\n');
-             
-             const prompt = `Act as a team coordinator. Based on the following data, create a summary for the upcoming week's schedule.
-             Organize the summary day by day (e.g., Monday, Tuesday...). For each event, list its name and type.
-             Start with a positive opening, like "Here's a look at our week ahead!". Keep it clear and easy to read.
-             
-             Event Data:
-             ${eventDataString}`;
-             
-             await fetchAIAssistance(prompt);
+        // AI Summary Logic
+        const generateWeeklySummary = async () => {
+            showAlert("Generating weekly event summary...", false);
+            const now = new Date();
+            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); 
+            const endOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 6)); 
+            startOfWeek.setHours(0, 0, 0, 0);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            const eventsInWeek = events.filter(event => {
+                const eventDate = new Date(event.startDate + "T00:00:00");
+                return eventDate >= startOfWeek && eventDate <= endOfWeek;
+            }).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+            if (eventsInWeek.length === 0) {
+                return showAlert("No events scheduled for the current week.");
+            }
+
+            const eventDataFormatted = eventsInWeek.map(e => 
+                `- Event: ${e.eventName} on ${e.startDate} (Type: ${e.sessionType}), POC: ${e.selectPoc || e.eventPoc || "N/A"}`
+            ).join("\n");
+
+            const prompt = `Act as a team coordinator. Based on the following data, create a summary for the upcoming week's schedule. Organize the summary day by day (e.g., Monday, Tuesday...). For each event, list its name and type. Start with a positive opening, like "Here's a look at our week ahead!". Keep it clear and easy to read. Event Data: ${eventDataFormatted}`;
+            await fetchAIAssistance(prompt);
         };
 
         const generateMonthlyProjectSummary = async () => {
             showAlert("Generating AI project summary... please wait.", false);
-            const relevantProjects = projects;
+            if (projects.length === 0) {
+                return showAlert("No project data available to summarize.");
+            }
+            const projectDataFormatted = projects.map(p => 
+                `- Title: ${p.title} (Status: ${projectColumns[p.status] || p.status}), Assigned to: ${p.assignee || "unassigned"}, Due: ${p.dueDate || "N/A"}.`
+            ).join("\n");
 
-            if (relevantProjects.length === 0) {
-                showAlert("No project data available to summarize.");
-                return;
+            const prompt = `Act as a project manager. Based on the following data, provide a concise but insightful monthly summary report for the Tech Innovation team. Structure the report with three sections: "Completed Projects", "In Progress", and "Up Next (To Do)". For each project, briefly mention the title and who it's assigned to. Start with a brief, encouraging opening sentence and end with a forward-looking statement. The tone should be professional but motivating. Project Data: ${projectDataFormatted}`;
+            await fetchAIAssistance(prompt);
+        };
+
+        const fetchAIAssistance = async (promptText) => {
+            const requestBody = {
+                contents: [{
+                    role: "user",
+                    parts: [{ text: promptText }]
+                }]
+            };
+            const apiKey = ""; // <--- IMPORTANT: Replace with your actual Gemini API Key here!
+                               // Or better yet, securely fetch this from an Azure Function or GitHub Secret.
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorResponse = await response.json();
+                    console.error("AI API Error Response:", errorResponse);
+                    throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorResponse)}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0) {
+                    showAlert(result.candidates[0].content.parts[0].text.replace(/\n/g, "<br>"), true);
+                } else {
+                    showAlert("AI summary could not be generated. The response was empty or malformed.");
+                }
+            } catch (error) {
+                console.error("AI Summary Error:", error);
+                showAlert(`Failed to generate AI summary. Please check the console for errors. Details: ${error.message}`);
+            }
+        };
+
+        const getEventModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-5xl modal-fade-in custom-scrollbar overflow-y-auto" style="max-height: 90vh;"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Event</h3> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> <div><label class="block text-sm text-gray-300">Event Name</label><input type="text" name="eventName" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Event POC</label><input type="text" name="eventPoc" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Session Type</label><select name="sessionType" class="mt-1 block w-full rounded-md" required>${Object.keys(sessionTypes).map(e=>`<option>${e}</option>`).join("")}</select></div><div><label class="block text-sm text-gray-300">Start Date</label><input type="date" name="startDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">End Date</label><input type="date" name="endDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Select POC</label><select name="selectPoc" class="mt-1 block w-full rounded-md">${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Location</label><input type="text" name="location" value="NYIH" class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Event Location (Room)</label><input type="text" name="eventLocation" placeholder="Enter room..." class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Classification</label><select name="classification" class="mt-1 block w-full rounded-md"><option>Unclassified</option><option>Confidential</option><option>Secret</option></select></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Attendees (comma-separated)</label><input type="text" name="attendees" class="mt-1 block w-full rounded-md"></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Demo Resources</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/50">${demoResourceOptions.map(e=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="demoResources" value="${e}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Event</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+        const getProjectModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl modal-fade-in"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Project</h3> <div><label class="block text-sm text-gray-300">Project Title</label><input type="text" name="title" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Description</label><textarea name="description" rows="3" class="mt-1 block w-full rounded-md"></textarea></div><div class="grid grid-cols-1 md:grid-cols-2 gap-6"> <div><label class="block text-sm text-gray-300">Assign To</label><select name="assignee" class="mt-1 block w-full rounded-md"><option value="">Unassigned</option>${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Due Date</label><input type="date" name="dueDate" class="mt-1 block w-full rounded-md"></div></div><div><label class="block text-sm text-gray-300">Tag Users for Notifications</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 gap-4 bg-gray-900/50">${Object.entries(pocEmails).map(([e,t])=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="taggedUsers" value="${t}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Project</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+
+
+        // --- UI Logic & Event Listeners ---
+        const setupEventListeners = () => {
+            calendarTab.onclick = () => switchView("calendar");
+            projectsTab.onclick = () => switchView("projects");
+            document.getElementById("prev-month-btn").onclick = () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); };
+            document.getElementById("next-month-btn").onclick = () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); };
+            
+            // Add Event/Project buttons in header (Ensure these exist in your HTML)
+            document.getElementById('add-event-btn').onclick = () => openModal('event');
+            document.getElementById('export-events-week-btn').onclick = () => exportToCSV('events','week');
+            document.getElementById('export-events-month-btn').onclick = () => exportToCSV('events','month');
+            document.getElementById('weekly-summary-btn').onclick = generateWeeklySummary;
+
+            document.getElementById('add-project-btn').onclick = () => openModal('project');
+            document.getElementById('export-projects-btn').onclick = () => exportToCSV('projects');
+            document.getElementById('monthly-summary-btn').onclick = generateMonthlyProjectSummary;
+
+
+            // Event delegation for opening modals from calendar/kanban cards
+            calendarGridBody.addEventListener("click", e => {
+                const eventChip = e.target.closest(".event-chip");
+                if (eventChip) openModal("event", eventChip.dataset.id);
+            });
+            projectsView.addEventListener("click", e => {
+                const kanbanCard = e.target.closest(".kanban-card");
+                if (kanbanCard) openModal("project", kanbanCard.dataset.id);
+            });
+            
+            // Close modals with Escape key
+            window.onkeydown = e => {
+                if ("Escape" === e.key) {
+                    document.getElementById("event-modal").classList.add("hidden");
+                    document.getElementById("project-modal").classList.add("hidden");
+                    document.getElementById("custom-alert").classList.add("hidden"); 
+                }
+            };
+        };
+
+
+        // --- Rendering Functions ---
+        const renderCalendar = () => {
+            if (!calendarGridBody) return;
+            calendarGridBody.innerHTML = '';
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            currentMonthYearEl.textContent = `${currentDate.toLocaleString("default", { month: "long" })} ${year}`;
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Add empty divs for leading blank days
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                calendarGridBody.innerHTML += '<div class="p-2 border-t border-r border-gray-700 opacity-50"></div>';
             }
 
-            const projectDataString = relevantProjects.map(p => 
-                `- Title: ${p.title} (Status: ${projectColumns[p.status] || p.status}), Assigned to: ${p.assignee || 'unassigned'}, Due: ${p.dueDate || 'N/A'}.`
-            ).join('\n');
+            // Add days of the month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const fullDate = new Date(year, month, day); 
+                const isToday = fullDate.toDateString() === new Date().toDateString();
+                const dayEvents = events.filter(e => {
+                    const eventStartDate = new Date(e.startDate + "T00:00:00"); 
+                    const eventEndDate = new Date(e.endDate + "T00:00:00");
+                    return fullDate >= eventStartDate && fullDate <= eventEndDate;
+                });
 
-            const prompt = `Act as a project manager. Based on the following data, provide a concise but insightful monthly summary report for the Tech Innovation team.
-            Structure the report with three sections: "Completed Projects", "In Progress", and "Up Next (To Do)". For each project, briefly mention the title and who it's assigned to.
-            Start with a brief, encouraging opening sentence and end with a forward-looking statement. The tone should be professional but motivating.
-            
-            Project Data:
-            ${projectDataString}`;
-            
-             await fetchAIAssistance(prompt);
+                // Corrected template literal syntax in dayHtml
+                let dayHtml = `<div class="calendar-day p-2 border-t border-r border-gray-700 relative flex flex-col gap-1 custom-scrollbar overflow-y-auto" data-date="${fullDate.toISOString().split("T")[0]}">
+                                <span class="font-semibold text-sm mb-1 ${isToday ? 'today-marker text-white rounded-full w-7 h-7 flex items-center justify-center' : ''}">${day}</span>`;
+                
+                dayEvents.forEach(event => {
+                    const typeColor = sessionTypes[event.sessionType] || "gray";
+                    // Corrected template literal syntax
+                    dayHtml += `<div class="event-chip rounded truncate cursor-pointer border-${colorMap[typeColor]} bg-${colorMap[typeColor]}/20 text-${colorMap[typeColor].replace("-500","-300")}" data-id="${event.id}">${event.eventName}</div>`;
+                });
+                dayHtml += `</div>`; // Corrected: This div closes the .calendar-day
+                calendarGridBody.innerHTML += dayHtml;
+            }
         };
-        
-        const fetchAIAssistance = async (prompt) => {
-             const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
-             const apiKey = ""; // API key will be provided by the environment
-             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-             try {
-                 const response = await fetch(apiUrl, {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify(payload)
-                 });
-                 if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-                 const result = await response.json();
-                 if (result.candidates && result.candidates.length > 0) {
-                    const summaryText = result.candidates[0].content.parts[0].text;
-                    showAlert(summaryText.replace(/\n/g, '<br>'), true);
-                 } else {
-                    showAlert("AI summary could not be generated. The response was empty.");
-                 }
-             } catch(error) {
-                 console.error("AI Summary Error:", error);
-                 showAlert(`Failed to generate AI summary. Please check the console for errors. Details: ${error.message}`);
-             }
-        }
 
 
-        // --- Modal HTML Generators ---
-        const getEventModalHTML = () => `
-            <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-5xl modal-fade-in custom-scrollbar overflow-y-auto" style="max-height: 90vh;">
-            <form class="p-8 space-y-6">
-                <input type="hidden" name="id">
-                <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Event</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div><label class="block text-sm text-gray-300">Event Name</label><input type="text" name="eventName" class="mt-1 block w-full rounded-md" required></div>
-                    <div><label class="block text-sm text-gray-300">Event POC</label><input type="text" name="eventPoc" class="mt-1 block w-full rounded-md"></div>
-                    <div><label class="block text-sm text-gray-300">Session Type</label><select name="sessionType" class="mt-1 block w-full rounded-md" required>${Object.keys(sessionTypes).map(t => `<option>${t}</option>`).join('')}</select></div>
-                    <div><label class="block text-sm text-gray-300">Start Date</label><input type="date" name="startDate" class="mt-1 block w-full rounded-md" required></div>
-                    <div><label class="block text-sm text-gray-300">End Date</label><input type="date" name="endDate" class="mt-1 block w-full rounded-md" required></div>
-                    <div><label class="block text-sm text-gray-300">Select POC</label><select name="selectPoc" class="mt-1 block w-full rounded-md">${Object.keys(pocEmails).map(p=>`<option>${p}</option>`).join('')}<option>Other</option></select></div>
-                    <div><label class="block text-sm text-gray-300">Location</label><input type="text" name="location" value="NYIH" class="mt-1 block w-full rounded-md"></div>
-                    <div><label class="block text-sm text-gray-300">Event Location (Room)</label><input type="text" name="eventLocation" placeholder="Enter room..." class="mt-1 block w-full rounded-md"></div>
-                    <div><label class="block text-sm text-gray-300">Classification</label><select name="classification" class="mt-1 block w-full rounded-md"><option>Unclassified</option><option>Confidential</option><option>Secret</option></select></div>
-                    <div class="md:col-span-3"><label class="block text-sm text-gray-300">Attendees (comma-separated)</label><input type="text" name="attendees" class="mt-1 block w-full rounded-md"></div>
-                    <div class="md:col-span-3"><label class="block text-sm text-gray-300">Demo Resources</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/50">${demoResourceOptions.map(o=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="demoResources" value="${o}" class="h-4 w-4 rounded mr-2">${o}</label>`).join('')}</div></div>
-                </div>
-                <div class="pt-6 flex justify-end space-x-4">
-                    <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Event</button>
-                    <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button>
-                </div>
-            </form></div>`;
+        const renderKanbanBoard = () => {
+            const kanbanBoardEl = document.querySelector(".kanban-board");
+            if (!kanbanBoardEl) return;
+            kanbanBoardEl.innerHTML = ""; 
 
-        const getProjectModalHTML = () => `
-             <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl modal-fade-in">
-             <form class="p-8 space-y-6">
-                <input type="hidden" name="id">
-                <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Project</h3>
-                <div><label class="block text-sm text-gray-300">Project Title</label><input type="text" name="title" class="mt-1 block w-full rounded-md" required></div>
-                <div><label class="block text-sm text-gray-300">Description</label><textarea name="description" rows="3" class="mt-1 block w-full rounded-md"></textarea></div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label class="block text-sm text-gray-300">Assign To</label><select name="assignee" class="mt-1 block w-full rounded-md"><option value="">Unassigned</option>${Object.keys(pocEmails).map(p=>`<option>${p}</option>`).join('')}<option>Other</option></select></div>
-                    <div><label class="block text-sm text-gray-300">Due Date</label><input type="date" name="dueDate" class="mt-1 block w-full rounded-md"></div>
-                </div>
-                <div><label class="block text-sm text-gray-300">Tag Users for Notifications</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 gap-4 bg-gray-900/50">${Object.entries(pocEmails).map(([name, email])=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="taggedUsers" value="${email}" class="h-4 w-4 rounded mr-2">${name}</label>`).join('')}</div></div>
-                <div class="pt-6 flex justify-end space-x-4">
-                    <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
-                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Project</button>
-                    <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button>
-                </div>
-            </form></div>`;
-        
-        // --- Event Listeners & Initial Load ---
+            for (const [colId, colName] of Object.entries(projectColumns)) {
+                const columnProjects = projects.filter(p => p.status === colId);
+                // Corrected template literal syntax
+                let columnHtml = `<div id="col-${colId}" class="kanban-column" data-col-id="${colId}">
+                                    <h3 class="text-lg font-bold mb-4 text-white">${colName} <span class="text-sm font-normal text-gray-400">${columnProjects.length}</span></h3>
+                                    <div class="kanban-cards custom-scrollbar pr-2" data-col-id="${colId}">`;
+                columnProjects.forEach(project => {
+                    // Corrected template literal syntax
+                    columnHtml += `<div class="kanban-card" draggable="true" data-id="${project.id}">
+                                    <h4 class="font-bold text-white">${project.title}</h4>
+                                    <p class="text-sm text-gray-400 mt-1">${project.description || ""}</p>
+                                    ${project.dueDate ? `<p class="text-xs text-blue-400 mt-3"><i class="fas fa-clock mr-1"></i>${project.dueDate}</p>` : ""}
+                                    ${project.assignee ? `<p class="text-xs text-purple-400 mt-1"><i class="fas fa-user mr-1"></i>${project.assignee}</p>` : ""}
+                                </div>`;
+                });
+                columnHtml += `</div></div>`;
+                kanbanBoardEl.innerHTML += columnHtml;
+            }
+        };
+
+        // Drag and Drop Logic
+        let draggedItemId = null;
+        document.addEventListener("dragstart", e => {
+            if (e.target.classList.contains("kanban-card")) {
+                draggedItemId = e.target.dataset.id;
+                e.target.classList.add("dragging");
+            }
+        });
+        document.addEventListener("dragend", e => {
+            if (e.target.classList.contains("kanban-card")) {
+                draggedItemId = null;
+                e.target.classList.remove("dragging");
+            }
+        });
+        document.addEventListener("dragover", e => {
+            e.preventDefault(); 
+            const column = e.target.closest(".kanban-column");
+            if (column) {
+                document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+                col.classList.add("drag-over");
+            }
+        });
+        document.addEventListener("dragleave", e => {
+            const column = e.target.closest(".kanban-column");
+            if (column) {
+                column.classList.remove("drag-over");
+            }
+        });
+        document.addEventListener("drop", async e => {
+            e.preventDefault();
+            document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+            const targetColumn = e.target.closest(".kanban-column");
+            if (targetColumn && draggedItemId) {
+                const success = await saveData("projects", { id: draggedItemId, status: targetColumn.dataset.colId });
+                if (success) {
+                    switchView("projects"); 
+                }
+            }
+        });
+
+        // CSV Export Logic
+        const exportToCSV = (itemType, period = null) => {
+            let dataToExport = itemType === 'events' ? events : projects;
+
+            if (dataToExport.length === 0) {
+                return showAlert(`No ${itemType} to export.`);
+            }
+
+            if (itemType === 'events' && period) {
+                const now = new Date();
+                let startDateFilter, endDateFilter;
+
+                if (period === 'month') {
+                    startDateFilter = new Date(now.getFullYear(), now.getMonth(), 1);
+                    endDateFilter = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                } else if (period === 'week') {
+                    startDateFilter = new Date(now.setDate(now.getDate() - now.getDay())); 
+                    endDateFilter = new Date(now.setDate(now.getDate() - now.getDay() + 6)); 
+                }
+                startDateFilter.setHours(0, 0, 0, 0);
+                endDateFilter.setHours(23, 59, 59, 999);
+
+                dataToExport = events.filter(event => {
+                    const eventDate = new Date(event.startDate + "T00:00:00"); 
+                    return eventDate >= startDateFilter && eventDate <= endDateFilter;
+                });
+            }
+
+            if (dataToExport.length === 0) {
+                return showAlert(`No ${itemType} to export for this period.`);
+            }
+
+            const headers = itemType === 'events' ? 
+                ["eventName", "startDate", "endDate", "eventPoc", "selectPoc", "location", "eventLocation", "classification", "sessionType", "attendees", "demoResources"] :
+                ["title", "description", "assignee", "dueDate", "status", "taggedUsers"];
+
+            const csvRows = [headers.join(',')]; 
+
+            for (const item of dataToExport) {
+                const values = headers.map(header => {
+                    let value = item[header] || ''; 
+                    if (Array.isArray(value)) {
+                        value = value.join('; '); 
+                    }
+                    return `"${value.toString().replace(/"/g, '""')}"`;
+                });
+                csvRows.push(values.join(','));
+            }
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            // Corrected template literal syntax
+            link.download = `${itemType}_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        };
+
+        // AI Summary Logic
+        const generateWeeklySummary = async () => {
+            showAlert("Generating weekly event summary...", false);
+            const now = new Date();
+            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); 
+            const endOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 6)); 
+            startOfWeek.setHours(0, 0, 0, 0);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            const eventsInWeek = events.filter(event => {
+                const eventDate = new Date(event.startDate + "T00:00:00");
+                return eventDate >= startOfWeek && eventDate <= endOfWeek;
+            }).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+            if (eventsInWeek.length === 0) {
+                return showAlert("No events scheduled for the current week.");
+            }
+
+            const eventDataFormatted = eventsInWeek.map(e => 
+                `- Event: ${e.eventName} on ${e.startDate} (Type: ${e.sessionType}), POC: ${e.selectPoc || e.eventPoc || "N/A"}`
+            ).join("\n");
+
+            const prompt = `Act as a team coordinator. Based on the following data, create a summary for the upcoming week's schedule. Organize the summary day by day (e.g., Monday, Tuesday...). For each event, list its name and type. Start with a positive opening, like "Here's a look at our week ahead!". Keep it clear and easy to read. Event Data: ${eventDataFormatted}`;
+            await fetchAIAssistance(prompt);
+        };
+
+        const generateMonthlyProjectSummary = async () => {
+            showAlert("Generating AI project summary... please wait.", false);
+            if (projects.length === 0) {
+                return showAlert("No project data available to summarize.");
+            }
+            const projectDataFormatted = projects.map(p => 
+                `- Title: ${p.title} (Status: ${projectColumns[p.status] || p.status}), Assigned to: ${p.assignee || "unassigned"}, Due: ${p.dueDate || "N/A"}.`
+            ).join("\n");
+
+            const prompt = `Act as a project manager. Based on the following data, provide a concise but insightful monthly summary report for the Tech Innovation team. Structure the report with three sections: "Completed Projects", "In Progress", and "Up Next (To Do)". For each project, briefly mention the title and who it's assigned to. Start with a brief, encouraging opening sentence and end with a forward-looking statement. The tone should be professional but motivating. Project Data: ${projectDataFormatted}`;
+            await fetchAIAssistance(prompt);
+        };
+
+        const fetchAIAssistance = async (promptText) => {
+            const requestBody = {
+                contents: [{
+                    role: "user",
+                    parts: [{ text: promptText }]
+                }]
+            };
+            const apiKey = ""; // <--- IMPORTANT: Replace with your actual Gemini API Key here!
+                               // Or better yet, securely fetch this from an Azure Function or GitHub Secret.
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorResponse = await response.json();
+                    console.error("AI API Error Response:", errorResponse);
+                    throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorResponse)}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0) {
+                    showAlert(result.candidates[0].content.parts[0].text.replace(/\n/g, "<br>"), true);
+                } else {
+                    showAlert("AI summary could not be generated. The response was empty or malformed.");
+                }
+            } catch (error) {
+                console.error("AI Summary Error:", error);
+                showAlert(`Failed to generate AI summary. Please check the console for errors. Details: ${error.message}`);
+            }
+        };
+
+        const getEventModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-5xl modal-fade-in custom-scrollbar overflow-y-auto" style="max-height: 90vh;"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Event</h3> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> <div><label class="block text-sm text-gray-300">Event Name</label><input type="text" name="eventName" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Event POC</label><input type="text" name="eventPoc" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Session Type</label><select name="sessionType" class="mt-1 block w-full rounded-md" required>${Object.keys(sessionTypes).map(e=>`<option>${e}</option>`).join("")}</select></div><div><label class="block text-sm text-gray-300">Start Date</label><input type="date" name="startDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">End Date</label><input type="date" name="endDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Select POC</label><select name="selectPoc" class="mt-1 block w-full rounded-md">${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Location</label><input type="text" name="location" value="NYIH" class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Event Location (Room)</label><input type="text" name="eventLocation" placeholder="Enter room..." class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Classification</label><select name="classification" class="mt-1 block w-full rounded-md"><option>Unclassified</option><option>Confidential</option><option>Secret</option></select></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Attendees (comma-separated)</label><input type="text" name="attendees" class="mt-1 block w-full rounded-md"></div><div class="md:col-span-3"><label class="block text-sm text-gray-300">Demo Resources</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-900/50">${demoResourceOptions.map(e=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="demoResources" value="${e}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Event</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+        const getProjectModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-2xl modal-fade-in"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Project</h3> <div><label class="block text-sm text-gray-300">Project Title</label><input type="text" name="title" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Description</label><textarea name="description" rows="3" class="mt-1 block w-full rounded-md"></textarea></div><div class="grid grid-cols-1 md:grid-cols-2 gap-6"> <div><label class="block text-sm text-gray-300">Assign To</label><select name="assignee" class="mt-1 block w-full rounded-md"><option value="">Unassigned</option>${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Due Date</label><input type="date" name="dueDate" class="mt-1 block w-full rounded-md"></div></div><div><label class="block text-sm text-gray-300">Tag Users for Notifications</label><div class="mt-2 p-4 border border-gray-700 rounded-md grid grid-cols-2 gap-4 bg-gray-900/50">${Object.entries(pocEmails).map(([e,t])=>`<label class="flex items-center text-sm text-gray-300"><input type="checkbox" name="taggedUsers" value="${t}" class="h-4 w-4 rounded mr-2">${e}</label>`).join("")}</div></div><div class="pt-6 flex justify-end space-x-4"> <button type="button" class="cancel-btn bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancel</button> <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-lg glow-button">Save Project</button> <button type="button" class="delete-btn bg-red-700 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg glow-button hidden">Delete</button> </div></form></div>`;
+
+
+        // --- UI Logic & Event Listeners ---
         const setupEventListeners = () => {
-            calendarTab.onclick = () => switchView('calendar');
-            projectsTab.onclick = () => switchView('projects');
-            document.getElementById('prev-month-btn').onclick = () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); };
-            document.getElementById('next-month-btn').onclick = () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); };
-            calendarGridBody.addEventListener('click', e => { if(e.target.closest('.event-chip')) openModal('event', e.target.closest('.event-chip').dataset.id); });
-            projectsView.addEventListener('click', e => { if(e.target.closest('.kanban-card')) openModal('project', e.target.closest('.kanban-card').dataset.id); });
-            window.onkeydown = (e) => { if (e.key === 'Escape') { document.getElementById('event-modal').classList.add('hidden'); document.getElementById('project-modal').classList.add('hidden'); }};
-        };
-        
-        const init = () => {
-            const legendContainer = document.getElementById('calendar-legend');
-            legendContainer.innerHTML = Object.entries(sessionTypes).map(([name, color]) => `<div class="flex items-center"><span class="w-3 h-3 rounded-full mr-2 bg-${colorMap[color]}"></span>${name}</div>`).join('');
-            switchView('calendar');
-            setupEventListeners();
-            setupAuth();
+            calendarTab.onclick = () => switchView("calendar");
+            projectsTab.onclick = () => switchView("projects");
+            document.getElementById("prev-month-btn").onclick = () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); };
+            document.getElementById("next-month-btn").onclick = () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); };
+            
+            // Add Event/Project buttons in header (Ensure these exist in your HTML)
+            document.getElementById('add-event-btn').onclick = () => openModal('event');
+            document.getElementById('export-events-week-btn').onclick = () => exportToCSV('events','week');
+            document.getElementById('export-events-month-btn').onclick = () => exportToCSV('events','month');
+            document.getElementById('weekly-summary-btn').onclick = generateWeeklySummary;
+
+            document.getElementById('add-project-btn').onclick = () => openModal('project');
+            document.getElementById('export-projects-btn').onclick = () => exportToCSV('projects');
+            document.getElementById('monthly-summary-btn').onclick = generateMonthlyProjectSummary;
+
+
+            // Event delegation for opening modals from calendar/kanban cards
+            calendarGridBody.addEventListener("click", e => {
+                const eventChip = e.target.closest(".event-chip");
+                if (eventChip) openModal("event", eventChip.dataset.id);
+            });
+            projectsView.addEventListener("click", e => {
+                const kanbanCard = e.target.closest(".kanban-card");
+                if (kanbanCard) openModal("project", kanbanCard.dataset.id);
+            });
+            
+            // Close modals with Escape key
+            window.onkeydown = e => {
+                if ("Escape" === e.key) {
+                    document.getElementById("event-modal").classList.add("hidden");
+                    document.getElementById("project-modal").classList.add("hidden");
+                    document.getElementById("custom-alert").classList.add("hidden"); 
+                }
+            };
         };
 
-        init();
-    </script>
-</body>
-</html>
+
+        // --- Rendering Functions ---
+        const renderCalendar = () => {
+            if (!calendarGridBody) return;
+            calendarGridBody.innerHTML = '';
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            currentMonthYearEl.textContent = `${currentDate.toLocaleString("default", { month: "long" })} ${year}`;
+
+            const firstDayOfMonth = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Add empty divs for leading blank days
+            for (let i = 0; i < firstDayOfMonth; i++) {
+                calendarGridBody.innerHTML += '<div class="p-2 border-t border-r border-gray-700 opacity-50"></div>';
+            }
+
+            // Add days of the month
+            for (let day = 1; day <= daysInMonth; day++) {
+                const fullDate = new Date(year, month, day); 
+                const isToday = fullDate.toDateString() === new Date().toDateString();
+                const dayEvents = events.filter(e => {
+                    const eventStartDate = new Date(e.startDate + "T00:00:00"); 
+                    const eventEndDate = new Date(e.endDate + "T00:00:00");
+                    return fullDate >= eventStartDate && fullDate <= eventEndDate;
+                });
+
+                // Corrected template literal syntax in dayHtml
+                let dayHtml = `<div class="calendar-day p-2 border-t border-r border-gray-700 relative flex flex-col gap-1 custom-scrollbar overflow-y-auto" data-date="${fullDate.toISOString().split("T")[0]}">
+                                <span class="font-semibold text-sm mb-1 ${isToday ? 'today-marker text-white rounded-full w-7 h-7 flex items-center justify-center' : ''}">${day}</span>`;
+                
+                dayEvents.forEach(event => {
+                    const typeColor = sessionTypes[event.sessionType] || "gray";
+                    // Corrected template literal syntax
+                    dayHtml += `<div class="event-chip rounded truncate cursor-pointer border-${colorMap[typeColor]} bg-${colorMap[typeColor]}/20 text-${colorMap[typeColor].replace("-500","-300")}" data-id="${event.id}">${event.eventName}</div>`;
+                });
+                dayHtml += `</div>`; // Corrected: This div closes the .calendar-day
+                calendarGridBody.innerHTML += dayHtml;
+            }
+        };
+
+
+        const renderKanbanBoard = () => {
+            const kanbanBoardEl = document.querySelector(".kanban-board");
+            if (!kanbanBoardEl) return;
+            kanbanBoardEl.innerHTML = ""; 
+
+            for (const [colId, colName] of Object.entries(projectColumns)) {
+                const columnProjects = projects.filter(p => p.status === colId);
+                // Corrected template literal syntax
+                let columnHtml = `<div id="col-${colId}" class="kanban-column" data-col-id="${colId}">
+                                    <h3 class="text-lg font-bold mb-4 text-white">${colName} <span class="text-sm font-normal text-gray-400">${columnProjects.length}</span></h3>
+                                    <div class="kanban-cards custom-scrollbar pr-2" data-col-id="${colId}">`;
+                columnProjects.forEach(project => {
+                    // Corrected template literal syntax
+                    columnHtml += `<div class="kanban-card" draggable="true" data-id="${project.id}">
+                                    <h4 class="font-bold text-white">${project.title}</h4>
+                                    <p class="text-sm text-gray-400 mt-1">${project.description || ""}</p>
+                                    ${project.dueDate ? `<p class="text-xs text-blue-400 mt-3"><i class="fas fa-clock mr-1"></i>${project.dueDate}</p>` : ""}
+                                    ${project.assignee ? `<p class="text-xs text-purple-400 mt-1"><i class="fas fa-user mr-1"></i>${project.assignee}</p>` : ""}
+                                </div>`;
+                });
+                columnHtml += `</div></div>`;
+                kanbanBoardEl.innerHTML += columnHtml;
+            }
+        };
+
+        // Drag and Drop Logic
+        let draggedItemId = null;
+        document.addEventListener("dragstart", e => {
+            if (e.target.classList.contains("kanban-card")) {
+                draggedItemId = e.target.dataset.id;
+                e.target.classList.add("dragging");
+            }
+        });
+        document.addEventListener("dragend", e => {
+            if (e.target.classList.contains("kanban-card")) {
+                draggedItemId = null;
+                e.target.classList.remove("dragging");
+            }
+        });
+        document.addEventListener("dragover", e => {
+            e.preventDefault(); 
+            const column = e.target.closest(".kanban-column");
+            if (column) {
+                document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+                col.classList.add("drag-over");
+            }
+        });
+        document.addEventListener("dragleave", e => {
+            const column = e.target.closest(".kanban-column");
+            if (column) {
+                column.classList.remove("drag-over");
+            }
+        });
+        document.addEventListener("drop", async e => {
+            e.preventDefault();
+            document.querySelectorAll(".kanban-column").forEach(col => col.classList.remove("drag-over"));
+            const targetColumn = e.target.closest(".kanban-column");
+            if (targetColumn && draggedItemId) {
+                const success = await saveData("projects", { id: draggedItemId, status: targetColumn.dataset.colId });
+                if (success) {
+                    switchView("projects"); 
+                }
+            }
+        });
+
+        // CSV Export Logic
+        const exportToCSV = (itemType, period = null) => {
+            let dataToExport = itemType === 'events' ? events : projects;
+
+            if (dataToExport.length === 0) {
+                return showAlert(`No ${itemType} to export.`);
+            }
+
+            if (itemType === 'events' && period) {
+                const now = new Date();
+                let startDateFilter, endDateFilter;
+
+                if (period === 'month') {
+                    startDateFilter = new Date(now.getFullYear(), now.getMonth(), 1);
+                    endDateFilter = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                } else if (period === 'week') {
+                    startDateFilter = new Date(now.setDate(now.getDate() - now.getDay())); 
+                    endDateFilter = new Date(now.setDate(now.getDate() - now.getDay() + 6)); 
+                }
+                startDateFilter.setHours(0, 0, 0, 0);
+                endDateFilter.setHours(23, 59, 59, 999);
+
+                dataToExport = events.filter(event => {
+                    const eventDate = new Date(event.startDate + "T00:00:00"); 
+                    return eventDate >= startDateFilter && eventDate <= endDateFilter;
+                });
+            }
+
+            if (dataToExport.length === 0) {
+                return showAlert(`No ${itemType} to export for this period.`);
+            }
+
+            const headers = itemType === 'events' ? 
+                ["eventName", "startDate", "endDate", "eventPoc", "selectPoc", "location", "eventLocation", "classification", "sessionType", "attendees", "demoResources"] :
+                ["title", "description", "assignee", "dueDate", "status", "taggedUsers"];
+
+            const csvRows = [headers.join(',')]; 
+
+            for (const item of dataToExport) {
+                const values = headers.map(header => {
+                    let value = item[header] || ''; 
+                    if (Array.isArray(value)) {
+                        value = value.join('; '); 
+                    }
+                    return `"${value.toString().replace(/"/g, '""')}"`;
+                });
+                csvRows.push(values.join(','));
+            }
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            // Corrected template literal syntax
+            link.download = `${itemType}_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        };
+
+        // AI Summary Logic
+        const generateWeeklySummary = async () => {
+            showAlert("Generating weekly event summary...", false);
+            const now = new Date();
+            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); 
+            const endOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 6)); 
+            startOfWeek.setHours(0, 0, 0, 0);
+            endOfWeek.setHours(23, 59, 59, 999);
+
+            const eventsInWeek = events.filter(event => {
+                const eventDate = new Date(event.startDate + "T00:00:00");
+                return eventDate >= startOfWeek && eventDate <= endOfWeek;
+            }).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+            if (eventsInWeek.length === 0) {
+                return showAlert("No events scheduled for the current week.");
+            }
+
+            const eventDataFormatted = eventsInWeek.map(e => 
+                `- Event: ${e.eventName} on ${e.startDate} (Type: ${e.sessionType}), POC: ${e.selectPoc || e.eventPoc || "N/A"}`
+            ).join("\n");
+
+            const prompt = `Act as a team coordinator. Based on the following data, create a summary for the upcoming week's schedule. Organize the summary day by day (e.g., Monday, Tuesday...). For each event, list its name and type. Start with a positive opening, like "Here's a look at our week ahead!". Keep it clear and easy to read. Event Data: ${eventDataFormatted}`;
+            await fetchAIAssistance(prompt);
+        };
+
+        const generateMonthlyProjectSummary = async () => {
+            showAlert("Generating AI project summary... please wait.", false);
+            if (projects.length === 0) {
+                return showAlert("No project data available to summarize.");
+            }
+            const projectDataFormatted = projects.map(p => 
+                `- Title: ${p.title} (Status: ${projectColumns[p.status] || p.status}), Assigned to: ${p.assignee || "unassigned"}, Due: ${p.dueDate || "N/A"}.`
+            ).join("\n");
+
+            const prompt = `Act as a project manager. Based on the following data, provide a concise but insightful monthly summary report for the Tech Innovation team. Structure the report with three sections: "Completed Projects", "In Progress", and "Up Next (To Do)". For each project, briefly mention the title and who it's assigned to. Start with a brief, encouraging opening sentence and end with a forward-looking statement. The tone should be professional but motivating. Project Data: ${projectDataFormatted}`;
+            await fetchAIAssistance(prompt);
+        };
+
+        const fetchAIAssistance = async (promptText) => {
+            const requestBody = {
+                contents: [{
+                    role: "user",
+                    parts: [{ text: promptText }]
+                }]
+            };
+            const apiKey = ""; // <--- IMPORTANT: Replace with your actual Gemini API Key here!
+                               // Or better yet, securely fetch this from an Azure Function or GitHub Secret.
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    const errorResponse = await response.json();
+                    console.error("AI API Error Response:", errorResponse);
+                    throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorResponse)}`);
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0) {
+                    showAlert(result.candidates[0].content.parts[0].text.replace(/\n/g, "<br>"), true);
+                } else {
+                    showAlert("AI summary could not be generated. The response was empty or malformed.");
+                }
+            } catch (error) {
+                console.error("AI Summary Error:", error);
+                showAlert(`Failed to generate AI summary. Please check the console for errors. Details: ${error.message}`);
+            }
+        };
+
+        const getEventModalHTML = () => `<div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl w-full max-w-5xl modal-fade-in custom-scrollbar overflow-y-auto" style="max-height: 90vh;"> <form class="p-8 space-y-6"> <input type="hidden" name="id"> <h3 class="modal-title text-2xl font-bold mb-6 text-white">Create New Event</h3> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> <div><label class="block text-sm text-gray-300">Event Name</label><input type="text" name="eventName" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Event POC</label><input type="text" name="eventPoc" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Session Type</label><select name="sessionType" class="mt-1 block w-full rounded-md" required>${Object.keys(sessionTypes).map(e=>`<option>${e}</option>`).join("")}</select></div><div><label class="block text-sm text-gray-300">Start Date</label><input type="date" name="startDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">End Date</label><input type="date" name="endDate" class="mt-1 block w-full rounded-md" required></div><div><label class="block text-sm text-gray-300">Select POC</label><select name="selectPoc" class="mt-1 block w-full rounded-md">${Object.keys(pocEmails).map(e=>`<option>${e}</option>`).join("")}<option>Other</option></select></div><div><label class="block text-sm text-gray-300">Location</label><input type="text" name="location" value="NYIH" class="mt-1 block w-full rounded-md"></div><div><label class="block text-sm text-gray-300">Event Location (Room)</label><input type="text" name="eventLocation" placeholder="Enter room..." class="mt-1 block w-full rounded-md"></div><div><label class
