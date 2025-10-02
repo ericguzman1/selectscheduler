@@ -1,19 +1,12 @@
 {
+  "installCommand": "npm install --prefix client",
   "builds": [
     {
-      "src": "client/package.json",
+      "src": "client/**",
       "use": "@vercel/static-build",
-      "config": { "installCommand": "npm install" }
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/graphql",
-      "dest": "http://localhost:7071/api/graphql" // This is a placeholder and should be ignored since you are using Firebase
-    },
-    {
-      "src": "/.*",
-      "dest": "client/build/index.html"
+      "config": {
+        "outputDirectory": "build"
+      }
     }
   ]
 }
