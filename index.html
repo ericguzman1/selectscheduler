@@ -6,26 +6,33 @@
     <title>Accenture Project Hub</title>
     <!-- Tailwind CSS CDN for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: sans-serif; background-color: #f7f7f7; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; color: #1a202c; }
         /* Custom colors matching your theme */
         .bg-\[\#424A9F\] { background-color: #424A9F; }
         .text-\[\#424A9F\] { color: #424A9F; }
         .hover\:bg-\[\#343D84\]:hover { background-color: #343D84; }
         .bg-\[\#A3E635\] { background-color: #A3E635; }
         .hover\:bg-\[\#8CD02F\]:hover { background-color: #8CD02F; }
-        .kanban-column { min-height: 250px; max-height: 600px; overflow-y: auto; }
-        .border-red-600 { border-left-color: #dc2626; }
-        .border-yellow-500 { border-left-color: #f59e0b; }
-        .space-y-4 > * + * { margin-top: 1rem; }
+        .border-\[\#424A9F\] { border-color: #424A9F; }
+        .border-purple-500 { border-color: #9f7aea; }
+        .border-red-600 { border-color: #e53e3e; }
+        .border-yellow-500 { border-color: #f59e0b; }
+        /* Custom styles for Kanban board and other elements */
+        .kanban-column { min-height: 400px; max-height: 70vh; overflow-y: auto; }
+        .kanban-card { cursor: grab; }
+        .kanban-card:active { cursor: grabbing; opacity: 0.8; transform: scale(1.05); }
+        .dragging { opacity: 0.5; }
+        .drag-over { border: 2px dashed #a3e635; }
     </style>
 </head>
-<body>
+<body class="bg-gray-100">
 
-    <div id="app-container" class="min-h-screen p-4 flex flex-col items-center font-sans">
+    <div id="app-container" class="min-h-screen p-4 flex flex-col items-center">
         <!-- Header and Navigation -->
-        <div class="w-full max-w-5xl bg-white p-6 rounded-2xl shadow-xl mb-6">
+        <div class="w-full max-w-6xl bg-white p-6 rounded-2xl shadow-xl mb-6">
             <h1 class="text-4xl font-extrabold text-center text-[#424A9F] mb-2">
                 Accenture Project Hub
             </h1>
@@ -33,76 +40,127 @@
                 Welcome to your team's central command center.
             </p>
             <div class="flex justify-center mb-4 space-x-2">
-                <button id="nav-schedule" data-page="schedule" class="nav-button px-4 py-2 rounded-lg font-semibold bg-[#A3E635] text-gray-900 shadow-lg">Meetings & Events</button>
-                <button id="nav-kanban" data-page="kanban" class="nav-button px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">Task Board</button>
-                <button id="nav-issues" data-page="issues" class="nav-button px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">Tech Issues</button>
+                <button data-page="schedule" class="nav-button px-4 py-2 rounded-lg font-semibold bg-[#A3E635] text-gray-900 shadow-lg">Meetings & Events</button>
+                <button data-page="kanban" class="nav-button px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">Task Board</button>
+                <button data-page="issues" class="nav-button px-4 py-2 rounded-lg font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">Tech Issues</button>
             </div>
         </div>
 
         <!-- Message Area -->
-        <div id="message-area" class="w-full max-w-5xl hidden bg-blue-100 border-l-4 border-[#A3E635] text-blue-700 p-4 mb-4 rounded-lg shadow-md" role="alert">
+        <div id="message-area" class="w-full max-w-6xl hidden bg-blue-100 border-l-4 border-[#A3E635] text-blue-700 p-4 mb-4 rounded-lg shadow-md" role="alert">
             <p id="message-text"></p>
         </div>
 
         <!-- Dynamic Content Area -->
-        <div id="content-area" class="w-full max-w-5xl flex-grow">
+        <div id="content-area" class="w-full max-w-6xl flex-grow">
             <!-- Content will be rendered here by JavaScript -->
         </div>
     </div>
+    
+    <!-- Modals will be injected here -->
+    <div id="modal-container"></div>
 
     <!-- Application Logic -->
     <script type="module">
-        // FIX: Import ONLY the module versions of Firebase SDK (v9 syntax)
+        // --- FIREBASE SDK IMPORTS ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
         import { getFirestore, doc, addDoc, collection, onSnapshot, query, where, getDocs, writeBatch, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
 
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "firebase/app";
-        // TODO: Add SDKs for Firebase products that you want to use
-        // https://firebase.google.com/docs/web/setup#available-libraries
-
-        // Your web app's Firebase configuration
+        // --- CONFIGURATION (IMPORTANT!) ---
         const firebaseConfig = {
-        apiKey: "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo",
-        authDomain: "schedule-fef69.firebaseapp.com",
-        projectId: "schedule-fef69",
-        storageBucket: "schedule-fef69.firebasestorage.app",
-        messagingSenderId: "565438351947",
-        appId: "1:565438351947:web:b787c417351d16a19cdbce"
+            apiKey: "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo", // <-- REPLACE with your Firebase API Key
+            authDomain: "schedule-fef69.firebaseapp.com",
+            projectId: "schedule-fef69",
+            storageBucket: "schedule-fef69.appspot.com",
+            messagingSenderId: "565438351947",
+            appId: "1:565438351947:web:b787c417351d16a19cdbce"
         };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+        const GEMINI_API_KEY = "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo"; // <-- REPLACE with your Google AI Studio API Key
 
-        const GEMINI_API_KEY = "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo"; // Replace with your Google AI Studio API Key
+        // --- GLOBAL STATE & INITIALIZATION ---
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
 
-        // --- INITIALIZE FIREBASE ---
-        // FIX: Added check to prevent initializeApp error if config is placeholder/invalid
-        let app, db, auth;
-        if (FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey !== "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo") {
-             app = initializeApp(FIREBASE_CONFIG);
-             db = getFirestore(app);
-             auth = getAuth(app);
-        }
-        
         let userId = null;
+        let currentPage = 'schedule';
+        
         let currentEvents = [];
         let currentTasks = [];
         let currentIssues = [];
-        let currentPage = 'schedule';
+        let unsubscribeEvents, unsubscribeTasks, unsubscribeIssues;
 
-        // --- UI UTILITIES ---
-
-        function showMessage(msg) {
+        // --- UTILITY FUNCTIONS ---
+        
+        function showMessage(msg, isError = false) {
             const msgArea = document.getElementById('message-area');
             const msgText = document.getElementById('message-text');
             msgText.textContent = msg;
-            msgArea.classList.remove('hidden');
+            msgArea.classList.remove('hidden', 'bg-blue-100', 'border-[#A3E635]', 'text-blue-700', 'bg-red-100', 'border-red-500', 'text-red-700');
+            if (isError) {
+                msgArea.classList.add('bg-red-100', 'border-red-500', 'text-red-700');
+            } else {
+                msgArea.classList.add('bg-blue-100', 'border-[#A3E635]', 'text-blue-700');
+            }
             setTimeout(() => {
                 msgArea.classList.add('hidden');
             }, 5000);
         }
+
+        // Helper for icons
+        function getIcon(name, classes = 'w-4 h-4 inline-block mr-2') {
+            const iconMap = {
+                calendar: 'fa-calendar-alt',
+                zap: 'fa-bolt',
+                trash: 'fa-trash-alt',
+                book: 'fa-book-open',
+                export: 'fa-external-link-alt',
+                refresh: 'fa-sync-alt',
+                xcircle: 'fa-times-circle',
+                search: 'fa-search',
+                chevronLeft: 'fa-chevron-left',
+                chevronRight: 'fa-chevron-right',
+                plus: 'fa-plus',
+            };
+            return `<i class="fas ${iconMap[name] || ''} ${classes}"></i>`;
+        }
+
+        async function fetchGemini(prompt, isJson = false) {
+            if (!GEMINI_API_KEY || GEMINI_API_KEY === "YOUR_GEMINI_API_KEY") {
+                showMessage("AI Error: Gemini API Key is missing. Please update the script.", true);
+                return isJson ? {} : "AI Key Missing.";
+            }
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+            };
+            if(isJson) {
+                payload.generationConfig = { responseMimeType: "application/json" };
+            }
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                
+                if (!response.ok || !result.candidates) {
+                    throw new Error(result.error?.message || `HTTP ${response.status} failed.`);
+                }
+                const generatedText = result.candidates[0]?.content?.parts[0]?.text;
+                return isJson ? JSON.parse(generatedText || '{}') : generatedText;
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                showMessage(`AI Error: ${error.message}`, true);
+                return isJson ? {} : `AI Error: ${error.message}`;
+            }
+        }
+
+        // --- NAVIGATION & PAGE RENDERING ---
 
         function handleNavigate(pageName) {
             currentPage = pageName;
@@ -117,360 +175,452 @@ const app = initializeApp(firebaseConfig);
             renderPage();
         }
 
-        // Helper for icons (since we can't use React components)
-        function getIcon(name, classes = 'w-4 h-4 inline mr-2') {
-            const icons = {
-                calendar: `<i class="fas fa-calendar-alt ${classes}"></i>`,
-                zap: `<i class="fas fa-bolt ${classes}"></i>`,
-                trash: `<i class="fas fa-trash-alt ${classes}"></i>`,
-                book: `<i class="fas fa-book-open ${classes}"></i>`,
-                export: `<i class="fas fa-file-export ${classes}"></i>`,
-                exclamation: `<i class="fas fa-exclamation-circle ${classes}"></i>`,
-            };
-            return icons[name] || '';
-        }
-
-
-        // --- GEMINI AI UTILITY ---
-        async function fetchGemini(prompt, isJson = false) {
-            if (!GEMINI_API_KEY || GEMINI_API_KEY === "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo") {
-                showMessage("AI Error: Gemini API Key is missing or invalid. Please update the script.");
-                return isJson ? {} : "AI Key Missing.";
-            }
-
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: isJson ? {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            eventName: { type: "STRING" },
-                            startDate: { type: "STRING" },
-                            endDate: { type: "STRING" },
-                            eventPOC: { type: "STRING" },
-                            selectPOC: { type: "STRING" },
-                            location: { type: "STRING" },
-                            eventLocation: { type: "STRING" },
-                            classification: { type: "STRING" },
-                            sessionType: { type: "STRING" },
-                            attendees: { type: "STRING" },
-                            demo: { type: "STRING" },
-                            selectResources: { type: "STRING" },
-                        },
-                    },
-                } : {}
-            };
-
-            try {
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${GEMINI_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const result = await response.json();
-                
-                if (!response.ok || result.error) {
-                    throw new Error(result.error?.message || `HTTP ${response.status} failed.`);
-                }
-
-                const generatedText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                
-                return isJson ? JSON.parse(generatedText || '{}') : generatedText;
-            } catch (error) {
-                console.error("Gemini API Error:", error);
-                return isJson ? {} : `AI Error: ${error.message}`;
+        function renderPage() {
+            const contentArea = document.getElementById('content-area');
+            if (!contentArea) return;
+            
+            switch (currentPage) {
+                case 'schedule':
+                    contentArea.innerHTML = renderSchedulePage();
+                    attachScheduleListeners();
+                    break;
+                case 'kanban':
+                    contentArea.innerHTML = renderKanbanPage();
+                    attachKanbanListeners();
+                    break;
+                case 'issues':
+                    contentArea.innerHTML = renderIssuesPage();
+                    attachIssuesListeners();
+                    break;
+                default:
+                    contentArea.innerHTML = `<p>Page not found.</p>`;
             }
         }
-        
-        // --- DATA LISTENERS ---
+
+        // --- DATA LISTENERS (FIRESTORE) ---
 
         function setupDataListeners() {
             if (!userId) return;
 
-            // Events Listener
-            const eventsCollectionRef = collection(db, `users/${userId}/events`);
-            onSnapshot(eventsCollectionRef, (snapshot) => {
-                currentEvents = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-                renderPage();
+            // Clean up old listeners before creating new ones
+            if (unsubscribeEvents) unsubscribeEvents();
+            if (unsubscribeTasks) unsubscribeTasks();
+            if (unsubscribeIssues) unsubscribeIssues();
+
+            const eventsRef = collection(db, `users/${userId}/events`);
+            unsubscribeEvents = onSnapshot(eventsRef, (snapshot) => {
+                currentEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                                    .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+                if (currentPage === 'schedule') renderPage();
             });
 
-            // Tasks Listener
-            const tasksCollectionRef = collection(db, `users/${userId}/tasks`);
-            onSnapshot(tasksCollectionRef, (snapshot) => {
-                currentTasks = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                }));
-                renderPage();
+            const tasksRef = collection(db, `users/${userId}/tasks`);
+            unsubscribeTasks = onSnapshot(tasksRef, (snapshot) => {
+                currentTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (currentPage === 'kanban') renderPage();
             });
 
-            // Issues Listener
-            const issuesCollectionRef = collection(db, `users/${userId}/issues`);
-            onSnapshot(issuesCollectionRef, (snapshot) => {
-                currentIssues = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data(),
-                })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                renderPage();
+            const issuesRef = collection(db, `users/${userId}/issues`);
+            unsubscribeIssues = onSnapshot(issuesRef, (snapshot) => {
+                currentIssues = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                if (currentPage === 'issues') renderPage();
             });
         }
         
-        // --- EVENT HANDLERS (Simplified CRUD handlers for Firestore) ---
+        // --- SCHEDULE PAGE ---
+
+        function renderSchedulePage() {
+            const resourceOptions = ["Surface Hubs", "Proto", "Spot", "Hypervsn", "GenAI", "Vestaboard", "Loaner Laptop", "Clicker", "Teams Call", "Vu AI", "Other"];
+            const resourceCheckboxes = resourceOptions.map(r => `
+                <label class="flex items-center space-x-2 text-sm text-gray-700">
+                    <input type="checkbox" name="demoResources" value="${r}" class="text-[#424A9F] focus:ring-[#A3E635] rounded">
+                    <span>${r}</span>
+                </label>`).join('');
+
+            return `
+                <div class="bg-white p-6 rounded-2xl shadow-xl grid md:grid-cols-2 gap-8">
+                    <!-- Left Side: Form & AI -->
+                    <div class="space-y-4">
+                        <h2 class="text-2xl font-bold text-[#424A9F]">Add Event & AI Extraction</h2>
+                        
+                        <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
+                            <label class="block text-sm font-medium mb-1 text-gray-700">Paste Report Text for AI Extraction:</label>
+                            <textarea id="pdf-text-input" class="w-full h-32 p-2 rounded-lg border-2 border-gray-300 bg-white text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-[#A3E635]" placeholder="Paste your PDF report text here..."></textarea>
+                            <button id="analyze-pdf-btn" class="mt-2 w-full bg-[#A3E635] text-gray-900 font-bold py-2 px-4 rounded-lg hover:bg-[#8CD02F] transition-colors duration-300 flex items-center justify-center">
+                                ${getIcon('zap')} <span id="analyze-btn-text">Extract Data with AI</span>
+                            </button>
+                        </div>
+
+                        <form id="event-form" class="space-y-4 p-4 border border-gray-200 rounded-xl">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input name="eventName" type="text" placeholder="Event Name*" required class="w-full p-2 rounded-lg border-2 border-gray-300">
+                                <input name="eventPoc" type="text" placeholder="Event POC*" required class="w-full p-2 rounded-lg border-2 border-gray-300">
+                                <div><label class="text-xs text-gray-500">Start Date*</label><input name="startDate" type="date" required class="w-full p-2 rounded-lg border-2 border-gray-300"></div>
+                                <div><label class="text-xs text-gray-500">End Date*</label><input name="endDate" type="date" required class="w-full p-2 rounded-lg border-2 border-gray-300"></div>
+                                <input name="location" type="text" placeholder="Location (e.g., NYIH)" value="NYIH" class="w-full p-2 rounded-lg border-2 border-gray-300">
+                                <input name="eventLocation" type="text" placeholder="Room/Event Location" class="w-full p-2 rounded-lg border-2 border-gray-300">
+                            </div>
+                            <input name="attendees" type="text" placeholder="Attendees (comma-separated)" class="w-full p-2 rounded-lg border-2 border-gray-300">
+                            <details class="bg-gray-100 p-3 rounded-lg">
+                                <summary class="font-medium text-sm text-gray-700 cursor-pointer">Demo Resources</summary>
+                                <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
+                                    ${resourceCheckboxes}
+                                </div>
+                            </details>
+                            <button type="submit" class="w-full bg-[#424A9F] text-white font-bold py-3 rounded-lg hover:bg-[#343D84] transition-colors duration-300">
+                                ${getIcon('calendar')} Add Event
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Right Side: Events List -->
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold text-[#424A9F]">Upcoming Events (${currentEvents.length})</h2>
+                            <button id="generate-summary-btn" class="bg-[#A3E635] text-gray-900 font-bold py-2 px-3 rounded-lg hover:bg-[#8CD02F] text-sm flex items-center justify-center">
+                                ${getIcon('zap', 'w-4 h-4 mr-1')} <span id="summary-btn-text">AI Summary</span>
+                            </button>
+                        </div>
+                        <div id="summary-output" class="hidden bg-gray-100 p-4 rounded-lg shadow-inner whitespace-pre-wrap font-mono text-sm"></div>
+                        <div id="event-list" class="space-y-3 max-h-[60vh] overflow-y-auto p-2 border rounded-xl bg-gray-50">
+                            ${currentEvents.length > 0 ? currentEvents.map(event => `
+                                <div class="bg-white p-4 rounded-xl shadow-md flex justify-between items-start border-l-4 border-[#424A9F]">
+                                    <div>
+                                        <h3 class="text-lg font-semibold">${event.eventName}</h3>
+                                        <p class="text-sm text-gray-600"><strong>Date:</strong> ${event.startDate} to ${event.endDate}</p>
+                                        <p class="text-sm text-gray-600"><strong>POC:</strong> ${event.eventPoc}</p>
+                                        ${event.demoResources && event.demoResources.length > 0 ? `<p class="text-xs text-gray-500 mt-1"><strong>Resources:</strong> ${event.demoResources.join(', ')}</p>` : ''}
+                                    </div>
+                                    <div class="flex flex-col gap-2">
+                                        <button data-event-id="${event.id}" class="export-btn bg-gray-200 text-gray-700 px-3 py-1 rounded-lg text-xs font-bold hover:bg-gray-300 flex items-center">${getIcon('export', 'w-3 h-3 mr-1')} Export</button>
+                                        <button data-id="${event.id}" class="delete-event-btn bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-600 flex items-center">${getIcon('trash', 'w-3 h-3 mr-1')} Delete</button>
+                                    </div>
+                                </div>
+                            `).join('') : '<p class="text-center text-gray-500 p-8">No upcoming events.</p>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachScheduleListeners() {
+            document.getElementById('event-form').addEventListener('submit', handleEventSubmit);
+            document.getElementById('analyze-pdf-btn').addEventListener('click', handleAnalyzePDF);
+            document.getElementById('generate-summary-btn').addEventListener('click', handleGenerateEventSummary);
+            document.querySelectorAll('.delete-event-btn').forEach(btn => btn.addEventListener('click', (e) => handleDelete('events', e.currentTarget.dataset.id)));
+            document.querySelectorAll('.export-btn').forEach(btn => btn.addEventListener('click', (e) => handleExtractForServiceNow(e.currentTarget.dataset.eventId)));
+        }
+        
+        // --- KANBAN PAGE ---
+
+        function renderKanbanPage() {
+             return `
+                <div class="bg-white p-6 rounded-2xl shadow-xl">
+                    <h2 class="text-2xl font-bold text-center text-[#424A9F] mb-4">Project Task Board</h2>
+                    
+                    <form id="add-task-form" class="flex gap-2 mb-6 max-w-lg mx-auto">
+                        <input type="text" name="newTaskText" placeholder="Add a new task..." required class="flex-grow p-2 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#A3E635]">
+                        <button type="submit" class="bg-[#424A9F] text-white font-bold py-2 px-4 rounded-lg hover:bg-[#343D84]">${getIcon('plus', 'w-4 h-4 mr-1')} Add</button>
+                    </form>
+                    
+                    <div class="grid md:grid-cols-3 gap-6">
+                        ${renderKanbanColumn('todo', 'To Do')}
+                        ${renderKanbanColumn('doing', 'In Progress')}
+                        ${renderKanbanColumn('complete', 'Done')}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function renderKanbanColumn(status, title) {
+            const tasksInColumn = currentTasks.filter(t => t.status === status);
+            return `
+                <div id="kanban-col-${status}" data-status="${status}" class="kanban-column bg-gray-100 p-4 rounded-xl shadow-inner flex flex-col w-full">
+                    <h3 class="text-xl font-bold mb-4 text-center text-[#424A9F]">${title} (${tasksInColumn.length})</h3>
+                    <div class="flex-grow space-y-3">
+                        ${tasksInColumn.map(task => `
+                            <div id="task-${task.id}" class="kanban-card bg-white p-3 rounded-xl shadow-md border-l-4 border-purple-500 flex justify-between items-center" draggable="true" data-task-id="${task.id}">
+                                <p class="text-gray-900">${task.title}</p>
+                                <button data-id="${task.id}" class="delete-task-btn text-gray-400 hover:text-red-500 transition-colors p-1">${getIcon('trash', 'w-4 h-4 m-0')}</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function attachKanbanListeners() {
+            document.getElementById('add-task-form').addEventListener('submit', handleAddTask);
+            document.querySelectorAll('.delete-task-btn').forEach(btn => btn.addEventListener('click', e => {
+                e.stopPropagation();
+                handleDelete('tasks', e.currentTarget.dataset.id);
+            }));
+
+            // Drag and Drop Logic
+            const cards = document.querySelectorAll('.kanban-card');
+            const columns = document.querySelectorAll('.kanban-column');
+            
+            cards.forEach(card => {
+                card.addEventListener('dragstart', () => {
+                    card.classList.add('dragging');
+                });
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                });
+            });
+
+            columns.forEach(column => {
+                column.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    const draggingCard = document.querySelector('.dragging');
+                    if (draggingCard) {
+                        column.classList.add('drag-over');
+                    }
+                });
+                column.addEventListener('dragleave', () => {
+                    column.classList.remove('drag-over');
+                });
+                column.addEventListener('drop', async e => {
+                    e.preventDefault();
+                    column.classList.remove('drag-over');
+                    const draggingCard = document.querySelector('.dragging');
+                    if (draggingCard) {
+                        const taskId = draggingCard.dataset.taskId;
+                        const newStatus = column.dataset.status;
+                        await updateDoc(doc(db, `users/${userId}/tasks`, taskId), { status: newStatus });
+                        showMessage('Task moved!');
+                    }
+                });
+            });
+        }
+        
+        // --- ISSUES PAGE ---
+        function renderIssuesPage() {
+            return `
+            <div class="bg-white p-6 rounded-2xl shadow-xl grid md:grid-cols-2 gap-8">
+                <div>
+                    <h2 class="text-2xl font-bold text-red-600 mb-4 flex items-center">${getIcon('xcircle', 'w-6 h-6 mr-2')} Log New Tech Issue</h2>
+                    <form id="add-issue-form" class="space-y-4">
+                        <input name="issueTitle" placeholder="Issue Title*" required class="w-full p-2 rounded-lg border-2 border-gray-300">
+                        <textarea name="issueDescription" placeholder="Description*" required rows="3" class="w-full p-2 rounded-lg border-2 border-gray-300"></textarea>
+                        <select name="urgency" class="w-full p-2 rounded-lg border-2 border-gray-300 bg-white">
+                            <option value="Low">Low Urgency</option>
+                            <option value="Medium" selected>Medium Urgency</option>
+                            <option value="High">High Urgency</option>
+                            <option value="Urgent">Urgent</option>
+                        </select>
+                        <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 rounded-lg hover:bg-red-700">Log Issue</button>
+                    </form>
+                </div>
+                <div>
+                    <h2 class="text-2xl font-bold text-red-600 mb-4">Active Issues (${currentIssues.length})</h2>
+                    <div class="space-y-3 max-h-[60vh] overflow-y-auto p-2 border rounded-xl bg-gray-50">
+                        ${currentIssues.length > 0 ? currentIssues.map(issue => `
+                            <div class="bg-white p-4 rounded-xl shadow-md border-l-4 ${issue.urgency === 'Urgent' ? 'border-red-600' : 'border-yellow-500'}">
+                                <div class="flex justify-between items-start">
+                                    <h3 class="font-semibold">${issue.issueTitle}</h3>
+                                    <button data-id="${issue.id}" class="delete-issue-btn text-red-500 hover:text-red-700 p-1">${getIcon('trash', 'w-4 h-4 m-0')}</button>
+                                </div>
+                                <p class="text-sm text-gray-600 mt-1">${issue.issueDescription}</p>
+                                <span class="text-xs font-medium bg-gray-200 px-2 py-1 rounded-full mt-2 inline-block">${issue.urgency}</span>
+                            </div>
+                        `).join('') : '<p class="text-center text-gray-500 p-8">No active issues.</p>'}
+                    </div>
+                </div>
+            </div>
+            `;
+        }
+
+        function attachIssuesListeners() {
+            document.getElementById('add-issue-form').addEventListener('submit', handleAddIssue);
+            document.querySelectorAll('.delete-issue-btn').forEach(btn => btn.addEventListener('click', e => handleDelete('issues', e.currentTarget.dataset.id)));
+        }
+
+        // --- CRUD & ACTION HANDLERS ---
 
         async function handleEventSubmit(e) {
             e.preventDefault();
-            if (!db) { showMessage("Error: Database not initialized."); return; }
-
             const form = e.target;
             const data = {
                 eventName: form.eventName.value,
-                eventPOC: form.eventPOC.value,
+                eventPoc: form.eventPoc.value,
                 startDate: form.startDate.value,
                 endDate: form.endDate.value,
-                classification: form.classification ? form.classification.value : 'Unclassified',
-                location: form.location ? form.location.value : 'NYIH',
-                eventLocation: form.eventLocation ? form.eventLocation.value : '',
-                attendees: form.attendees ? form.attendees.value : '',
+                location: form.location.value,
+                eventLocation: form.eventLocation.value,
+                attendees: form.attendees.value,
                 demoResources: Array.from(form.querySelectorAll('input[name="demoResources"]:checked')).map(cb => cb.value),
                 timestamp: new Date().toISOString()
             };
 
             try {
-                const eventsCollectionRef = collection(db, `users/${userId}/events`);
-                await addDoc(eventsCollectionRef, data);
-                form.reset();
+                await addDoc(collection(db, `users/${userId}/events`), data);
                 showMessage('Event added successfully!');
+                form.reset();
             } catch (error) {
-                console.error('Firestore Save Error:', error);
-                showMessage(`Failed to add event: ${error.message}`);
+                showMessage(`Failed to add event: ${error.message}`, true);
             }
         }
         
-        async function handleDeleteData(id, collectionName) {
-            if (!db) { showMessage("Error: Database not initialized."); return; }
+        async function handleAddTask(e) {
+            e.preventDefault();
+            const form = e.target;
+            const newText = form.newTaskText.value.trim();
+            if (!newText) return;
+            
             try {
-                const docRef = doc(db, `users/${userId}/${collectionName}`, id);
-                await deleteDoc(docRef);
+                await addDoc(collection(db, `users/${userId}/tasks`), { title: newText, status: 'todo', timestamp: new Date().toISOString() });
+                showMessage('Task added!');
+                form.reset();
+            } catch(error) {
+                showMessage(`Failed to add task: ${error.message}`, true);
+            }
+        }
+
+        async function handleAddIssue(e) {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                issueTitle: form.issueTitle.value,
+                issueDescription: form.issueDescription.value,
+                urgency: form.urgency.value,
+                timestamp: new Date().toISOString()
+            };
+            try {
+                await addDoc(collection(db, `users/${userId}/issues`), data);
+                showMessage('Issue logged successfully!');
+                form.reset();
+            } catch (error) {
+                showMessage(`Failed to log issue: ${error.message}`, true);
+            }
+        }
+
+        async function handleDelete(collectionName, id) {
+            if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) return;
+            try {
+                await deleteDoc(doc(db, `users/${userId}/${collectionName}`, id));
                 showMessage(`${collectionName.slice(0, -1)} deleted successfully!`);
             } catch (error) {
-                console.error(`Error deleting ${collectionName}: `, error);
-                showMessage(`Failed to delete ${collectionName.slice(0, -1)}.`);
+                showMessage(`Failed to delete: ${error.message}`, true);
             }
         }
 
-        async function handleGenerateSummary() {
-             showMessage('Generating summary with AI...');
-
-            const eventList = currentEvents.map(e => (
-                `Event Name: ${e.eventName}, Date: ${e.startDate}, Location: ${e.eventLocation || e.location}, POC: ${e.eventPOC}`
-            )).join('; ');
-
-            const prompt = `Provide a concise and professional summary of the team's upcoming events. Events: ${eventList || 'None'}`;
-            const generatedText = await fetchGemini(prompt, false);
-            
-            if (generatedText && !generatedText.startsWith('AI Error')) {
-                document.getElementById('summary-output-text').textContent = generatedText;
-                document.getElementById('summary-output').classList.remove('hidden');
-                showMessage('Summary generated successfully!');
-            } else {
-                showMessage(`AI Summary failed: ${generatedText}`);
-            }
-        }
-        
         async function handleAnalyzePDF() {
-            const pdfText = document.getElementById('pdfText').value;
+            const btn = document.getElementById('analyze-pdf-btn');
+            const btnText = document.getElementById('analyze-btn-text');
+            const pdfText = document.getElementById('pdf-text-input').value;
             if (!pdfText.trim()) return;
-            showMessage('Analyzing text with AI...');
 
-            const extractedData = await fetchGemini(pdfText, true);
-            
-            if (extractedData) {
+            btn.disabled = true;
+            btnText.textContent = 'Extracting...';
+            btn.firstElementChild.classList.add('fa-spin');
+
+            const prompt = `Extract event details from the following text and return a JSON object with keys: eventName, startDate, endDate, eventPoc, eventLocation, attendees. Text: \n\n${pdfText}`;
+            const data = await fetchGemini(prompt, true);
+
+            if (data && data.eventName) {
                 const form = document.getElementById('event-form');
-                form.eventName.value = extractedData.eventName || '';
-                form.startDate.value = extractedData.startDate || '';
-                form.endDate.value = extractedData.endDate || '';
-                showMessage('Data extracted successfully! Review and save.');
+                form.eventName.value = data.eventName || '';
+                form.startDate.value = data.startDate || '';
+                form.endDate.value = data.endDate || '';
+                form.eventPoc.value = data.eventPoc || '';
+                form.eventLocation.value = data.eventLocation || '';
+                form.attendees.value = data.attendees || '';
+                showMessage('Data extracted! Please review and save.');
             } else {
-                showMessage('AI extraction failed.');
+                showMessage('AI extraction failed. Please check the text.', true);
             }
+
+            btn.disabled = false;
+            btnText.textContent = 'Extract Data with AI';
+            btn.firstElementChild.classList.remove('fa-spin');
         }
-        
-        // --- PAGE RENDERING ---
 
-        function renderPage() {
-            const contentArea = document.getElementById('content-area');
-            contentArea.innerHTML = ''; // Clear existing content
-
-            if (currentPage === 'schedule') {
-                contentArea.innerHTML = renderSchedulePage();
-                
-                // FIX: Must RE-ATTACH all event listeners after innerHTML update
-                document.getElementById('event-form').onsubmit = handleEventSubmit;
-                document.getElementById('analyze-pdf').onclick = handleAnalyzePDF;
-                document.getElementById('generate-summary').onclick = handleGenerateSummary;
-
-                document.querySelectorAll('.delete-event-btn').forEach(btn => {
-                    btn.onclick = (e) => handleDeleteData(e.currentTarget.dataset.id, 'events');
-                });
-            } else if (currentPage === 'kanban') {
-                contentArea.innerHTML = renderKanbanPage();
-                // Attach Kanban listeners
-            } else if (currentPage === 'issues') {
-                 contentArea.innerHTML = renderIssuesPage();
-                 // Attach Issues listeners
-                 document.querySelectorAll('.delete-issue-btn').forEach(btn => {
-                    btn.onclick = (e) => handleDeleteData(e.currentTarget.dataset.id, 'issues');
-                 });
+        async function handleGenerateEventSummary() {
+            if (currentEvents.length === 0) {
+                showMessage('No events to summarize.', true);
+                return;
             }
+            const btn = document.getElementById('generate-summary-btn');
+            const btnText = document.getElementById('summary-btn-text');
+            const outputDiv = document.getElementById('summary-output');
+
+            btn.disabled = true;
+            btnText.textContent = 'Generating...';
+
+            const eventList = currentEvents.map(e => `Event: ${e.eventName}, Date: ${e.startDate}, POC: ${e.eventPoc}`).join('; ');
+            const prompt = `Provide a concise, professional summary for a team meeting based on these events: ${eventList}`;
+            const summary = await fetchGemini(prompt);
+            
+            if (summary && !summary.startsWith('AI Error')) {
+                outputDiv.textContent = summary;
+                outputDiv.classList.remove('hidden');
+            } else {
+                showMessage('Failed to generate summary.', true);
+            }
+            btn.disabled = false;
+            btnText.textContent = 'AI Summary';
         }
         
-        // --- HTML TEMPLATES ---
+        function handleExtractForServiceNow(eventId) {
+            const event = currentEvents.find(e => e.id === eventId);
+            if (!event) return;
+            const output = `Event Name: ${event.eventName || ''}
+Start Date: ${event.startDate || ''}
+End Date: ${event.endDate || ''}
+Event POC: ${event.eventPoc || ''}
+Location: ${event.eventLocation || event.location || ''}
+Attendees: ${event.attendees || ''}
+Resources: ${(event.demoResources || []).join(', ')}`;
 
-        function renderSchedulePage() {
-            const resourceCheckboxes = ["Surface Hubs", "Proto", "Spot", "Hypervsn", "GenAI", "Vestaboard", "Loaner Laptop", "Clicker", "Teams Call", "Vu AI", "Other"].map(r => `
-                <label class="flex items-center space-x-2 text-sm text-gray-700">
-                    <input type="checkbox" name="demoResources" value="${r}" class="text-[#424A9F] focus:ring-[#A3E635]">
-                    <span>${r}</span>
-                </label>`).join('');
-
-            const eventListItems = currentEvents.map(event => `
-                <div class="bg-gray-50 p-4 rounded-xl shadow-md flex justify-between items-start border-l-4 border-[#424A9F]">
-                    <div>
-                        <h3 class="text-lg font-semibold">${event.eventName}</h3>
-                        <p class="text-sm">Date: ${event.startDate} to ${event.endDate}</p>
-                        <p class="text-sm">POC: ${event.eventPOC}</p>
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <button data-event-id="${event.id}" class="export-event-btn bg-[#A3E635] text-gray-900 px-3 py-1 rounded-lg text-xs font-bold hover:bg-[#8CD02F]"><i class="fas fa-file-export mr-1"></i> Export</button>
-                        <button data-id="${event.id}" class="delete-event-btn bg-red-500 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-red-600"><i class="fas fa-trash-alt mr-1"></i> Delete</button>
-                    </div>
-                </div>
-            `).join('');
-
-            return `
-                <div class="bg-white p-6 rounded-2xl shadow-xl grid md:grid-cols-2 gap-8">
-                    <div>
-                        <h2 class="text-2xl font-bold text-[#424A9F] mb-4">Add Event & AI Extraction</h2>
-                        <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200 mb-4">
-                            <label class="block text-sm font-medium mb-1 text-gray-700">Paste Report Text for AI Extraction:</label>
-                            <textarea id="pdfText" class="w-full h-32 p-2 rounded-lg border-2 border-gray-300 bg-white text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-[#A3E635]" placeholder="Paste your PDF report text here..."></textarea>
-                            <button id="analyze-pdf" type="button" class="mt-2 w-full bg-[#A3E635] text-gray-900 font-bold py-2 px-4 rounded-lg hover:bg-[#8CD02F] transition-colors duration-300 flex items-center justify-center">
-                                ${getIcon('zap')} Extract Data with AI
-                            </button>
-                        </div>
-
-                        <form id="event-form" class="space-y-4 p-4 border border-gray-200 rounded-xl">
-                            <input type="text" name="eventName" placeholder="Event Name" class="w-full p-2 border rounded" required>
-                            <input type="text" name="eventPOC" placeholder="Event POC" class="w-full p-2 border rounded" required>
-                            <input type="date" name="startDate" class="w-full p-2 border rounded" required>
-                            <input type="date" name="endDate" class="w-full p-2 border rounded" required>
-                            <select name="classification" class="w-full p-2 border rounded">
-                                <option>Unclassified</option><option>Confidential</option><option>Secret</option>
-                            </select>
-                            <input type="text" name="location" value="NYIH" placeholder="Location" class="w-full p-2 border rounded">
-                            <input type="text" name="eventLocation" placeholder="Room/Event Location" class="w-full p-2 border rounded">
-                            <input type="text" name="attendees" placeholder="Attendees (comma-separated)" class="w-full p-2 border rounded">
-
-                            <div class="space-y-2">
-                                <label class="block text-sm font-medium text-gray-700">Demo Resources:</label>
-                                <div class="grid grid-cols-2 gap-2 bg-gray-100 p-3 rounded-lg">
-                                    ${resourceCheckboxes}
-                                </div>
-                            </div>
-                            
-                            <button type="submit" class="w-full bg-[#424A9F] text-white font-bold py-3 rounded-lg hover:bg-[#343D84] transition-colors duration-300">
-                                ${getIcon('calendar')} Add Event to Schedule
-                            </button>
-                        </form>
-                    </div>
-                    
-                    <div>
-                        <h2 class="text-2xl font-bold text-[#424A9F] mb-4">Upcoming Events (${currentEvents.length})</h2>
-                        <button id="generate-summary" class="w-full bg-[#A3E635] text-gray-900 font-bold py-2 px-3 rounded-lg hover:bg-[#8CD02F] transition-colors duration-300 flex items-center justify-center mb-4">
-                            ${getIcon('zap')} Generate AI Summary
-                        </button>
-                        <div id="summary-output" class="bg-gray-100 p-4 rounded-lg shadow-inner whitespace-pre-wrap mb-4 hidden">
-                            <h4 class="font-bold text-[#424A9F] mb-2">Summary:</h4>
-                            <p id="summary-output-text"></p>
-                        </div>
-
-                        <div class="space-y-4 max-h-96 overflow-y-auto p-2 border rounded-xl bg-white">
-                            ${eventListItems}
+            const modalContainer = document.getElementById('modal-container');
+            modalContainer.innerHTML = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div class="bg-white p-6 rounded-2xl shadow-2xl max-w-lg w-full">
+                        <h3 class="text-xl font-bold text-[#424A9F] mb-4">ServiceNow Data</h3>
+                        <textarea readonly class="w-full h-64 p-4 rounded-lg border-2 bg-gray-50 font-mono text-sm">${output}</textarea>
+                        <div class="flex justify-end gap-2 mt-4">
+                            <button id="close-modal-btn" class="bg-gray-300 font-bold py-2 px-4 rounded-lg hover:bg-gray-400">Close</button>
+                            <button id="copy-modal-btn" class="bg-[#A3E635] text-gray-900 font-bold py-2 px-4 rounded-lg hover:bg-[#8CD02F]">Copy</button>
                         </div>
                     </div>
                 </div>
             `;
+            document.getElementById('close-modal-btn').onclick = () => modalContainer.innerHTML = '';
+            document.getElementById('copy-modal-btn').onclick = () => {
+                navigator.clipboard.writeText(output);
+                showMessage('Copied to clipboard!');
+            };
         }
 
-        function renderKanbanPage() {
-            return `
-                <div class="bg-white p-6 rounded-2xl shadow-xl">
-                    <h2 class="text-2xl font-bold text-[#424A9F] mb-4">Project Task Board (${currentTasks.length} Tasks)</h2>
-                    <p class="text-gray-600">Task form and Kanban columns go here.</p>
-                </div>
-            `;
-        }
-        
-        function renderIssuesPage() {
-            return `
-                <div class="bg-white p-6 rounded-2xl shadow-xl grid md:grid-cols-2 gap-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-red-600 mb-4 flex items-center">${getIcon('exclamation')} Log New Tech Issue</h2>
-                        <p class="text-gray-600">Issue logging form goes here.</p>
-                    </div>
-                    
-                    <div>
-                        <h2 class="text-2xl font-bold text-red-600 mb-4">Active Issues (${currentIssues.length})</h2>
-                        <div class="space-y-3 max-h-96 overflow-y-auto p-2 border rounded-xl">
-                            ${currentIssues.map(issue => `
-                                <div class="bg-gray-50 p-4 rounded-xl shadow-md flex justify-between items-start border-l-4 ${issue.urgency === 'Urgent' ? 'border-red-600' : 'border-yellow-500'}">
-                                    <div>
-                                        <h3 class="font-semibold">${issue.issueTitle}</h3>
-                                        <p class="text-sm text-gray-600">Urgency: ${issue.urgency}</p>
-                                    </div>
-                                    <button data-id="${issue.id}" class="delete-issue-btn text-red-500 hover:text-red-700">${getIcon('trash')}</button>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // --- INITIALIZATION ---
 
+        // --- APP INITIALIZATION ---
+        
         window.onload = () => {
-            // Check if essential config is missing before trying to sign in
-            if (!FIREBASE_CONFIG.apiKey || FIREBASE_CONFIG.apiKey === "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo") {
-                 showMessage("CRITICAL: Firebase configuration is missing. Please update the script.");
-                 return;
+            if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo") {
+                showMessage("CRITICAL: Firebase configuration is missing. Please update the script with your API key.", true);
+                return;
             }
 
-            signInAnonymously(auth).catch(error => {
-                console.error("Anonymous sign-in failed:", error);
-                showMessage("Authentication failed. Data saving disabled.");
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    setupDataListeners();
+                    renderPage();
+                } else {
+                    signInAnonymously(auth).catch(error => {
+                        console.error("Anonymous sign-in failed:", error);
+                        showMessage("Authentication failed. Data may not save.", true);
+                    });
+                }
+            });
+
+            document.querySelectorAll('.nav-button').forEach(btn => {
+                btn.addEventListener('click', () => handleNavigate(btn.dataset.page));
             });
         };
 
-        onAuthStateChanged(auth, user => {
-            if (user) {
-                userId = user.uid; // Actual user ID from Firebase Auth
-            } else {
-                userId = 'anonymous_user_id'; // Fallback
-            }
-            setupDataListeners();
-            handleNavigate('schedule'); // Initial page load
-        });
-
-        // Set up navigation listeners
-        document.querySelectorAll('.nav-button').forEach(btn => {
-            btn.onclick = () => handleNavigate(btn.dataset.page);
-        });
-        
     </script>
 </body>
 </html>
