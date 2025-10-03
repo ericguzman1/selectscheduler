@@ -162,7 +162,7 @@
         
         async function fetchGemini(prompt, isJson = false) {
              if (!GEMINI_API_KEY || GEMINI_API_KEY === "AIzaSyDOPxH3GxDR7fbRoK3Mls6HxpctSeEWECY") {
-                showMessage("AI Error: Gemini API Key is missing. Please update the script.", true);
+                showMessage("AI Error: Gemini API Key is missing. Please replace the placeholder key in the script.", true);
                 return isJson ? {} : "AI Key Missing.";
             }
 
@@ -728,5 +728,6 @@ Resources: ${(event.demoResources || []).join(', ')}`;
     </script>
 </body>
 </html>
+
 
 
