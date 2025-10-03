@@ -113,7 +113,7 @@
             messagingSenderId: "565438351947",
             appId: "1:565438351947:web:b787c417351d16a19cdbce"
         };
-        const GEMINI_API_KEY = "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo";
+        const GEMINI_API_KEY = "AIzaSyDOPxH3GxDR7fbRoK3Mls6HxpctSeEWECY";
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -161,7 +161,7 @@
         }
         
         async function fetchGemini(prompt, isJson = false) {
-             if (!GEMINI_API_KEY || GEMINI_API_KEY === "AIzaSyCBuOzD3V96thT2TIiC3n8DdvpfChGYjEo") {
+             if (!GEMINI_API_KEY || GEMINI_API_KEY === "AIzaSyDOPxH3GxDR7fbRoK3Mls6HxpctSeEWECY") {
                 showMessage("AI Error: Gemini API Key is missing. Please update the script.", true);
                 return isJson ? {} : "AI Key Missing.";
             }
