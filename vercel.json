@@ -1,12 +1,12 @@
 {
-  "installCommand": "npm install --prefix client",
+  "version": 3,
   "builds": [
     {
-      "src": "client/**",
-      "use": "@vercel/static-build",
-      "config": {
-        "outputDirectory": "build"
-      }
+      "src": "client/package.json",
+      "use": "@vercel/static-build"
     }
-  ]
+  ],
+  "installCommand": "npm install --prefix client",
+  "buildCommand": "npm run build --prefix client",
+  "outputDirectory": "client/build"
 }
