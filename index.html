@@ -187,8 +187,8 @@
             }
 
             try {
-                // Using the corrected model name as per your feedback.
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`, {
+                // Using the corrected model name.
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -344,7 +344,7 @@
                         
                         <div class="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
                             <label class="block text-sm font-medium mb-1 text-gray-700">Paste Report Text for AI Extraction:</label>
-                            <textarea id="pdf-text-input" class="w-full h-32 p-2 rounded-lg border-2 border-gray-300 bg-white text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-[#A3E635]" placeholder="Paste your PDF report text here..."></textarea>
+                            <textarea id="pdf-text-input" class="w-full h-32 p-2 rounded-lg border-2 border-gray-300 bg-white text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-[#A3E635]" placeholder="Paste your BEO text here..."></textarea>
                             <button id="analyze-pdf-btn" class="mt-2 w-full bg-[#A3E635] text-gray-900 font-bold py-2 px-4 rounded-lg hover:bg-[#8CD02F] transition-colors duration-300 flex items-center justify-center">
                                 ${getIcon('zap')} <span id="analyze-btn-text">Extract Data with AI</span>
                             </button>
@@ -444,20 +444,110 @@
             btnText.textContent = 'Extracting...';
             btn.firstElementChild.classList.add('fa-spin');
 
-            const prompt = `Extract event details from the following text and return a JSON object with keys: eventName, startDate, endDate, eventPoc, eventLocation, attendees. Text: \n\n${pdfText}`;
-            const data = await fetchGemini(prompt, true);
+            const prompt = `TASK: From the provided BEO text, output only events that satisfy both filters:
 
-            if (data && data.eventName) {
-                const form = document.getElementById('event-form');
-                form.eventName.value = data.eventName || '';
-                form.startDate.value = data.startDate || '';
-                form.endDate.value = data.endDate || '';
-                form.eventPoc.value = data.eventPoc || '';
-                form.eventLocation.value = data.eventLocation || '';
-                form.attendees.value = data.attendees || '';
-                showMessage('Data extracted! Please review and save.');
+The event block explicitly contains the phrase “SELECT Required” (case‑insensitive; allow arbitrary spacing and an optional leading “*”).
+The event takes place in one of these spaces (case‑insensitive, substring match is sufficient):
+tank space (e.g., “Tank”, “W64 Tank”)
+interchange space (e.g., “Interchange – Café”)
+vision room / vision room space (e.g., “Vision”, “Vision Room”)
+homeroom (e.g., “Homeroom A/B/C”)
+common grounds (e.g., “60 Common Grounds – Café”)
+EVENT BOUNDARIES
+
+Treat each event as a block starting at “WRES” (e.g., WRES13985123) and ending right before the next WRES ID or a new date header (e.g., 9/16/2025). Consolidate all lines inside a block.
+Some blocks may include multiple time ranges (e.g., support window + session window). Use the earliest start and latest end in the block as the event’s Start/End.
+MATCHING “SELECT Required” (STRICT)
+
+Include the event only if the block contains “SELECT Required” with flexible whitespace and optional leading “*”, e.g.:
+*SELECT Required, SELECT Required, *SELECT Required
+Do not include events that only mention TXA Required, or that mention “Select support” without the exact word “Required” following “Select/SELECT” (unless the block also contains “SELECT Required” separately).
+ALLOWED SPACES (ROOM FILTER)
+
+Event qualifies only if its Event Location line (the line with the room/space, usually right after the WRES) contains one of: Tank, Interchange, Vision, Homeroom, Common Grounds (case‑insensitive, substring match).
+Keep the full original location text (e.g., “454 W64 Tank”, “65 Interchange – Cafe”, “412 W67 Vision”, “420 W61 Homeroom B”, “60 Common Grounds – Cafe”).
+FIELD POPULATION RULES (exact labels, order, and capitalization):
+
+Event Name: Use the exact event title. Trim leading/trailing whitespace only.
+Start Date: Format as Day, Mon DD, YYYY hh:mm AM/PM ET (use ET unless a timezone is explicitly provided). Use the earliest start time found in the block.
+End Date: Same format. Use the latest end time found in the block.
+Event POC: List all POCs/names mentioned for this event block:
+Include names that appear as standalone contact lines and any “POC – …” or “contacts:” lines.
+If emails/phones appear, include them inline after the name in parentheses.
+Separate multiple POCs with semicolons. Do not normalize names—preserve the original tokens (e.g., greta.joung; peggy.thomas-petit; Shikha Tyagi (shikha.b.tyagi@accenture.com)).
+SELECT POC: Leave blank.
+Location: Always exactly: NYIH.
+Event Location: Return the full room/space text (building + room) as printed (e.g., 454 W64 Tank).
+Classification: Return the classification tag exactly as shown (e.g., Client Visit, Internal, Community, Training, Client Preparation, Workspace).
+Session Type: Use the session/setup label (e.g., Conference/ Boardroom, Clusters/Pods, Auditorium/Theatre/Chairs Only, U-Shaped, Other - Please describe below, Partition). If multiple appear, use the first such label in the block.
+Attendees: Leave blank.
+Demo: Only include explicit tech requested/required in the block (e.g., loaner laptop; clicker; (1) surface hub; 2 hand mics; broadcast recording). Separate items with semicolons. If no explicit tech, leave blank.
+SELECT Resources: Leave blank.
+Session Days: Leave blank.
+Session Support Duration: Leave blank.
+TIME HANDLING
+
+Parse times like 07:30 AM - 06:00 PM, 2:00–3:30 PM, 08:00 AM - 05:30 PM.
+If multiple ranges exist in a block (e.g., 11:30 AM - 06:30 PM and 12:00 PM - 06:00 PM), compute:
+Start Date = earliest start across all ranges.
+End Date = latest end across all ranges.
+Dates appear as headers like 9/17/2025; apply that date to all events until the next date header.
+If no timezone is present, default to ET.
+DEDUPLICATION & STRICTNESS
+
+If the same event appears more than once (same WRES + same title + same room on the same date), output one consolidated record using earliest start/latest end.
+Never infer missing values (leave blank where rules say).
+Never include fields that are not in the schema. Never change labels or order.
+OUTPUT FORMAT (exactly this; no extra fields). Put one blank line between events:
+
+Event Name:
+Start Date:
+End Date:
+Event POC:
+SELECT POC:
+Location: NYIH
+Event Location:
+Classification:
+Session Type:
+Attendees:
+Demo:
+SELECT Resources:
+Session Days:
+Session Support Duration:
+WORKFLOW
+
+Split the document into event blocks using WRES IDs and date headers.
+Discard any block that lacks “SELECT Required” (per the strict pattern) or whose room/space does not match the allowed list.
+For each qualifying block, extract fields per rules above.
+Render the final output exactly in the schema/order shown.
+As a QA step, list (to yourself) all lines where “SELECT Required” occurs and assert each lives inside a rendered event; if any do not, re‑scan the surrounding block and fix omissions.
+REGEX HINTS (case‑insensitive):
+
+SELECT Required flag: (?i)[*\\s]*s\\s*e\\s*l\\s*e\\s*c\\s*t\\s*[\\s-]*required\\b
+WRES start: \\bWRES\\d{6,}\\b
+Date header: \\b(0?[1-9]|1[0-2])/(0?[1-9]|[12]\\d|3[01])/(20\\d{2})\\b
+Time range: \\b(0?\\d|1[0-2]):?\\d{2}\\s?(AM|PM)\\s*[-–]\\s*(0?\\d|1[0-2]):?\\d{2}\\s?(AM|PM)\\b
+Allowed rooms (room line often immediately after WRES): (?i)(tank|interchange|vision|homeroom|common\\s*grounds)
+If anything is ambiguous, prefer leaving the field blank over guessing.
+Text to analyze:
+${pdfText}`;
+            
+            const resultText = await fetchGemini(prompt, false);
+
+            if (resultText && !resultText.startsWith('AI Error')) {
+                createModal("Extracted BEO Data", `
+                    <textarea readonly class="w-full h-64 p-4 rounded-lg border-2 bg-gray-50 font-mono text-sm">${resultText}</textarea>
+                    <div class="flex justify-end gap-2 mt-4">
+                         <button id="copy-modal-btn" class="bg-[#A3E635] text-gray-900 font-bold py-2 px-4 rounded-lg hover:bg-[#8CD02F]">Copy to Clipboard</button>
+                    </div>
+                `);
+
+                document.getElementById('copy-modal-btn').onclick = () => {
+                    navigator.clipboard.writeText(resultText);
+                    showMessage('Copied to clipboard!');
+                };
             } else {
-                showMessage('AI extraction failed. Please check the text.', true);
+                showMessage('AI extraction failed. The provided text may not contain events matching the required criteria.', true);
             }
 
             btn.disabled = false;
