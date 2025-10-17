@@ -322,19 +322,20 @@
             if (unsubscribeTasks) unsubscribeTasks();
             if (unsubscribeIssues) unsubscribeIssues();
 
-            const eventsRef = collection(db, `users/${userId}/events`);
+            // UPDATED: Pointing to the shared collection for events, tasks, and issues
+            const eventsRef = collection(db, 'shared_events');
             unsubscribeEvents = onSnapshot(eventsRef, (snapshot) => {
                 currentEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
                 if (currentPage === 'schedule') renderPage();
             });
 
-            const tasksRef = collection(db, `users/${userId}/tasks`);
+            const tasksRef = collection(db, 'shared_tasks');
             unsubscribeTasks = onSnapshot(tasksRef, (snapshot) => {
                 currentTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 if (currentPage === 'kanban') renderPage();
             });
 
-            const issuesRef = collection(db, `users/${userId}/issues`);
+            const issuesRef = collection(db, 'shared_issues');
             unsubscribeIssues = onSnapshot(issuesRef, (snapshot) => {
                 currentIssues = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                 if (currentPage === 'issues') renderPage();
@@ -459,7 +460,7 @@
             };
 
             try {
-                await addDoc(collection(db, `users/${userId}/events`), data);
+                await addDoc(collection(db, 'shared_events'), data);
                 showMessage('Event added successfully!');
                 form.reset();
             } catch (error) {
@@ -729,7 +730,7 @@ Session Support Duration: ${event.sessionSupportDuration || ''}`;
                     if (draggingCard) {
                         const taskId = draggingCard.dataset.taskId;
                         const newStatus = column.dataset.status;
-                        await updateDoc(doc(db, `users/${userId}/tasks`, taskId), { status: newStatus });
+                        await updateDoc(doc(db, 'shared_tasks', taskId), { status: newStatus });
                         showMessage('Task moved!');
                     }
                 });
@@ -770,7 +771,7 @@ Session Support Duration: ${event.sessionSupportDuration || ''}`;
             if (!data.title) return;
             
             try {
-                await addDoc(collection(db, `users/${userId}/tasks`), data);
+                await addDoc(collection(db, 'shared_tasks'), data);
                 showMessage('Task added!');
                 form.reset();
             } catch(error) {
@@ -841,7 +842,7 @@ Session Support Duration: ${event.sessionSupportDuration || ''}`;
                 timestamp: new Date().toISOString()
             };
             try {
-                await addDoc(collection(db, `users/${userId}/issues`), data);
+                await addDoc(collection(db, 'shared_issues'), data);
                 showMessage('Issue logged successfully!');
                 form.reset();
             } catch (error) {
@@ -853,7 +854,8 @@ Session Support Duration: ${event.sessionSupportDuration || ''}`;
         async function handleDelete(collectionName, id) {
             if (!confirm(`Are you sure you want to delete this ${collectionName.slice(0, -1)}?`)) return;
             try {
-                await deleteDoc(doc(db, `users/${userId}/${collectionName}`, id));
+                let docRef = doc(db, `shared_${collectionName}`, id);
+                await deleteDoc(docRef);
                 showMessage(`${collectionName.slice(0, -1)} deleted successfully!`);
             } catch (error) {
                 showMessage(`Failed to delete: ${error.message}`, true);
