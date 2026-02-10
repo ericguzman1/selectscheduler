@@ -1,20 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Layout, 
-  AlertCircle, 
-  Plus, 
-  Trash2, 
-  CheckCircle2, 
-  ChevronLeft, 
-  ChevronRight,
-  Search,
-  Zap,
-  ArrowRight,
-  LogOut,
-  User,
-  Lock
-} from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -32,13 +16,18 @@ import {
   orderBy, 
   deleteDoc, 
   doc, 
-  updateDoc 
+  updateDoc,
+  where,
+  writeBatch,
+  getDocs
 } from 'firebase/firestore';
 
 /**
  * ENVIRONMENT CONFIGURATION
- * These values should be added to your Vercel Project Settings -> Environment Variables.
- * We are using process.env for better compatibility with standard deployment targets.
+ * Add these to Vercel Settings -> Environment Variables:
+ * VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
+ * VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID,
+ * VITE_GEMINI_API_KEY
  */
 
 const firebaseConfig = {
@@ -57,12 +46,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const App = () => {
+export default function App() {
   const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('schedule');
-  const [notification, setNotification] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState('schedule');
+  const [message, setMessage] = useState({ text: '', isError: false });
+  const [aiEnabled, setAiEnabled] = useState(true);
 
+  // Auth State Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
@@ -71,302 +62,275 @@ const App = () => {
     return () => unsubscribe();
   }, []);
 
-  const notify = (msg) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 4000);
+  const showMsg = (text, isError = false) => {
+    setMessage({ text, isError });
+    setTimeout(() => setMessage({ text: '', isError: false }), 5000);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#424A9F]"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 font-sans">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#424A9F]"></div>
       </div>
     );
   }
 
   if (!user) {
-    return <AuthPage notify={notify} />;
+    return <AuthPage showMsg={showMsg} />;
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'schedule': return <SchedulePage notify={notify} />;
-      case 'kanban': return <KanbanPage notify={notify} />;
-      case 'issues': return <TechIssuesPage notify={notify} />;
-      default: return <SchedulePage notify={notify} />;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-slate-900">
-      <nav className="bg-[#424A9F] text-white shadow-lg sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
+    <div className="min-h-screen bg-gray-100 font-sans text-gray-800 flex flex-col items-center p-4">
+      {/* Header Container */}
+      <div className="w-full max-w-6xl bg-white p-6 rounded-2xl shadow-xl mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-4xl font-extrabold text-[#424A9F]">Accenture Project Hub</h1>
+          <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              <div className="bg-[#A3E635] p-1.5 rounded-lg text-[#424A9F]">
-                <Layout size={24} />
-              </div>
-              <span className="text-xl font-bold tracking-tight text-white">Accenture Hub</span>
+              <span className="text-sm font-medium text-gray-600">AI Features</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={aiEnabled} 
+                  onChange={(e) => setAiEnabled(e.target.checked)} 
+                />
+                <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#A3E635]"></div>
+              </label>
             </div>
-            
-            <div className="hidden md:flex space-x-4">
-              <NavBtn id="schedule" label="Meetings" icon={<Calendar size={18}/>} active={activeTab} set={setActiveTab} />
-              <NavBtn id="kanban" label="Kanban" icon={<Layout size={18}/>} active={activeTab} set={setActiveTab} />
-              <NavBtn id="issues" label="Tech Issues" icon={<AlertCircle size={18}/>} active={activeTab} set={setActiveTab} />
-              <button 
-                onClick={() => signOut(auth)}
-                className="flex items-center px-3 py-2 rounded-md text-sm font-medium hover:bg-white/10 transition-colors text-red-300"
-              >
-                <LogOut size={18} className="mr-2" /> Logout
-              </button>
-            </div>
+            <button 
+              onClick={() => signOut(auth)} 
+              className="bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg hover:bg-gray-300 transition"
+            >
+              Logout
+            </button>
           </div>
         </div>
-      </nav>
+        <p className="text-center text-gray-600 mb-4 font-medium italic">Accenture High Performance. Delivered.</p>
+        <div className="flex justify-center mb-4 space-x-2">
+          <NavButton active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings & Events" />
+          <NavButton active={currentPage === 'kanban'} onClick={() => setCurrentPage('kanban')} label="Task Board" />
+          <NavButton active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Issues" />
+        </div>
+      </div>
 
-      <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {renderContent()}
-      </main>
-
-      {notification && (
-        <div className="fixed bottom-6 right-6 flex items-center bg-slate-800 text-white px-4 py-3 rounded-xl shadow-2xl animate-bounce border-l-4 border-[#A3E635] z-[100]">
-          <CheckCircle2 size={20} className="text-[#A3E635] mr-3" />
-          <p className="text-sm font-medium">{notification}</p>
+      {/* Global Message Area */}
+      {message.text && (
+        <div className={`w-full max-w-6xl p-4 mb-4 rounded-lg shadow-md border-l-4 transition-all ${message.isError ? 'bg-red-100 border-red-500 text-red-700' : 'bg-blue-100 border-[#A3E635] text-blue-700'}`}>
+          <p>{message.text}</p>
         </div>
       )}
+
+      {/* Content Area */}
+      <div className="w-full max-w-6xl flex-grow">
+        {currentPage === 'schedule' && <SchedulePage user={user} showMsg={showMsg} aiEnabled={aiEnabled} />}
+        {currentPage === 'kanban' && <KanbanPage user={user} showMsg={showMsg} aiEnabled={aiEnabled} />}
+        {currentPage === 'issues' && <IssuesPage user={user} showMsg={showMsg} aiEnabled={aiEnabled} />}
+      </div>
     </div>
   );
-};
+}
 
-const NavBtn = ({ id, label, icon, active, set }) => (
+const NavButton = ({ active, onClick, label }) => (
   <button 
-    onClick={() => set(id)}
-    className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${active === id ? 'bg-white/10 text-[#A3E635]' : 'hover:bg-white/5 text-white/80'}`}
+    onClick={onClick}
+    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 ${active ? 'bg-[#A3E635] text-gray-900 shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
   >
-    {React.cloneElement(icon, { className: 'mr-2' })} {label}
+    {label}
   </button>
 );
 
 /* --- AUTH COMPONENT --- */
-const AuthPage = ({ notify }) => {
+function AuthPage({ showMsg }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleAuth = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        notify("Welcome back!");
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
-        notify("Account created successfully!");
       }
     } catch (err) {
-      notify(`Error: ${err.message}`);
+      showMsg(err.message, true);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#424A9F] p-4">
-      <div className="w-full max-w-md bg-white p-8 rounded-3xl shadow-2xl text-slate-900">
-        <div className="flex justify-center mb-6">
-          <div className="bg-[#A3E635] p-4 rounded-2xl shadow-lg">
-            <Layout size={40} className="text-[#424A9F]" />
-          </div>
-        </div>
-        <h1 className="text-3xl font-bold text-center text-[#424A9F] mb-2">Accenture Project Hub</h1>
-        <p className="text-center text-slate-500 mb-8 text-sm">{isLogin ? 'Sign in to access your dashboard' : 'Create an account to get started'}</p>
-        
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div className="relative">
-            <User className="absolute left-3 top-3 text-slate-400" size={20} />
-            <input 
-              type="email" placeholder="Email Address" required 
-              value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#424A9F] outline-none"
-            />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 text-slate-400" size={20} />
-            <input 
-              type="password" placeholder="Password" required 
-              value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#424A9F] outline-none"
-            />
-          </div>
-          <button type="submit" className="w-full bg-[#424A9F] text-white font-bold py-3 rounded-xl hover:opacity-90 transition shadow-lg">
-            {isLogin ? 'Sign In' : 'Register Account'}
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans">
+      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl">
+        <h1 className="text-3xl font-bold text-center text-[#424A9F] mb-6 tracking-tight">Accenture Project Hub</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input 
+            type="email" placeholder="Corporate Email" required 
+            className="w-full p-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#A3E635]"
+            value={email} onChange={(e) => setEmail(e.target.value)}
+          />
+          <input 
+            type="password" placeholder="Password" required 
+            className="w-full p-3 rounded-lg border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#A3E635]"
+            value={password} onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="submit" className={`w-full text-white font-bold py-3 rounded-lg transition-colors ${isLogin ? 'bg-[#424A9F] hover:bg-[#343D84]' : 'bg-[#A3E635] text-gray-900 hover:bg-[#8CD02F]'}`}>
+            {isLogin ? 'Login' : 'Register'}
           </button>
         </form>
-
         <p className="text-center text-sm text-gray-500 mt-6">
-          {isLogin ? "New to the hub?" : "Already have an account?"} 
-          <button onClick={() => setIsLogin(!isLogin)} className="ml-1 font-bold text-[#424A9F] hover:underline">
-            {isLogin ? 'Create Account' : 'Back to Login'}
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <button onClick={() => setIsLogin(!isLogin)} className="font-semibold text-[#424A9F] hover:underline">
+            {isLogin ? 'Register here' : 'Login here'}
           </button>
         </p>
       </div>
     </div>
   );
-};
+}
 
-/* --- SCHEDULE COMPONENT --- */
-const SchedulePage = ({ notify }) => {
+/* --- SCHEDULE PAGE --- */
+function SchedulePage({ user, showMsg, aiEnabled }) {
   const [events, setEvents] = useState([]);
-  const [isAiProcessing, setIsAiProcessing] = useState(false);
-  const [formData, setFormData] = useState({ eventName: '', eventPoc: '', startDate: '', endDate: '', location: 'NYIH' });
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [summary, setSummary] = useState('');
+  const formRef = useRef();
 
   useEffect(() => {
     const q = query(collection(db, 'shared_events'), orderBy('startDate', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(q, (snap) => {
+      setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  const handleSave = async (e) => {
+  const handleAddEvent = async (e) => {
     e.preventDefault();
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData.entries());
     try {
-      await addDoc(collection(db, 'shared_events'), { ...formData, timestamp: new Date().toISOString() });
-      setFormData({ eventName: '', eventPoc: '', startDate: '', endDate: '', location: 'NYIH' });
-      notify("Event saved to database.");
-    } catch (err) { notify(err.message); }
+      await addDoc(collection(db, 'shared_events'), { 
+        ...data, 
+        createdBy: user.uid,
+        timestamp: new Date().toISOString() 
+      });
+      e.target.reset();
+      showMsg('Event added successfully!');
+    } catch (err) { showMsg(err.message, true); }
   };
 
   const handleAiExtract = async () => {
-    setIsAiProcessing(true);
-    // AI simulation logic
-    setTimeout(() => {
-      setIsAiProcessing(false);
-      notify("AI: Analysis complete.");
-    }, 1500);
+    const text = formRef.current.querySelector('#pdfText').value;
+    if (!text.trim() || !aiEnabled) return;
+    setIsAiLoading(true);
+    const prompt = `From the provided BEO text, output only valid events as a JSON object with keys: eventName, eventPoc, startDate (YYYY-MM-DD), endDate (YYYY-MM-DD), location, eventLocation. Text: ${text}`;
+    
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json" } })
+      });
+      const result = await response.json();
+      const extracted = JSON.parse(result.candidates[0].content.parts[0].text);
+      
+      const form = formRef.current.querySelector('#scheduleForm');
+      Object.keys(extracted).forEach(key => {
+        if (form.elements[key]) form.elements[key].value = extracted[key];
+      });
+      showMsg('Data extracted successfully via AI!');
+    } catch (err) { showMsg('AI Extraction failed.', true); }
+    setIsAiLoading(false);
   };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-8">
-      <div className="lg:col-span-1 space-y-6 text-slate-900">
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-[#424A9F] mb-4 flex items-center">
-            <Zap size={20} className="mr-2 text-[#A3E635]" /> BEO Intelligence
-          </h2>
-          <textarea 
-            className="w-full h-32 p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none"
-            placeholder="Paste BEO text for automated extraction..."
-          ></textarea>
-          <button 
-            onClick={handleAiExtract} disabled={isAiProcessing}
-            className="mt-3 w-full bg-[#A3E635] text-[#424A9F] font-bold py-3 rounded-xl hover:opacity-90 transition flex justify-center items-center shadow-md"
-          >
-            {isAiProcessing ? "Analyzing..." : "Analyze with AI"}
+    <div className="bg-white p-6 rounded-2xl shadow-xl grid md:grid-cols-2 gap-8" ref={formRef}>
+      <div className="space-y-4">
+        <h2 className="text-2xl font-bold text-[#424A9F]">Add Event & AI Reader</h2>
+        <div className="p-4 bg-gray-50 rounded-xl shadow-inner border border-gray-200">
+          <textarea id="pdfText" className="w-full h-32 p-2 rounded-lg border-2 border-gray-300 resize-none outline-none" placeholder="Paste BEO text here..."></textarea>
+          <button onClick={handleAiExtract} disabled={isAiLoading} className="mt-2 w-full bg-[#A3E635] text-gray-900 font-bold py-2 rounded-lg hover:bg-[#8CD02F] transition">
+            {isAiLoading ? 'AI is Thinking...' : 'Extract Data with AI'}
           </button>
         </div>
-
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
-          <h2 className="text-lg font-bold text-[#424A9F] mb-4 text-slate-900">Quick Entry</h2>
-          <form onSubmit={handleSave} className="space-y-4">
-            <input 
-              type="text" placeholder="Event Name" required 
-              value={formData.eventName} onChange={e => setFormData({...formData, eventName: e.target.value})}
-              className="w-full p-2 bg-slate-50 border rounded-lg outline-none" 
-            />
-            <input 
-              type="text" placeholder="POC Name" required 
-              value={formData.eventPoc} onChange={e => setFormData({...formData, eventPoc: e.target.value})}
-              className="w-full p-2 bg-slate-50 border rounded-lg outline-none" 
-            />
-            <div className="grid grid-cols-2 gap-4 text-slate-900">
-              <input type="date" required value={formData.startDate} onChange={e => setFormData({...formData, startDate: e.target.value})} className="w-full p-2 bg-slate-50 border rounded-lg outline-none" />
-              <input type="date" required value={formData.endDate} onChange={e => setFormData({...formData, endDate: e.target.value})} className="w-full p-2 bg-slate-50 border rounded-lg outline-none" />
-            </div>
-            <button className="w-full bg-[#424A9F] text-white font-bold py-3 rounded-xl hover:opacity-90 transition shadow-lg">
-              Confirm Event
-            </button>
-          </form>
-        </div>
+        <form id="scheduleForm" onSubmit={handleAddEvent} className="space-y-3">
+          <input name="eventName" placeholder="Event Name*" required className="w-full p-2 border rounded-lg" />
+          <input name="eventPoc" placeholder="Event POC*" required className="w-full p-2 border rounded-lg" />
+          <div className="grid grid-cols-2 gap-2">
+            <input name="startDate" type="date" required className="p-2 border rounded-lg" />
+            <input name="endDate" type="date" required className="p-2 border rounded-lg" />
+          </div>
+          <input name="location" placeholder="Location" defaultValue="NYIH" className="w-full p-2 border rounded-lg" />
+          <input name="eventLocation" placeholder="Event Room/Location" className="w-full p-2 border rounded-lg" />
+          <button type="submit" className="w-full bg-[#424A9F] text-white font-bold py-3 rounded-lg hover:bg-[#343D84]">Save Event</button>
+        </form>
       </div>
-
-      <div className="lg:col-span-2">
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">Active Team Schedule</h2>
-            <div className="flex space-x-2">
-               <button className="p-2 bg-white rounded-lg border border-slate-200 text-slate-600"><Search size={18} /></button>
-               <button className="px-4 py-2 bg-white rounded-lg border border-slate-200 text-sm font-bold text-slate-600">List View</button>
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-[#424A9F]">Team Schedule</h2>
+          <button onClick={() => showMsg('Syncing...')} className="text-gray-500 hover:text-[#424A9F] transition"><Zap size={20}/></button>
+        </div>
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto p-2">
+          {events.map(ev => (
+            <div key={ev.id} className="bg-gray-50 p-4 rounded-xl shadow-sm border-l-4 border-[#424A9F] flex justify-between items-center">
+              <div>
+                <p className="font-bold">{ev.eventName}</p>
+                <p className="text-xs text-gray-500">{ev.startDate} | {ev.eventPoc}</p>
+              </div>
+              <button onClick={() => deleteDoc(doc(db, 'shared_events', ev.id))} className="text-gray-400 hover:text-red-500 transition"><Trash2 size={18}/></button>
             </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-widest">
-                <tr>
-                  <th className="px-6 py-4">Event</th>
-                  <th className="px-6 py-4">Timeline</th>
-                  <th className="px-6 py-4">POC</th>
-                  <th className="px-6 py-4">Location</th>
-                  <th className="px-6 py-4"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {events.length > 0 ? events.map(ev => (
-                  <tr key={ev.id} className="hover:bg-slate-50/80 transition group">
-                    <td className="px-6 py-4 font-bold text-[#424A9F]">{ev.eventName}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{ev.startDate}</td>
-                    <td className="px-6 py-4 text-sm text-slate-600 font-semibold">{ev.eventPoc}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{ev.location}</td>
-                    <td className="px-6 py-4 text-right">
-                      <button onClick={async () => await deleteDoc(doc(db, 'shared_events', ev.id))} className="text-slate-300 hover:text-red-500 transition"><Trash2 size={18}/></button>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">No events found. Start by adding one.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          ))}
         </div>
       </div>
     </div>
   );
-};
+}
 
-/* --- KANBAN COMPONENT --- */
-const KanbanPage = ({ notify }) => {
+/* --- KANBAN PAGE --- */
+function KanbanPage({ user, showMsg }) {
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
     const q = query(collection(db, 'shared_tasks'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(q, (snap) => {
+      setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  const moveTask = async (id, newStatus) => {
-    await updateDoc(doc(db, 'shared_tasks', id), { status: newStatus });
-    notify(`Task progress updated.`);
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    const input = e.target.taskName;
+    if (!input.value.trim()) return;
+    try {
+      await addDoc(collection(db, 'shared_tasks'), { 
+        text: input.value, 
+        status: 'todo', 
+        createdBy: user.uid,
+        timestamp: new Date().toISOString() 
+      });
+      input.value = '';
+      showMsg('Task created!');
+    } catch (err) { showMsg(err.message, true); }
   };
 
-  const Column = ({ title, status, color }) => (
-    <div className="bg-slate-200/40 p-4 rounded-3xl min-h-[500px] border border-slate-200 flex flex-col">
-      <div className="flex items-center justify-between mb-4 px-2 text-slate-600">
-        <h3 className="font-bold flex items-center uppercase text-[10px] tracking-widest">
-          <span className={`w-2.5 h-2.5 rounded-full mr-2 shadow-sm ${color}`}></span> {title}
-        </h3>
-        <span className="bg-slate-200 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-black">
-          {tasks.filter(t => t.status === status).length}
-        </span>
-      </div>
-      <div className="space-y-3 flex-grow text-slate-900">
+  const updateStatus = async (id, status) => {
+    await updateDoc(doc(db, 'shared_tasks', id), { status });
+  };
+
+  const Column = ({ status, title }) => (
+    <div className="bg-gray-100 p-4 rounded-xl flex flex-col min-h-[400px]">
+      <h3 className="font-bold text-[#424A9F] mb-4 text-center border-b pb-2 uppercase text-sm tracking-widest">{title}</h3>
+      <div className="space-y-3 flex-grow">
         {tasks.filter(t => t.status === status).map(task => (
-          <div key={task.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 hover:shadow-md transition">
-            <h4 className="text-sm font-bold text-slate-800 mb-4">{task.title}</h4>
-            <div className="flex justify-between items-center">
-              <span className="text-[9px] bg-[#424A9F]/5 text-[#424A9F] px-2 py-1 rounded-lg font-black uppercase tracking-tighter italic">Accenture-Core</span>
+          <div key={task.id} className="bg-white p-3 rounded-lg shadow border-l-4 border-purple-400 group">
+            <p className="text-sm font-semibold">{task.text}</p>
+            <div className="mt-4 flex justify-between items-center opacity-0 group-hover:opacity-100 transition">
               <div className="flex space-x-1">
-                {status !== 'todo' && <button onClick={() => moveTask(task.id, 'todo')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><ChevronLeft size={14}/></button>}
-                {status !== 'complete' && <button onClick={() => moveTask(task.id, status === 'todo' ? 'doing' : 'complete')} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400"><ChevronRight size={14}/></button>}
+                {status !== 'todo' && <button onClick={() => updateStatus(task.id, 'todo')} className="p-1 bg-gray-100 rounded hover:bg-gray-200"><ChevronLeft size={14}/></button>}
+                {status !== 'complete' && <button onClick={() => updateStatus(task.id, status === 'todo' ? 'doing' : 'complete')} className="p-1 bg-gray-100 rounded hover:bg-gray-200"><ChevronRight size={14}/></button>}
               </div>
+              <button onClick={() => deleteDoc(doc(db, 'shared_tasks', task.id))} className="text-red-300 hover:text-red-500"><Trash2 size={14}/></button>
             </div>
           </div>
         ))}
@@ -375,84 +339,78 @@ const KanbanPage = ({ notify }) => {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center px-2">
-        <h2 className="text-2xl font-black text-slate-800">Operational Kanban</h2>
-        <button 
-          onClick={async () => await addDoc(collection(db, 'shared_tasks'), { title: 'New Task', status: 'todo' })}
-          className="bg-[#424A9F] text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center hover:shadow-lg transition shadow-md"
-        >
-          <Plus size={18} className="mr-2" /> Quick Task
-        </button>
-      </div>
+    <div className="bg-white p-6 rounded-2xl shadow-xl">
+      <form onSubmit={handleAddTask} className="flex gap-2 mb-6 max-w-xl mx-auto">
+        <input name="taskName" placeholder="New high-performance task..." className="flex-grow p-2 border-2 rounded-lg outline-none focus:ring-2 focus:ring-[#A3E635]" />
+        <button type="submit" className="bg-[#424A9F] text-white px-6 py-2 rounded-lg font-bold">Add</button>
+      </form>
       <div className="grid md:grid-cols-3 gap-6">
-        <Column title="Backlog" status="todo" color="bg-slate-400" />
-        <Column title="Active" status="doing" color="bg-blue-400" />
-        <Column title="Done" status="complete" color="bg-[#A3E635]" />
+        <Column status="todo" title="Needs to be Done" />
+        <Column status="doing" title="In Progress" />
+        <Column status="complete" title="Completed" />
       </div>
     </div>
   );
-};
+}
 
-/* --- TECH ISSUES COMPONENT --- */
-const TechIssuesPage = ({ notify }) => {
+/* --- ISSUES PAGE --- */
+function IssuesPage({ user, showMsg }) {
   const [issues, setIssues] = useState([]);
 
   useEffect(() => {
     const q = query(collection(db, 'shared_issues'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setIssues(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsub = onSnapshot(q, (snap) => {
+      setIssues(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  return (
-    <div className="space-y-6">
-      <div className="bg-[#424A9F] rounded-[2rem] p-10 text-white flex flex-col md:flex-row justify-between items-center shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16"></div>
-        <div className="relative z-10">
-          <h2 className="text-3xl font-black mb-3">Tech Issue Intelligence</h2>
-          <p className="text-indigo-100 opacity-70 max-w-lg text-sm leading-relaxed">
-            Report blockers and outages. High-priority items will be flagged for immediate review by the lead team.
-          </p>
-        </div>
-        <button 
-          onClick={async () => await addDoc(collection(db, 'shared_issues'), { title: 'Network Outage', priority: 'High', status: 'Open', timestamp: new Date().toISOString() })}
-          className="bg-[#A3E635] text-[#424A9F] px-8 py-4 rounded-2xl font-black hover:scale-105 transition shadow-2xl mt-6 md:mt-0"
-        >
-          Report Incident
-        </button>
-      </div>
+  const handleLogIssue = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd.entries());
+    try {
+      await addDoc(collection(db, 'shared_issues'), { 
+        ...data, 
+        timestamp: new Date().toISOString(),
+        status: 'Open'
+      });
+      e.target.reset();
+      showMsg('Issue logged correctly.');
+    } catch (err) { showMsg(err.message, true); }
+  };
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {issues.length > 0 ? issues.map(issue => (
-          <div key={issue.id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 hover:border-[#424A9F]/30 transition group flex flex-col">
-            <div className="flex justify-between items-start mb-6">
-              <h3 className="text-lg font-black text-slate-800 tracking-tight">{issue.title}</h3>
-              <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${issue.priority === 'Critical' || issue.priority === 'High' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`}>
-                {issue.priority || 'Low'}
-              </span>
+  return (
+    <div className="bg-white p-6 rounded-2xl shadow-xl grid md:grid-cols-2 gap-8">
+      <div>
+        <h2 className="text-2xl font-bold text-red-600 mb-4 flex items-center"><AlertCircle className="mr-2"/> Log Tech Blocker</h2>
+        <form onSubmit={handleLogIssue} className="space-y-4">
+          <input name="issueTitle" placeholder="Issue Summary*" required className="w-full p-2 border rounded-lg" />
+          <textarea name="issueDescription" placeholder="Provide technical details..." required rows="4" className="w-full p-2 border rounded-lg"></textarea>
+          <select name="urgency" className="w-full p-2 border rounded-lg bg-white">
+            <option>Low</option><option>Medium</option><option>High</option><option>Urgent</option>
+          </select>
+          <button type="submit" className="w-full bg-red-600 text-white font-bold py-2 rounded-lg hover:bg-red-700 transition">Report Incident</button>
+        </form>
+      </div>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-700 mb-4 tracking-tight">Environment Status</h2>
+        <div className="space-y-4">
+          {issues.length > 0 ? issues.map(issue => (
+            <div key={issue.id} className={`p-4 rounded-xl shadow-sm border-l-4 ${issue.urgency === 'Urgent' ? 'border-red-600 bg-red-50' : 'border-yellow-500 bg-white'}`}>
+              <div className="flex justify-between items-start">
+                <h3 className="font-bold">{issue.issueTitle}</h3>
+                <button onClick={() => deleteDoc(doc(db, 'shared_issues', issue.id))} className="text-gray-300 hover:text-red-500 transition"><Trash2 size={16}/></button>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">{issue.issueDescription}</p>
+              <div className="mt-3 flex items-center justify-between text-[10px] font-black uppercase tracking-tighter">
+                <span className="bg-gray-200 px-2 py-0.5 rounded-full">{issue.urgency}</span>
+                <button onClick={() => showMsg('Exporting to ServiceNow placeholder')} className="text-[#424A9F] hover:underline flex items-center italic">ServiceNow Export <ArrowRight size={10} className="ml-1"/></button>
+              </div>
             </div>
-            <div className="flex items-center text-[11px] text-slate-400 font-bold uppercase mb-8 space-x-6">
-              <span className="flex items-center"><Plus size={14} className="mr-1 text-slate-300"/> TI-HUB-0{issue.id.slice(0,3)}</span>
-              <span className="flex items-center"><CheckCircle2 size={14} className="mr-1 text-[#A3E635]"/> {issue.status || 'Received'}</span>
-            </div>
-            <div className="mt-auto pt-6 border-t border-slate-50 flex justify-between items-center">
-              <button className="text-xs font-black text-[#424A9F] hover:text-[#A3E635] flex items-center transition uppercase tracking-tighter">
-                Transfer to ServiceNow <ArrowRight size={14} className="ml-1.5" />
-              </button>
-              <button onClick={async () => await deleteDoc(doc(db, 'shared_issues', issue.id))} className="text-slate-200 hover:text-red-500 transition-colors p-2"><Trash2 size={20}/></button>
-            </div>
-          </div>
-        )) : (
-          <div className="col-span-2 py-20 text-center bg-white rounded-[2rem] border border-dashed border-slate-300">
-            <AlertCircle size={40} className="mx-auto text-slate-200 mb-4" />
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No incidents currently reported</p>
-          </div>
-        )}
+          )) : <p className="text-center text-gray-400 py-10 italic">No active tech blockers.</p>}
+        </div>
       </div>
     </div>
   );
-};
-
-export default App;
+}
