@@ -1,6 +1,8 @@
 {
-  "installCommand": "echo 'Skipping installation'",
-  "buildCommand": "echo 'Serving static index.html'",
-  "outputDirectory": ".",
-  "public": true
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
