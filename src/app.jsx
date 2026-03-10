@@ -21,12 +21,15 @@ import {
 
 /**
  * ENVIRONMENT CONFIGURATION
- * These now check for the raw names you provided in Vercel.
+ * * IMPORTANT: Because you are using 'react-scripts', you MUST rename your 
+ * variables in the Vercel Dashboard to include the REACT_APP_ prefix.
+ * Example: FIREBASE_API_KEY -> REACT_APP_FIREBASE_API_KEY
  */
 const getEnv = (key) => {
   const env = typeof process !== 'undefined' ? process.env : {};
-  // Check raw key, then common prefixes just in case
-  return env[key] || env[`REACT_APP_${key}`] || env[`VITE_${key}`] || "";
+  // The builder (react-scripts) only allows variables starting with REACT_APP_ 
+  // to be accessed in the browser. 
+  return env[`REACT_APP_${key}`] || env[key] || env[`VITE_${key}`] || "";
 };
 
 const firebaseConfig = {
@@ -42,12 +45,16 @@ const GEMINI_API_KEY = getEnv("GEMINI_API_KEY");
 
 // Initialize Firebase safely
 let auth, db;
-const isConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey.length > 5;
+const isConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10;
 
 if (isConfigured) {
-  const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-  auth = getAuth(app);
-  db = getFirestore(app);
+  try {
+    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (e) {
+    console.error("Firebase Init Error:", e);
+  }
 }
 
 export default function App() {
@@ -59,7 +66,7 @@ export default function App() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [modal, setModal] = useState(null);
 
-  // Global Data States
+  // Data States
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -76,7 +83,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Firestore Real-time Listeners
+  // Listeners
   useEffect(() => {
     if (!user || !isConfigured) return;
 
@@ -114,9 +121,7 @@ export default function App() {
       });
       const data = await response.json();
       return data.candidates[0].content.parts[0].text;
-    } catch (e) {
-      return "AI Connection Error.";
-    }
+    } catch (e) { return "AI Error"; }
   };
 
   if (loading) {
@@ -128,18 +133,32 @@ export default function App() {
     );
   }
 
-  // Setup Guard UI
+  // Setup Guard with Direct Instructions
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-3xl shadow-2xl text-center border-t-8 border-red-500">
-          <i className="fas fa-shield-alt text-red-500 text-5xl mb-4"></i>
-          <h1 className="text-2xl font-black text-[#424A9F] mb-2 uppercase italic tracking-tighter">Setup Required</h1>
-          <p className="text-gray-600 mb-6 text-sm italic">
-            Environment variables (FIREBASE_API_KEY) were not found.
-            <br/><br/>
-            <b>Note:</b> If you use raw names in Vercel, the React builder might strip them. Rename them to <b>REACT_APP_FIREBASE_API_KEY</b> in the Vercel dashboard to fix this.
+        <div className="max-w-lg w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500">
+          <i className="fas fa-shield-alt text-red-500 text-5xl mb-6"></i>
+          <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic tracking-tighter">Setup Required</h1>
+          <p className="text-gray-600 mb-8 text-sm leading-relaxed">
+            Your Vercel environment variables are hidden from the app. Because you use <b>react-scripts</b>, you MUST rename them in Vercel to start with <b>REACT_APP_</b>.
           </p>
+          <div className="text-left bg-gray-50 p-6 rounded-2xl font-mono text-[11px] space-y-3 border border-gray-100">
+             <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px] mb-2">Required Renaming in Vercel:</p>
+             <div className="flex justify-between border-b pb-1 border-gray-200">
+                <span className="text-red-400 line-through">FIREBASE_API_KEY</span>
+                <span className="text-green-600 font-bold">REACT_APP_FIREBASE_API_KEY</span>
+             </div>
+             <div className="flex justify-between border-b pb-1 border-gray-200">
+                <span className="text-red-400 line-through">FIREBASE_PROJECT_ID</span>
+                <span className="text-green-600 font-bold">REACT_APP_FIREBASE_PROJECT_ID</span>
+             </div>
+             <div className="flex justify-between">
+                <span className="text-red-400 line-through">GEMINI_API_KEY</span>
+                <span className="text-green-600 font-bold">REACT_APP_GEMINI_API_KEY</span>
+             </div>
+          </div>
+          <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase">After renaming, you must redeploy in Vercel.</p>
         </div>
       </div>
     );
@@ -189,7 +208,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
-      {/* Header Layout matches out_index.html */}
+      {/* Header UI - Matches out_index.html */}
       <div className="w-full max-w-6xl bg-white p-6 rounded-[2rem] shadow-xl mb-6 border border-gray-50">
         <div className="flex justify-between items-center mb-2">
           <h1 className="text-4xl font-black text-[#424A9F] uppercase italic tracking-tighter">Accenture Hub</h1>
@@ -206,15 +225,15 @@ export default function App() {
         </div>
         <p className="text-center text-gray-400 font-bold uppercase text-[10px] tracking-[0.3em] mb-6">High Performance. Delivered.</p>
         <div className="flex justify-center mb-4 space-x-2">
-          <button onClick={() => setCurrentPage('schedule')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all ${currentPage === 'schedule' ? 'bg-[#A3E635] text-gray-900 shadow-lg scale-105' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Meetings</button>
-          <button onClick={() => setCurrentPage('kanban')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all ${currentPage === 'kanban' ? 'bg-[#A3E635] text-gray-900 shadow-lg scale-105' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Task Board</button>
-          <button onClick={() => setCurrentPage('issues')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all ${currentPage === 'issues' ? 'bg-[#A3E635] text-gray-900 shadow-lg scale-105' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Tech Feed</button>
+          <TabBtn active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings & Events" />
+          <TabBtn active={currentPage === 'kanban'} onClick={() => setCurrentPage('kanban')} label="Task Board" />
+          <TabBtn active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Issues" />
         </div>
       </div>
 
       {message.text && (
         <div className={`w-full max-w-6xl p-4 mb-4 rounded-xl shadow-lg border-l-4 transition-all ${message.isError ? 'bg-red-50 border-red-500 text-red-700' : 'bg-blue-50 border-[#A3E635] text-blue-700'}`}>
-          <p className="font-bold text-sm leading-relaxed tracking-tight">{message.text}</p>
+          <p className="font-bold text-sm leading-relaxed tracking-tight italic">{message.text}</p>
         </div>
       )}
 
@@ -230,13 +249,21 @@ export default function App() {
             <h3 className="text-xl font-black text-[#424A9F] mb-6 uppercase italic tracking-widest border-b-2 border-gray-50 pb-2">{modal.title}</h3>
             <div className="text-gray-700 max-h-[50vh] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed italic">{modal.content}</div>
             <div className="flex justify-end mt-8 space-x-2">
-              {modal.action && <button onClick={() => { modal.action(); showMsg("Copied to clipboard"); }} className="bg-[#A3E635] text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-[#8CD02F] shadow-lg transition uppercase tracking-tighter text-xs italic">Copy Data</button>}
+              {modal.action && <button onClick={() => { modal.action(); showMsg("Copied to clipboard"); }} className="bg-[#A3E635] text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-[#8CD02F] shadow-lg transition uppercase tracking-tighter text-xs italic">Copy Result</button>}
               <button onClick={() => setModal(null)} className="bg-gray-100 font-bold px-6 py-3 rounded-xl hover:bg-gray-200 text-gray-600 transition uppercase tracking-tighter text-xs italic">Close</button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function TabBtn({ active, onClick, label }) {
+  return (
+    <button onClick={onClick} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all ${active ? 'bg-[#A3E635] text-gray-900 shadow-lg scale-105' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
+      {label}
+    </button>
   );
 }
 
@@ -257,7 +284,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   const handleAiExtract = async () => {
     const text = document.getElementById('ai-input').value;
     if (!text.trim()) return;
-    const result = await fetchGemini(`Strategic Extraction: Identify core event details and lead POCs from this BEO text. Provide technical requirements in a clean list format for the Hub team: ${text}`);
+    const result = await fetchGemini(`Identify core event details and lead POCs from this BEO text. Provide technical requirements in a clean list: ${text}`);
     setModal({ title: "AI Extraction Intelligence", content: result, action: () => navigator.clipboard.writeText(result) });
   };
 
@@ -311,7 +338,7 @@ function KanbanPage({ tasks, showMsg, fetchGemini, setModal }) {
 
   const getAiSummary = async () => {
     const list = tasks.map(t => `${t.status}: ${t.text}`).join(', ');
-    const res = await fetchGemini(`Strategic Assessment: Provide an overview of mission progress based on these tasks: ${list}. Identify the primary bottleneck.`);
+    const res = await fetchGemini(`Provide an overview of mission progress based on these tasks: ${list}. Identify the bottleneck.`);
     setModal({ title: "Mission Trajectory Intelligence", content: res });
   };
 
@@ -321,7 +348,7 @@ function KanbanPage({ tasks, showMsg, fetchGemini, setModal }) {
       <div className="space-y-4 flex-grow">
         {tasks.filter(t => t.status === status).map(t => (
           <div key={t.id} className="bg-white p-5 rounded-2xl shadow-md border-b-4 border-slate-200 group transition hover:scale-105 animate-fade-in">
-            <p className="text-sm font-black text-slate-800 leading-tight italic tracking-tight italic">"{t.text}"</p>
+            <p className="text-sm font-black text-slate-800 leading-tight italic tracking-tight">"{t.text}"</p>
             <div className="mt-6 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="flex space-x-1.5">
                 {status !== 'todo' && <button onClick={() => move(t.id, 'todo')} className="p-2 bg-gray-50 rounded-xl hover:bg-[#424A9F] hover:text-white transition shadow-sm"><i className="fas fa-chevron-left text-[8px]"></i></button>}
@@ -366,7 +393,7 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal }) {
   };
 
   const diagnose = async (i) => {
-    const res = await fetchGemini(`Technical Diagnostic: Blocker "${i.title}" described as "${i.desc}". Provide 3 high-impact troubleshooting actions for the NYIH tech team.`);
+    const res = await fetchGemini(`Technical Diagnostic: Blocker "${i.title}" described as "${i.desc}". Provide 3 high-impact troubleshooting actions for the tech team.`);
     setModal({ title: "Incident Diagnostic Protocol", content: res });
   };
 
@@ -380,7 +407,7 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal }) {
           <select name="urgency" className="w-full p-4 border-2 border-gray-100 rounded-2xl bg-gray-50 font-black text-slate-700 outline-none focus:border-red-500 italic text-xs">
             <option>Low Tier</option><option selected>Medium Diagnostic</option><option>High Criticality</option><option>Urgent Blocker</option>
           </select>
-          <button type="submit" className="w-full bg-red-600 text-white font-black py-5 rounded-3xl hover:bg-red-700 transition shadow-xl uppercase italic tracking-widest text-sm">Dispatch Diagnostic Alert</button>
+          <button type="submit" className="w-full bg-red-600 text-white font-black py-5 rounded-3xl hover:bg-red-700 transition shadow-xl uppercase italic tracking-widest text-sm">Dispatch Diagnostic Protocol</button>
         </form>
       </div>
       <div className="flex flex-col h-full bg-slate-50 p-8 rounded-[3rem] border border-gray-200 shadow-inner">
