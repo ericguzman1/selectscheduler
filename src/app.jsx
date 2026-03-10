@@ -22,43 +22,32 @@ import {
 } from 'firebase/firestore';
 
 /**
- * DIRECT CONFIGURATION
- * We use a safe check for process.env to avoid ReferenceErrors in environments 
- * where 'process' is not defined (like the preview sandbox).
+ * CONFIGURATION LOGIC
+ * We use direct literals for process.env because react-scripts requires 
+ * them to be explicitly written out for injection during the build.
  */
-const getSafeEnv = (key) => {
-  try {
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[`REACT_APP_${key}`] || process.env[key] || "";
-    }
-  } catch (e) {}
-  return "";
-};
-
 let firebaseConfig = {};
 let GEMINI_API_KEY = "";
-let appId = "default-app-id";
+let appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// Handle Firebase Configuration with safe fallbacks
-try {
-  // 1. Try to use global provided config (for Canvas/Preview environment)
-  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-    firebaseConfig = JSON.parse(__firebase_config);
-    appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-  } else {
-    // 2. Fallback to process.env (for Vercel/Production build)
+// Check if we are in the Preview environment (Canvas)
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+  firebaseConfig = JSON.parse(__firebase_config);
+} else {
+  // Otherwise, we are in Vercel/Production
+  try {
     firebaseConfig = {
-      apiKey: getSafeEnv("FIREBASE_API_KEY"),
-      authDomain: getSafeEnv("FIREBASE_AUTH_DOMAIN"),
-      projectId: getSafeEnv("FIREBASE_PROJECT_ID"),
-      storageBucket: getSafeEnv("FIREBASE_STORAGE_BUCKET") || `${getSafeEnv("FIREBASE_PROJECT_ID")}.appspot.com`,
-      messagingSenderId: getSafeEnv("FIREBASE_MESSAGING_SENDER_ID"),
-      appId: getSafeEnv("FIREBASE_APP_ID")
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || `${process.env.REACT_APP_FIREBASE_PROJECT_ID}.appspot.com`,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID
     };
-    GEMINI_API_KEY = getSafeEnv("GEMINI_API_KEY");
+    GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
+  } catch (e) {
+    // process.env might be missing in some development environments
   }
-} catch (e) {
-  console.error("Configuration Error:", e);
 }
 
 // Initialize Firebase safely
@@ -95,7 +84,6 @@ export default function App() {
       return;
     }
 
-    // Auth Initialization Protocol
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -104,7 +92,7 @@ export default function App() {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        console.error("Auth initialization failed:", err);
+        console.error("Auth init failed:", err);
       }
     };
 
@@ -116,34 +104,26 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Firestore Listeners
+  // Firestore Real-time Listeners
   useEffect(() => {
     if (!user || !isConfigured) return;
 
-    // Use specific paths if in specialized environment, otherwise use defaults
-    const eventsPath = typeof __app_id !== 'undefined' 
-      ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_events')
-      : collection(db, 'shared_events');
-    
-    const tasksPath = typeof __app_id !== 'undefined' 
-      ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks')
-      : collection(db, 'shared_tasks');
-    
-    const issuesPath = typeof __app_id !== 'undefined' 
-      ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues')
-      : collection(db, 'shared_issues');
+    // Use required artifact paths for shared environment compatibility
+    const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_events');
+    const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks');
+    const issuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues');
 
-    const unsubEvents = onSnapshot(query(eventsPath, orderBy('startDate')), (snap) => {
+    const unsubEvents = onSnapshot(query(eventsRef, orderBy('startDate')), (snap) => {
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Events Listener Error:", err));
+    }, (err) => console.error("Events error:", err));
 
-    const unsubTasks = onSnapshot(tasksPath, (snap) => {
+    const unsubTasks = onSnapshot(tasksRef, (snap) => {
       setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Tasks Listener Error:", err));
+    }, (err) => console.error("Tasks error:", err));
 
-    const unsubIssues = onSnapshot(query(issuesPath, orderBy('timestamp', 'desc')), (snap) => {
+    const unsubIssues = onSnapshot(query(issuesRef, orderBy('timestamp', 'desc')), (snap) => {
       setIssues(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Issues Listener Error:", err));
+    }, (err) => console.error("Issues error:", err));
 
     return () => {
       unsubEvents();
@@ -166,7 +146,7 @@ export default function App() {
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text || "AI produced no result.";
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "No result from AI.";
     } catch (e) { return "AI Connection Error."; }
   };
 
@@ -179,7 +159,7 @@ export default function App() {
     );
   }
 
-  // Configuration Guard UI
+  // Setup Guard UI
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -187,9 +167,11 @@ export default function App() {
           <i className="fas fa-shield-alt text-red-500 text-5xl mb-6"></i>
           <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic tracking-tighter">Connection Error</h1>
           <p className="text-gray-600 mb-8 text-sm leading-relaxed">
-            Firebase configuration is missing. Ensure your environment variables are set in Vercel or provided by the environment.
+            Environment variables were not detected. 
+            <br/><br/>
+            <b>If you just added them in Vercel:</b> You must trigger a <b>New Deployment</b> (rebuild) to bake the keys into the code.
           </p>
-          <button onClick={() => window.location.reload()} className="mt-8 w-full bg-gray-100 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-200 transition">Check Again</button>
+          <button onClick={() => window.location.reload()} className="mt-8 w-full bg-gray-100 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-200 transition">Retry Connection</button>
         </div>
       </div>
     );
@@ -303,9 +285,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal, db, appId }) {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     try {
-      const colRef = typeof __app_id !== 'undefined' 
-        ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_events')
-        : collection(db, 'shared_events');
+      const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_events');
       await addDoc(colRef, { ...data, timestamp: new Date().toISOString() });
       e.target.reset();
       showMsg("Event operational data synchronized.");
@@ -321,9 +301,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal, db, appId }) {
 
   const handleDeleteEvent = async (id) => {
     try {
-      const docRef = typeof __app_id !== 'undefined'
-        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', id)
-        : doc(db, 'shared_events', id);
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', id);
       await deleteDoc(docRef);
       showMsg("Event deleted.");
     } catch (err) { showMsg(err.message, true); }
@@ -349,7 +327,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal, db, appId }) {
       </div>
       <div className="flex flex-col h-full">
         <h2 className="text-xl font-black text-[#424A9F] mb-6 uppercase italic tracking-tighter">Live Operations</h2>
-        <div className="space-y-4 overflow-y-auto max-h-[65vh] pr-2">
+        <div className="space-y-4 overflow-y-auto max-h-[65vh] pr-2 custom-scrollbar">
           {events.map(e => (
             <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border-l-8 border-[#424A9F] flex justify-between items-center group hover:bg-indigo-50 transition border border-gray-50">
               <div>
@@ -372,9 +350,7 @@ function KanbanPage({ tasks, showMsg, fetchGemini, setModal, db, appId }) {
     const val = e.target.t.value.trim();
     if (!val) return;
     try {
-      const colRef = typeof __app_id !== 'undefined'
-        ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks')
-        : collection(db, 'shared_tasks');
+      const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks');
       await addDoc(colRef, { text: val, status: 'todo', timestamp: new Date().toISOString() });
       e.target.reset();
     } catch (err) { showMsg(err.message, true); }
@@ -382,18 +358,14 @@ function KanbanPage({ tasks, showMsg, fetchGemini, setModal, db, appId }) {
 
   const move = async (id, s) => {
     try {
-      const docRef = typeof __app_id !== 'undefined'
-        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)
-        : doc(db, 'shared_tasks', id);
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id);
       await updateDoc(docRef, { status: s });
     } catch (err) { showMsg(err.message, true); }
   };
 
   const deleteTask = async (id) => {
     try {
-      const docRef = typeof __app_id !== 'undefined'
-        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)
-        : doc(db, 'shared_tasks', id);
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id);
       await deleteDoc(docRef);
     } catch (err) { showMsg(err.message, true); }
   };
@@ -448,9 +420,7 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal, db, appId }) {
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     try {
-      const colRef = typeof __app_id !== 'undefined'
-        ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues')
-        : collection(db, 'shared_issues');
+      const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues');
       await addDoc(colRef, { ...data, timestamp: new Date().toISOString() });
       e.target.reset();
       showMsg("Incident reported to intelligence stream.");
@@ -464,9 +434,7 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal, db, appId }) {
 
   const deleteIssue = async (id) => {
     try {
-      const docRef = typeof __app_id !== 'undefined'
-        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id)
-        : doc(db, 'shared_issues', id);
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id);
       await deleteDoc(docRef);
       showMsg("Issue removed.");
     } catch (err) { showMsg(err.message, true); }
@@ -487,7 +455,7 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal, db, appId }) {
       </div>
       <div className="flex flex-col h-full bg-slate-50 p-8 rounded-[3rem] border border-gray-200 shadow-inner">
         <h2 className="text-xl font-black text-slate-800 mb-8 uppercase italic border-b-2 border-slate-200 pb-2 tracking-tight">Intelligence Diagnostic Feed</h2>
-        <div className="space-y-4 overflow-y-auto max-h-[550px] pr-2">
+        <div className="space-y-4 overflow-y-auto max-h-[550px] pr-2 custom-scrollbar">
           {issues.map(i => (
             <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 animate-fade-in ${i.urgency?.includes('Urgent') ? 'border-red-600 bg-red-50/20' : 'border-yellow-400'}`}>
               <div className="flex justify-between items-start mb-4">
