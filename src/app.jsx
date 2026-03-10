@@ -5,7 +5,9 @@ import {
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signOut 
+  signOut,
+  signInWithCustomToken,
+  signInAnonymously
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -20,32 +22,48 @@ import {
 } from 'firebase/firestore';
 
 /**
- * ENVIRONMENT CONFIGURATION
- * * IMPORTANT: Because you are using 'react-scripts', you MUST rename your 
- * variables in the Vercel Dashboard to include the REACT_APP_ prefix.
- * Example: FIREBASE_API_KEY -> REACT_APP_FIREBASE_API_KEY
+ * DIRECT CONFIGURATION
+ * We use a safe check for process.env to avoid ReferenceErrors in environments 
+ * where 'process' is not defined (like the preview sandbox).
  */
-const getEnv = (key) => {
-  const env = typeof process !== 'undefined' ? process.env : {};
-  // The builder (react-scripts) only allows variables starting with REACT_APP_ 
-  // to be accessed in the browser. 
-  return env[`REACT_APP_${key}`] || env[key] || env[`VITE_${key}`] || "";
+const getSafeEnv = (key) => {
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[`REACT_APP_${key}`] || process.env[key] || "";
+    }
+  } catch (e) {}
+  return "";
 };
 
-const firebaseConfig = {
-  apiKey: getEnv("FIREBASE_API_KEY"),
-  authDomain: getEnv("FIREBASE_AUTH_DOMAIN"),
-  projectId: getEnv("FIREBASE_PROJECT_ID"),
-  storageBucket: getEnv("FIREBASE_STORAGE_BUCKET") || `${getEnv("FIREBASE_PROJECT_ID")}.appspot.com`,
-  messagingSenderId: getEnv("FIREBASE_MESSAGING_SENDER_ID"),
-  appId: getEnv("FIREBASE_APP_ID")
-};
+let firebaseConfig = {};
+let GEMINI_API_KEY = "";
+let appId = "default-app-id";
 
-const GEMINI_API_KEY = getEnv("GEMINI_API_KEY");
+// Handle Firebase Configuration with safe fallbacks
+try {
+  // 1. Try to use global provided config (for Canvas/Preview environment)
+  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+    firebaseConfig = JSON.parse(__firebase_config);
+    appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+  } else {
+    // 2. Fallback to process.env (for Vercel/Production build)
+    firebaseConfig = {
+      apiKey: getSafeEnv("FIREBASE_API_KEY"),
+      authDomain: getSafeEnv("FIREBASE_AUTH_DOMAIN"),
+      projectId: getSafeEnv("FIREBASE_PROJECT_ID"),
+      storageBucket: getSafeEnv("FIREBASE_STORAGE_BUCKET") || `${getSafeEnv("FIREBASE_PROJECT_ID")}.appspot.com`,
+      messagingSenderId: getSafeEnv("FIREBASE_MESSAGING_SENDER_ID"),
+      appId: getSafeEnv("FIREBASE_APP_ID")
+    };
+    GEMINI_API_KEY = getSafeEnv("GEMINI_API_KEY");
+  }
+} catch (e) {
+  console.error("Configuration Error:", e);
+}
 
 // Initialize Firebase safely
 let auth, db;
-const isConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10;
+const isConfigured = !!firebaseConfig.apiKey;
 
 if (isConfigured) {
   try {
@@ -66,7 +84,7 @@ export default function App() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [modal, setModal] = useState(null);
 
-  // Data States
+  // Global Data States
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -76,6 +94,21 @@ export default function App() {
       setLoading(false);
       return;
     }
+
+    // Auth Initialization Protocol
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth initialization failed:", err);
+      }
+    };
+
+    initAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
@@ -83,21 +116,34 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Listeners
+  // Firestore Listeners
   useEffect(() => {
     if (!user || !isConfigured) return;
 
-    const unsubEvents = onSnapshot(query(collection(db, 'shared_events'), orderBy('startDate')), (snap) => {
+    // Use specific paths if in specialized environment, otherwise use defaults
+    const eventsPath = typeof __app_id !== 'undefined' 
+      ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_events')
+      : collection(db, 'shared_events');
+    
+    const tasksPath = typeof __app_id !== 'undefined' 
+      ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks')
+      : collection(db, 'shared_tasks');
+    
+    const issuesPath = typeof __app_id !== 'undefined' 
+      ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues')
+      : collection(db, 'shared_issues');
+
+    const unsubEvents = onSnapshot(query(eventsPath, orderBy('startDate')), (snap) => {
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => console.error("Events Listener Error:", err));
 
-    const unsubTasks = onSnapshot(collection(db, 'shared_tasks'), (snap) => {
+    const unsubTasks = onSnapshot(tasksPath, (snap) => {
       setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => console.error("Tasks Listener Error:", err));
 
-    const unsubIssues = onSnapshot(query(collection(db, 'shared_issues'), orderBy('timestamp', 'desc')), (snap) => {
+    const unsubIssues = onSnapshot(query(issuesPath, orderBy('timestamp', 'desc')), (snap) => {
       setIssues(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, (err) => console.error("Issues Listener Error:", err));
 
     return () => {
       unsubEvents();
@@ -114,14 +160,14 @@ export default function App() {
   const fetchGemini = async (prompt) => {
     if (!aiEnabled || !GEMINI_API_KEY) return "AI Service Unavailable";
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
       });
       const data = await response.json();
-      return data.candidates[0].content.parts[0].text;
-    } catch (e) { return "AI Error"; }
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "AI produced no result.";
+    } catch (e) { return "AI Connection Error."; }
   };
 
   if (loading) {
@@ -133,32 +179,17 @@ export default function App() {
     );
   }
 
-  // Setup Guard with Direct Instructions
+  // Configuration Guard UI
   if (!isConfigured) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <div className="max-w-lg w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500">
+        <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500">
           <i className="fas fa-shield-alt text-red-500 text-5xl mb-6"></i>
-          <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic tracking-tighter">Setup Required</h1>
+          <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic tracking-tighter">Connection Error</h1>
           <p className="text-gray-600 mb-8 text-sm leading-relaxed">
-            Your Vercel environment variables are hidden from the app. Because you use <b>react-scripts</b>, you MUST rename them in Vercel to start with <b>REACT_APP_</b>.
+            Firebase configuration is missing. Ensure your environment variables are set in Vercel or provided by the environment.
           </p>
-          <div className="text-left bg-gray-50 p-6 rounded-2xl font-mono text-[11px] space-y-3 border border-gray-100">
-             <p className="font-bold text-gray-400 uppercase tracking-widest text-[9px] mb-2">Required Renaming in Vercel:</p>
-             <div className="flex justify-between border-b pb-1 border-gray-200">
-                <span className="text-red-400 line-through">FIREBASE_API_KEY</span>
-                <span className="text-green-600 font-bold">REACT_APP_FIREBASE_API_KEY</span>
-             </div>
-             <div className="flex justify-between border-b pb-1 border-gray-200">
-                <span className="text-red-400 line-through">FIREBASE_PROJECT_ID</span>
-                <span className="text-green-600 font-bold">REACT_APP_FIREBASE_PROJECT_ID</span>
-             </div>
-             <div className="flex justify-between">
-                <span className="text-red-400 line-through">GEMINI_API_KEY</span>
-                <span className="text-green-600 font-bold">REACT_APP_GEMINI_API_KEY</span>
-             </div>
-          </div>
-          <p className="mt-8 text-[10px] text-gray-400 font-bold uppercase">After renaming, you must redeploy in Vercel.</p>
+          <button onClick={() => window.location.reload()} className="mt-8 w-full bg-gray-100 py-3 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-200 transition">Check Again</button>
         </div>
       </div>
     );
@@ -195,7 +226,7 @@ export default function App() {
             }}>
               <input name="email" type="email" placeholder="Corporate ID" required className="w-full p-4 rounded-2xl border-2 border-gray-100 focus:ring-2 focus:ring-[#A3E635] outline-none font-bold bg-gray-50" />
               <input name="password" type="password" placeholder="Key Phrase" required className="w-full p-4 rounded-2xl border-2 border-gray-100 focus:ring-2 focus:ring-[#A3E635] outline-none font-bold bg-gray-50" />
-              <button type="submit" className="w-full bg-[#A3E635] text-gray-900 font-black py-4 rounded-2xl shadow-xl hover:bg-[#8CD02F] transition uppercase italic">Create Profile</button>
+              <button type="submit" className="w-full bg-[#A3E635] text-gray-900 font-black py-4 rounded-xl shadow-xl hover:bg-[#8CD02F] transition uppercase italic">Create Profile</button>
               <p className="text-center text-xs text-gray-400 mt-6 font-bold uppercase">
                 Existing user? <button type="button" onClick={() => setShowRegister(false)} className="text-[#424A9F] hover:underline">Login here</button>
               </p>
@@ -208,7 +239,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center">
-      {/* Header UI - Matches out_index.html */}
       <div className="w-full max-w-6xl bg-white p-6 rounded-[2rem] shadow-xl mb-6 border border-gray-50">
         <div className="flex justify-between items-center mb-2">
           <h1 className="text-4xl font-black text-[#424A9F] uppercase italic tracking-tighter">Accenture Hub</h1>
@@ -227,7 +257,7 @@ export default function App() {
         <div className="flex justify-center mb-4 space-x-2">
           <TabBtn active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings & Events" />
           <TabBtn active={currentPage === 'kanban'} onClick={() => setCurrentPage('kanban')} label="Task Board" />
-          <TabBtn active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Issues" />
+          <TabBtn active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Feed" />
         </div>
       </div>
 
@@ -238,9 +268,9 @@ export default function App() {
       )}
 
       <div className="w-full max-w-6xl flex-grow animate-in fade-in duration-500">
-        {currentPage === 'schedule' && <SchedulePage events={events} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} />}
-        {currentPage === 'kanban' && <KanbanPage tasks={tasks} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} />}
-        {currentPage === 'issues' && <IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} />}
+        {currentPage === 'schedule' && <SchedulePage events={events} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} db={db} appId={appId} />}
+        {currentPage === 'kanban' && <KanbanPage tasks={tasks} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} db={db} appId={appId} />}
+        {currentPage === 'issues' && <IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} db={db} appId={appId} />}
       </div>
 
       {modal && (
@@ -249,7 +279,7 @@ export default function App() {
             <h3 className="text-xl font-black text-[#424A9F] mb-6 uppercase italic tracking-widest border-b-2 border-gray-50 pb-2">{modal.title}</h3>
             <div className="text-gray-700 max-h-[50vh] overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed italic">{modal.content}</div>
             <div className="flex justify-end mt-8 space-x-2">
-              {modal.action && <button onClick={() => { modal.action(); showMsg("Copied to clipboard"); }} className="bg-[#A3E635] text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-[#8CD02F] shadow-lg transition uppercase tracking-tighter text-xs italic">Copy Result</button>}
+              {modal.action && <button onClick={() => { modal.action(); showMsg("Copied to clipboard"); }} className="bg-[#A3E635] text-gray-900 font-bold px-6 py-3 rounded-xl hover:bg-[#8CD02F] shadow-lg transition uppercase tracking-tighter text-xs italic">Copy Data</button>}
               <button onClick={() => setModal(null)} className="bg-gray-100 font-bold px-6 py-3 rounded-xl hover:bg-gray-200 text-gray-600 transition uppercase tracking-tighter text-xs italic">Close</button>
             </div>
           </div>
@@ -267,15 +297,16 @@ function TabBtn({ active, onClick, label }) {
   );
 }
 
-/* --- SUB-COMPONENTS --- */
-
-function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
+function SchedulePage({ events, showMsg, fetchGemini, setModal, db, appId }) {
   const handleAdd = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     try {
-      await addDoc(collection(db, 'shared_events'), { ...data, timestamp: new Date().toISOString() });
+      const colRef = typeof __app_id !== 'undefined' 
+        ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_events')
+        : collection(db, 'shared_events');
+      await addDoc(colRef, { ...data, timestamp: new Date().toISOString() });
       e.target.reset();
       showMsg("Event operational data synchronized.");
     } catch (err) { showMsg(err.message, true); }
@@ -286,6 +317,16 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
     if (!text.trim()) return;
     const result = await fetchGemini(`Identify core event details and lead POCs from this BEO text. Provide technical requirements in a clean list: ${text}`);
     setModal({ title: "AI Extraction Intelligence", content: result, action: () => navigator.clipboard.writeText(result) });
+  };
+
+  const handleDeleteEvent = async (id) => {
+    try {
+      const docRef = typeof __app_id !== 'undefined'
+        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', id)
+        : doc(db, 'shared_events', id);
+      await deleteDoc(docRef);
+      showMsg("Event deleted.");
+    } catch (err) { showMsg(err.message, true); }
   };
 
   return (
@@ -315,7 +356,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
                 <p className="font-black text-slate-800 uppercase text-xs tracking-tight italic">{e.eventName}</p>
                 <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 italic">{e.startDate} — {e.eventPoc}</p>
               </div>
-              <button onClick={() => deleteDoc(doc(db, 'shared_events', e.id))} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition p-2"><i className="fas fa-trash-alt"></i></button>
+              <button onClick={() => handleDeleteEvent(e.id)} className="text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition p-2"><i className="fas fa-trash-alt"></i></button>
             </div>
           ))}
           {events.length === 0 && <p className="text-center py-20 opacity-20 italic">No operations active</p>}
@@ -325,20 +366,41 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   );
 }
 
-function KanbanPage({ tasks, showMsg, fetchGemini, setModal }) {
+function KanbanPage({ tasks, showMsg, fetchGemini, setModal, db, appId }) {
   const add = async (e) => {
     e.preventDefault();
     const val = e.target.t.value.trim();
     if (!val) return;
-    await addDoc(collection(db, 'shared_tasks'), { text: val, status: 'todo', timestamp: new Date().toISOString() });
-    e.target.reset();
+    try {
+      const colRef = typeof __app_id !== 'undefined'
+        ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks')
+        : collection(db, 'shared_tasks');
+      await addDoc(colRef, { text: val, status: 'todo', timestamp: new Date().toISOString() });
+      e.target.reset();
+    } catch (err) { showMsg(err.message, true); }
   };
 
-  const move = async (id, s) => { await updateDoc(doc(db, 'shared_tasks', id), { status: s }); };
+  const move = async (id, s) => {
+    try {
+      const docRef = typeof __app_id !== 'undefined'
+        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)
+        : doc(db, 'shared_tasks', id);
+      await updateDoc(docRef, { status: s });
+    } catch (err) { showMsg(err.message, true); }
+  };
+
+  const deleteTask = async (id) => {
+    try {
+      const docRef = typeof __app_id !== 'undefined'
+        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)
+        : doc(db, 'shared_tasks', id);
+      await deleteDoc(docRef);
+    } catch (err) { showMsg(err.message, true); }
+  };
 
   const getAiSummary = async () => {
     const list = tasks.map(t => `${t.status}: ${t.text}`).join(', ');
-    const res = await fetchGemini(`Provide an overview of mission progress based on these tasks: ${list}. Identify the bottleneck.`);
+    const res = await fetchGemini(`Strategic Assessment: Provide an overview of mission progress based on these tasks: ${list}. Identify the bottleneck.`);
     setModal({ title: "Mission Trajectory Intelligence", content: res });
   };
 
@@ -348,13 +410,13 @@ function KanbanPage({ tasks, showMsg, fetchGemini, setModal }) {
       <div className="space-y-4 flex-grow">
         {tasks.filter(t => t.status === status).map(t => (
           <div key={t.id} className="bg-white p-5 rounded-2xl shadow-md border-b-4 border-slate-200 group transition hover:scale-105 animate-fade-in">
-            <p className="text-sm font-black text-slate-800 leading-tight italic tracking-tight">"{t.text}"</p>
+            <p className="text-sm font-black text-slate-800 leading-tight italic tracking-tight italic">"{t.text}"</p>
             <div className="mt-6 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="flex space-x-1.5">
                 {status !== 'todo' && <button onClick={() => move(t.id, 'todo')} className="p-2 bg-gray-50 rounded-xl hover:bg-[#424A9F] hover:text-white transition shadow-sm"><i className="fas fa-chevron-left text-[8px]"></i></button>}
                 {status !== 'complete' && <button onClick={() => move(t.id, status === 'todo' ? 'doing' : 'complete')} className="p-2 bg-gray-50 rounded-xl hover:bg-[#424A9F] hover:text-white transition shadow-sm"><i className="fas fa-chevron-right text-[8px]"></i></button>}
               </div>
-              <button onClick={() => deleteDoc(doc(db, 'shared_tasks', t.id))} className="text-red-100 hover:text-red-500 transition p-1"><i className="fas fa-trash-alt text-[10px]"></i></button>
+              <button onClick={() => deleteTask(t.id)} className="text-red-100 hover:text-red-500 transition p-1"><i className="fas fa-trash-alt text-[10px]"></i></button>
             </div>
           </div>
         ))}
@@ -380,21 +442,34 @@ function KanbanPage({ tasks, showMsg, fetchGemini, setModal }) {
   );
 }
 
-function IssuesPage({ issues, showMsg, fetchGemini, setModal }) {
+function IssuesPage({ issues, showMsg, fetchGemini, setModal, db, appId }) {
   const handleReport = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const data = Object.fromEntries(fd.entries());
     try {
-      await addDoc(collection(db, 'shared_issues'), { ...data, timestamp: new Date().toISOString() });
+      const colRef = typeof __app_id !== 'undefined'
+        ? collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues')
+        : collection(db, 'shared_issues');
+      await addDoc(colRef, { ...data, timestamp: new Date().toISOString() });
       e.target.reset();
       showMsg("Incident reported to intelligence stream.");
     } catch (err) { showMsg(err.message, true); }
   };
 
   const diagnose = async (i) => {
-    const res = await fetchGemini(`Technical Diagnostic: Blocker "${i.title}" described as "${i.desc}". Provide 3 high-impact troubleshooting actions for the tech team.`);
+    const res = await fetchGemini(`Technical Diagnostic: Blocker "${i.title}" described as "${i.desc}". Provide 3 corrective actions for our tech team.`);
     setModal({ title: "Incident Diagnostic Protocol", content: res });
+  };
+
+  const deleteIssue = async (id) => {
+    try {
+      const docRef = typeof __app_id !== 'undefined'
+        ? doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id)
+        : doc(db, 'shared_issues', id);
+      await deleteDoc(docRef);
+      showMsg("Issue removed.");
+    } catch (err) { showMsg(err.message, true); }
   };
 
   return (
@@ -407,17 +482,17 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal }) {
           <select name="urgency" className="w-full p-4 border-2 border-gray-100 rounded-2xl bg-gray-50 font-black text-slate-700 outline-none focus:border-red-500 italic text-xs">
             <option>Low Tier</option><option selected>Medium Diagnostic</option><option>High Criticality</option><option>Urgent Blocker</option>
           </select>
-          <button type="submit" className="w-full bg-red-600 text-white font-black py-5 rounded-3xl hover:bg-red-700 transition shadow-xl uppercase italic tracking-widest text-sm">Dispatch Diagnostic Protocol</button>
+          <button type="submit" className="w-full bg-red-600 text-white font-black py-5 rounded-3xl hover:bg-red-700 transition shadow-xl uppercase italic tracking-widest text-sm">Dispatch Diagnostic Alert</button>
         </form>
       </div>
       <div className="flex flex-col h-full bg-slate-50 p-8 rounded-[3rem] border border-gray-200 shadow-inner">
         <h2 className="text-xl font-black text-slate-800 mb-8 uppercase italic border-b-2 border-slate-200 pb-2 tracking-tight">Intelligence Diagnostic Feed</h2>
         <div className="space-y-4 overflow-y-auto max-h-[550px] pr-2">
           {issues.map(i => (
-            <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 animate-fade-in ${i.urgency.includes('Urgent') ? 'border-red-600 bg-red-50/20' : 'border-yellow-400'}`}>
+            <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 animate-fade-in ${i.urgency?.includes('Urgent') ? 'border-red-600 bg-red-50/20' : 'border-yellow-400'}`}>
               <div className="flex justify-between items-start mb-4">
                 <h3 className="font-black text-slate-800 uppercase text-xs tracking-tight italic">"{i.title}"</h3>
-                <button onClick={() => deleteDoc(doc(db, 'shared_issues', i.id))} className="text-slate-200 hover:text-red-500 transition p-1"><i className="fas fa-trash-alt text-[10px]"></i></button>
+                <button onClick={() => deleteIssue(i.id)} className="text-slate-200 hover:text-red-500 transition p-1"><i className="fas fa-trash-alt text-[10px]"></i></button>
               </div>
               <p className="text-[11px] text-slate-500 font-bold italic line-clamp-3 mb-6">"${i.desc}"</p>
               <div className="flex justify-between items-center mt-auto">
