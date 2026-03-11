@@ -22,47 +22,46 @@ import {
 } from 'firebase/firestore';
 
 /**
- * SECURE CONFIGURATION HANDLER
- * Maintains the working connection logic for Vercel and Canvas.
+ * CONFIGURATION LOGIC
+ * We use explicit literal strings for process.env. This is MANDATORY for 
+ * react-scripts/Vercel to correctly "burn" the keys into your deployment.
  */
-const getConfigValue = (key) => {
-  if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-    try {
-      const config = JSON.parse(__firebase_config);
-      if (config[key]) return config[key];
-    } catch (e) {}
-  }
-  const envKey = `REACT_APP_${key.toUpperCase()}`;
+let firebaseConfig = {};
+let GEMINI_API_KEY = "";
+let appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// 1. Check for Canvas Preview Config
+if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+  firebaseConfig = JSON.parse(__firebase_config);
+} else {
+  // 2. Fallback to Vercel/Production Build
+  // The try-catch prevents crashes in environments where 'process' is not defined.
   try {
-    if (typeof process !== 'undefined' && process.env && process.env[envKey]) {
-      return process.env[envKey];
-    }
+    firebaseConfig = {
+      apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+      authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || `${process.env.REACT_APP_FIREBASE_PROJECT_ID}.appspot.com`,
+      messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.REACT_APP_FIREBASE_APP_ID
+    };
+    GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
   } catch (e) {}
-  return "";
-};
+}
 
-const firebaseConfig = {
-  apiKey: getConfigValue("apiKey") || getConfigValue("FIREBASE_API_KEY"),
-  authDomain: getConfigValue("authDomain") || getConfigValue("FIREBASE_AUTH_DOMAIN"),
-  projectId: getConfigValue("projectId") || getConfigValue("FIREBASE_PROJECT_ID"),
-  storageBucket: getConfigValue("storageBucket") || getConfigValue("FIREBASE_STORAGE_BUCKET") || `${getConfigValue("projectId")}.appspot.com`,
-  messagingSenderId: getConfigValue("messagingSenderId") || getConfigValue("FIREBASE_MESSAGING_SENDER_ID"),
-  appId: getConfigValue("appId") || getConfigValue("FIREBASE_APP_ID")
-};
-
-const GEMINI_API_KEY = getConfigValue("GEMINI_API_KEY") || getConfigValue("VITE_GEMINI_API_KEY");
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
+// Initialize Firebase safely
 let auth = null;
 let db = null;
-const isConfigured = !!firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10;
+const isConfigured = !!firebaseConfig.apiKey;
 
 if (isConfigured) {
   try {
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
     auth = getAuth(app);
     db = getFirestore(app);
-  } catch (e) { console.error("Firebase Init Error:", e); }
+  } catch (e) {
+    console.error("Firebase Init Failure:", e);
+  }
 }
 
 export default function App() {
@@ -75,6 +74,7 @@ export default function App() {
   const [modal, setModal] = useState(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
 
+  // Global Data States
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
@@ -84,6 +84,7 @@ export default function App() {
       setLoading(false);
       return;
     }
+
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -91,8 +92,11 @@ export default function App() {
         } else if (!auth.currentUser) {
           await signInAnonymously(auth);
         }
-      } catch (err) { console.error("Auth failed:", err); }
+      } catch (err) {
+        console.error("Auth init failed:", err);
+      }
     };
+
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
@@ -101,8 +105,10 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Real-time Listeners
   useEffect(() => {
     if (!user || !isConfigured) return;
+
     const eventsRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_events');
     const tasksRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks');
     const issuesRef = collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues');
@@ -110,9 +116,11 @@ export default function App() {
     const unsubEvents = onSnapshot(query(eventsRef, orderBy('timestamp', 'desc')), (snap) => {
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+
     const unsubTasks = onSnapshot(query(tasksRef, orderBy('timestamp', 'desc')), (snap) => {
       setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
+
     const unsubIssues = onSnapshot(query(issuesRef, orderBy('timestamp', 'desc')), (snap) => {
       setIssues(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -146,16 +154,15 @@ export default function App() {
     if (!aiEnabled) return;
     setIsBriefingLoading(true);
     
-    const eventContext = events.slice(0, 3).map(e => `${e.eventName} (${e.startDate})`).join(', ');
-    const taskContext = tasks.filter(t => t.status === 'doing').map(t => t.title).join(', ');
-    const issueContext = issues.filter(i => i.urgency === 'Urgent').map(i => i.title).join(', ');
+    const eventList = events.slice(0, 3).map(e => `${e.eventName} (${e.startDate})`).join(', ');
+    const taskList = tasks.filter(t => t.status === 'doing').map(t => t.title).join(', ');
+    const blockerList = issues.filter(i => i.urgency === 'Urgent').map(i => i.title).join(', ');
 
-    const prompt = `Act as an Accenture Project Manager. Summarize the following status into exactly TWO high-impact bullet points for leadership. 
-    Focus on upcoming events and current blockers. 
-    Events: ${eventContext || 'None'}
-    Active Tasks: ${taskContext || 'None'}
-    Urgent Issues: ${issueContext || 'None'}
-    Output should be concise and professional.`;
+    const prompt = `Act as an Accenture Project Manager. Provide exactly TWO professional bullet points for a leadership status update based on these details:
+    Events: ${eventList || 'None'}
+    Current Tasks: ${taskList || 'None'}
+    Urgent Blockers: ${blockerList || 'None'}
+    Tone: Concise, high-performance, delivered.`;
 
     const summary = await fetchGemini(prompt);
     setModal({ 
@@ -171,15 +178,24 @@ export default function App() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-gray-100"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-[#424A9F]"></div></div>;
 
-  if (!isConfigured) return <div className="min-h-screen flex items-center justify-center p-4"><div className="max-w-md bg-white p-10 rounded-3xl shadow-xl text-center border-t-8 border-red-500"><h1 className="text-2xl font-black text-[#424A9F]">Connection Error</h1><p className="text-gray-600 mt-4">Check Vercel variables or Canvas config.</p></div></div>;
+  if (!isConfigured) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500">
+        <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic">Connection Error</h1>
+        <p className="text-gray-600 mb-8 text-sm italic">Firebase environment variables were not detected. If you just updated them, please <strong>Redeploy</strong> in Vercel to apply the changes.</p>
+        <button onClick={() => window.location.reload()} className="w-full bg-gray-100 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition">Retry Link</button>
+      </div>
+    </div>
+  );
 
   if (!user) return <AuthPage showMsg={showMsg} />;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center font-sans">
+    <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center font-sans text-slate-900">
+      {/* App Header */}
       <div className="w-full max-w-6xl bg-white p-6 rounded-[2rem] shadow-xl mb-6 border border-gray-50">
         <div className="flex justify-between items-center mb-2">
-          <h1 className="text-4xl font-black text-[#424A9F] uppercase italic tracking-tighter leading-none">Accenture Hub</h1>
+          <h1 className="text-4xl font-black text-[#424A9F] uppercase italic tracking-tighter">Accenture Hub</h1>
           <div className="flex items-center space-x-4">
             <button 
               onClick={generateLeadBriefing}
@@ -187,10 +203,10 @@ export default function App() {
               className="bg-[#424A9F] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#343D84] transition-all flex items-center shadow-lg disabled:opacity-50"
             >
               <i className={`fas fa-bolt mr-2 text-[#A3E635] ${isBriefingLoading ? 'animate-spin' : ''}`}></i>
-              {isBriefingLoading ? 'BRIEFING...' : 'LEAD UPDATE'}
+              {isBriefingLoading ? 'ANALYZING...' : 'LEAD UPDATE'}
             </button>
             <div className="flex items-center space-x-2">
-              <span className="text-[10px] font-black uppercase text-gray-400">AI Status</span>
+              <span className="text-[10px] font-black uppercase text-gray-400">AI Features</span>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" className="sr-only peer" checked={aiEnabled} onChange={(e) => setAiEnabled(e.target.checked)} />
                 <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#A3E635]"></div>
@@ -200,9 +216,9 @@ export default function App() {
           </div>
         </div>
         <div className="flex justify-center mb-4 space-x-2">
-          <button onClick={() => setCurrentPage('schedule')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${currentPage === 'schedule' ? 'bg-[#A3E635] shadow-lg scale-105' : 'bg-gray-200'}`}>Meetings</button>
-          <button onClick={() => setCurrentPage('kanban')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${currentPage === 'kanban' ? 'bg-[#A3E635] shadow-lg scale-105' : 'bg-gray-200'}`}>Task Board</button>
-          <button onClick={() => setCurrentPage('issues')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${currentPage === 'issues' ? 'bg-[#A3E635] shadow-lg scale-105' : 'bg-gray-200'}`}>Tech Feed</button>
+          <TabBtn active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings" />
+          <TabBtn active={currentPage === 'kanban'} onClick={() => setCurrentPage('kanban')} label="Task Board" />
+          <TabBtn active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Feed" />
         </div>
       </div>
 
@@ -228,7 +244,7 @@ export default function App() {
             <div className="flex gap-2 mt-8">
               {modal.action && (
                 <button onClick={modal.action} className="flex-1 bg-[#A3E635] text-[#424A9F] font-black py-3 rounded-xl hover:bg-[#8CD02F] transition uppercase text-xs italic">
-                  Copy Update
+                  Copy Data
                 </button>
               )}
               <button onClick={() => setModal(null)} className="flex-1 bg-gray-100 font-bold py-3 rounded-xl hover:bg-gray-200 transition uppercase text-xs italic">
@@ -242,7 +258,15 @@ export default function App() {
   );
 }
 
-/* --- COMPONENTS --- */
+function TabBtn({ active, onClick, label }) {
+  return (
+    <button onClick={onClick} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all ${active ? 'bg-[#A3E635] shadow-lg scale-105' : 'bg-gray-200'}`}>
+      {label}
+    </button>
+  );
+}
+
+/* --- SUB-COMPONENTS --- */
 
 function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
@@ -292,8 +316,8 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
             <input name="eventPoc" placeholder="Event Lead / POC*" required className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="text-[9px] font-black uppercase text-gray-400">Start Date<input name="startDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50 outline-none" /></div>
-            <div className="text-[9px] font-black uppercase text-gray-400">End Date<input name="endDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50 outline-none" /></div>
+            <div className="text-[9px] font-black uppercase text-gray-400">Start Date<input name="startDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50" /></div>
+            <div className="text-[9px] font-black uppercase text-gray-400">End Date<input name="endDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
              <input name="selectPoc" placeholder="SELECT POC" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
@@ -304,7 +328,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
              <input name="classification" placeholder="Classification" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
              <input name="sessionType" placeholder="Session Type" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
           </div>
-          <input name="attendees" placeholder="Attendees Count/List" className="w-full p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+          <input name="attendees" placeholder="Attendees Count" className="w-full p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
           <div className="grid grid-cols-2 gap-4">
              <input name="demo" placeholder="Demo Requirements" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
              <input name="selectResources" placeholder="SELECT Resources" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
@@ -313,7 +337,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
              <input name="sessionDays" placeholder="Session Days" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
              <input name="sessionSupportDuration" placeholder="Support Duration" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
           </div>
-          <button type="submit" className="w-full bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-4 hover:bg-[#343D84]">Commit to Hub Stream</button>
+          <button type="submit" className="w-full bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl hover:bg-[#343D84] transition uppercase italic mt-4">Commit to Hub Stream</button>
         </form>
       </div>
       <div className="flex flex-col h-full">
@@ -431,12 +455,12 @@ function IssuesPage({ issues, showMsg }) {
         </form>
       </div>
       <div className="flex flex-col h-full bg-slate-50 p-8 rounded-[3rem] border border-gray-200 shadow-inner">
-        <h2 className="text-xl font-black text-slate-800 mb-8 uppercase italic border-b-2 border-slate-200 pb-2 tracking-tight">Intelligence Diagnostic Feed</h2>
+        <h2 className="text-xl font-black text-slate-800 mb-8 uppercase italic border-b-2 border-slate-200 pb-2 tracking-tight leading-none">Intelligence Feed</h2>
         <div className="space-y-4 overflow-y-auto max-h-[550px] pr-2 custom-scrollbar">
           {issues.map(i => (
             <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 ${i.urgency?.includes('Urgent') ? 'border-red-600 bg-red-50/20' : 'border-yellow-400'}`}>
               <div className="flex justify-between items-start mb-4">
-                <h3 className="font-black text-slate-800 uppercase text-xs tracking-tight italic">"{i.title}"</h3>
+                <h3 className="font-black text-slate-800 uppercase text-xs tracking-tight italic leading-tight">"{i.title}"</h3>
                 <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', i.id))} className="text-slate-200 hover:text-red-500 transition p-1"><i className="fas fa-trash-alt text-[10px]"></i></button>
               </div>
               <p className="text-[11px] text-slate-500 font-bold italic line-clamp-3 mb-6 leading-relaxed">"${i.desc}"</p>
