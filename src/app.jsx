@@ -34,19 +34,19 @@ import {
   Clipboard,
   FileText,
   BarChart3,
-  Flame
+  Flame,
+  PieChart as PieIcon
 } from 'lucide-react';
 
 /**
- * CONFIGURATION
- * Explicit literals for Vercel/Production Build.
+ * CONFIGURATION & CONSTANTS
  */
+const TEAM_MEMBERS = ["Eric.Guzman", "Tommy.Flinch", "Donald.Salazar", "Mistral.Rojas"];
+const DURATION_OPTIONS = ["0.5 Hours", "1 Hour", "2 Hours", "4 Hours", "6 Hours", "8 Hours", "Full Day (10h)", "Multi-Day"];
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
 let firebaseConfig = {};
 let GEMINI_API_KEY = "";
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
-
-const TEAM_MEMBERS = ["Eric.Guzman", "Tommy.Flinch", "Donald.Salazar", "Mistral.Rojas"];
-const DURATION_OPTIONS = ["1 Hour", "2 Hours", "4 Hours", "6 Hours", "8 Hours", "Full Day", "Multi-Day"];
 
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
   firebaseConfig = JSON.parse(__firebase_config);
@@ -92,7 +92,7 @@ export default function App() {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
           await signInWithCustomToken(auth, __initial_auth_token);
         } else if (!auth.currentUser) {
-          try { await signInAnonymously(auth); } catch (e) { console.warn("Manual sign-in required."); }
+          try { await signInAnonymously(auth); } catch (e) { console.warn("Manual login required."); }
         }
       } catch (err) { console.error("Auth init failed:", err); }
     };
@@ -111,15 +111,15 @@ export default function App() {
 
     const unsubEvents = onSnapshot(query(path('shared_events'), orderBy('timestamp', 'desc')), (snap) => {
       setEvents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Events error:", err));
+    });
 
     const unsubTasks = onSnapshot(query(path('shared_tasks'), orderBy('timestamp', 'desc')), (snap) => {
       setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Tasks error:", err));
+    });
 
     const unsubIssues = onSnapshot(query(path('shared_issues'), orderBy('timestamp', 'desc')), (snap) => {
       setIssues(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Issues error:", err));
+    });
 
     return () => { unsubEvents(); unsubTasks(); unsubIssues(); };
   }, [user]);
@@ -153,7 +153,7 @@ export default function App() {
     const taskContext = tasks.filter(t => t.status === 'doing').map(t => t.title).join(', ');
     const blockerContext = issues.filter(i => i.urgency === 'Urgent').map(i => i.title).join(', ');
 
-    const briefing = await fetchGemini(`Act as an Accenture PM. Provide exactly TWO professional bullet points summarizing status: Events (${eventContext}), Active Tasks (${taskContext}), Blockers (${blockerContext}). Style: High-impact.`);
+    const briefing = await fetchGemini(`Act as an Accenture PM. Provide exactly TWO high-impact professional bullet points summarizing status: Events (${eventContext}), Active Tasks (${taskContext}), Blockers (${blockerContext}). Style: High-performance.`);
     
     setModal({ title: "Leadership Intelligence Brief", content: briefing, action: () => { navigator.clipboard.writeText(briefing); showMsg("Summary copied."); } });
     setIsBriefingLoading(false);
@@ -167,11 +167,11 @@ export default function App() {
   );
 
   if (!firebaseConfig.apiKey) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans">
-      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans text-slate-900">
+      <div className="max-w-md bg-white p-10 rounded-3xl shadow-2xl text-center border-t-8 border-red-500">
         <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-        <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic">Config Error</h1>
-        <button onClick={() => window.location.reload()} className="w-full bg-gray-100 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 transition">Retry</button>
+        <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic">Config Sync Error</h1>
+        <button onClick={() => window.location.reload()} className="w-full bg-gray-100 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 transition">Retry Sync</button>
       </div>
     </div>
   );
@@ -193,7 +193,8 @@ export default function App() {
             </button>
           </div>
         </div>
-        <div className="flex justify-center space-x-2 mt-4">
+        <p className="text-center text-gray-400 font-bold uppercase text-[10px] tracking-[0.3em] mb-6">High Performance. Delivered.</p>
+        <div className="flex justify-center space-x-2">
           <NavBtn active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings" />
           <NavBtn active={currentPage === 'kanban'} onClick={() => setCurrentPage('kanban')} label="Task Board" />
           <NavBtn active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Feed" />
@@ -249,10 +250,9 @@ function NavBtn({ active, onClick, label, icon }) {
   );
 }
 
-/* --- SUB-COMPONENTS --- */
+/* --- ANALYTICS DASHBOARD --- */
 
 function AnalyticsDashboard({ events, tasks }) {
-  // Aggregate data for Team Insights
   const stats = useMemo(() => {
     const data = TEAM_MEMBERS.reduce((acc, name) => {
       acc[name] = { events: 0, tasks: 0, hours: 0 };
@@ -262,9 +262,9 @@ function AnalyticsDashboard({ events, tasks }) {
     events.forEach(e => {
       if (data[e.selectPoc]) {
         data[e.selectPoc].events += 1;
-        // Simple hour estimation for graph
-        const hMatch = e.sessionSupportDuration?.match(/\d+/);
-        data[e.selectPoc].hours += hMatch ? parseInt(hMatch[0]) : 8;
+        const hMatch = e.sessionSupportDuration?.match(/[\d.]+/);
+        const hours = hMatch ? parseFloat(hMatch[0]) : 0;
+        data[e.selectPoc].hours += hours;
       }
     });
 
@@ -275,67 +275,110 @@ function AnalyticsDashboard({ events, tasks }) {
     return data;
   }, [events, tasks]);
 
+  const totalHours = Object.values(stats).reduce((acc, s) => acc + s.hours, 0);
   const maxHours = Math.max(...Object.values(stats).map(s => s.hours), 1);
 
+  // SVG Pie Chart Calculation
+  let cumulativePercent = 0;
+  const pieSlices = TEAM_MEMBERS.map((name, i) => {
+    const hours = stats[name].hours;
+    const percent = totalHours > 0 ? (hours / totalHours) : 0;
+    const [startX, startY] = getCoordinatesForPercent(cumulativePercent);
+    cumulativePercent += percent;
+    const [endX, endY] = getCoordinatesForPercent(cumulativePercent);
+    const largeArcFlag = percent > 0.5 ? 1 : 0;
+    const colors = ["#424A9F", "#A3E635", "#6366f1", "#f59e0b"];
+
+    return { 
+      path: `M 1 0 A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY} L 0 0`, 
+      color: colors[i % colors.length],
+      label: name,
+      percent: (percent * 100).toFixed(0)
+    };
+  });
+
+  function getCoordinatesForPercent(percent) {
+    const x = Math.cos(2 * Math.PI * percent);
+    const y = Math.sin(2 * Math.PI * percent);
+    return [x, y];
+  }
+
   return (
-    <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 grid md:grid-cols-2 gap-12 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8 flex items-center">
-          <BarChart3 className="mr-3" /> Support Bandwidth
-        </h2>
-        <div className="space-y-8">
-          {TEAM_MEMBERS.map(name => (
-            <div key={name}>
-              <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-2 italic">
-                <span>{name}</span>
-                <span className="text-[#424A9F]">{stats[name].hours} Hours Recorded</span>
+    <div className="space-y-8 animate-fade-in">
+      <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 grid md:grid-cols-2 gap-12">
+        <div>
+          <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8 flex items-center leading-none">
+            <BarChart3 className="mr-3" /> Support Bandwidth
+          </h2>
+          <div className="space-y-8">
+            {TEAM_MEMBERS.map(name => (
+              <div key={name}>
+                <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-2 italic">
+                  <span>{name}</span>
+                  <span className="text-[#424A9F]">{stats[name].hours.toFixed(1)} Hours Total</span>
+                </div>
+                <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden shadow-inner border border-gray-200">
+                  <div 
+                    className="bg-[#424A9F] h-full transition-all duration-1000 border-r-4 border-[#A3E635]" 
+                    style={{ width: `${(stats[name].hours / maxHours) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden shadow-inner border border-gray-200">
-                <div 
-                  className="bg-[#424A9F] h-full transition-all duration-1000 border-r-4 border-[#A3E635]" 
-                  style={{ width: `${(stats[name].hours / maxHours) * 100}%` }}
-                />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center">
+          <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic flex items-center self-start">
+            <PieIcon className="mr-3" /> Time Distribution
+          </h2>
+          <div className="relative w-48 h-48 mb-8">
+             <svg viewBox="-1 -1 2 2" style={{ transform: 'rotate(-90deg)' }} className="w-full h-full drop-shadow-xl">
+                {totalHours > 0 ? pieSlices.map((slice, i) => (
+                  <path key={i} d={slice.path} fill={slice.color} className="transition-all hover:opacity-80 cursor-help" />
+                )) : <circle r="1" fill="#f3f4f6" />}
+             </svg>
+          </div>
+          <div className="grid grid-cols-2 gap-4 w-full">
+            {pieSlices.map((slice, i) => (
+              <div key={i} className="flex items-center text-[10px] font-black uppercase italic text-slate-500">
+                <div className="w-3 h-3 mr-2 rounded-sm" style={{ backgroundColor: slice.color }} />
+                {slice.label}: {slice.percent}%
               </div>
-              <div className="flex gap-4 mt-2">
-                <span className="text-[9px] font-bold text-gray-400">Events: {stats[name].events}</span>
-                <span className="text-[9px] font-bold text-gray-400">Active Tasks: {stats[name].tasks}</span>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
-      <div>
-        <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic flex items-center">
-          <Flame className="mr-3 text-orange-500" /> Support Intensity Heatmap
+      <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100">
+        <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic flex items-center leading-none">
+          <Flame className="mr-3 text-orange-500" /> Operational Intensity Heatmap
         </h2>
-        <p className="text-[10px] font-bold text-slate-400 uppercase mb-6 italic">Weekly operational density by team member</p>
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-6 gap-4">
           <div className="col-span-1"></div>
-          {["M", "T", "W", "T", "F"].map(d => <div key={d} className="text-center font-black text-[10px] text-gray-300">{d}</div>)}
+          {["MON", "TUE", "WED", "THU", "FRI"].map(d => <div key={d} className="text-center font-black text-[10px] text-gray-300 tracking-widest">{d}</div>)}
           
           {TEAM_MEMBERS.map(name => (
             <React.Fragment key={name}>
               <div className="text-[9px] font-black text-[#424A9F] flex items-center italic">{name.split('.')[0]}</div>
               {[1, 2, 3, 4, 5].map(day => {
-                const intensity = (stats[name].events + stats[name].tasks) > day ? "bg-indigo-600 shadow-indigo-200" : (stats[name].events > 0 ? "bg-[#A3E635] shadow-lime-100" : "bg-gray-100");
-                return <div key={day} className={`h-8 rounded-lg shadow-sm border border-gray-50 transition-all hover:scale-110 ${intensity}`} />
+                const weight = (stats[name].events * 2 + stats[name].tasks);
+                const intensity = weight > day * 2 ? "bg-[#424A9F] shadow-indigo-200" : (weight > 0 ? "bg-[#A3E635] shadow-lime-100" : "bg-gray-100");
+                return <div key={day} className={`h-12 rounded-xl shadow-sm border border-gray-50 transition-all hover:scale-110 ${intensity}`} title={`${name}: ${weight} points`} />
               })}
             </React.Fragment>
           ))}
-        </div>
-        <div className="mt-8 flex items-center justify-center space-x-6 text-[8px] font-black uppercase text-gray-400 italic">
-          <div className="flex items-center"><div className="w-2 h-2 bg-gray-100 mr-2 rounded" /> Idle</div>
-          <div className="flex items-center"><div className="w-2 h-2 bg-[#A3E635] mr-2 rounded" /> Assigned</div>
-          <div className="flex items-center"><div className="w-2 h-2 bg-indigo-600 mr-2 rounded" /> Peak Impact</div>
         </div>
       </div>
     </div>
   );
 }
 
+/* --- SCHEDULE PAGE (WITH EDITING) --- */
+
 function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const formRef = useRef();
 
   const handleAdd = async (e) => {
@@ -346,6 +389,27 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
       e.target.reset();
       showMsg("Operational entry synchronized.");
     } catch (err) { showMsg(err.message, true); }
+  };
+
+  const handleUpdate = async (id) => {
+    const data = Object.fromEntries(new FormData(formRef.current));
+    try {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', id), data);
+      setEditingId(null);
+      formRef.current.reset();
+      showMsg("Operational data updated.");
+    } catch (err) { showMsg(err.message, true); }
+  };
+
+  const startEdit = (e) => {
+    setEditingId(e.id);
+    setTimeout(() => {
+      if (formRef.current) {
+        Object.keys(e).forEach(key => {
+          if (formRef.current.elements[key]) formRef.current.elements[key].value = e[key];
+        });
+      }
+    }, 10);
   };
 
   const handleAiExtract = async () => {
@@ -362,47 +426,25 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
     setAiLoading(false);
   };
 
-  const openDetails = (e) => {
-    const content = `Event Name: ${e.eventName || ''}
-Start Date: ${e.startDate || ''}
-End Date: ${e.endDate || ''}
-Event POC: ${e.eventPoc || ''}
-SELECT POC: ${e.selectPoc || ''}
-Location: ${e.location || 'NYIH'}
-Event Location: ${e.eventLocation || ''}
-Classification: ${e.classification || ''}
-Session Type: ${e.sessionType || ''}
-Attendees: ${e.attendees || ''}
-Demo: ${e.demo || ''}
-SELECT Resources: ${e.selectResources || ''}
-Session Days: ${e.sessionDays || ''}
-Session Support Duration: ${e.sessionSupportDuration || ''}`;
-
-    setModal({
-      title: "Operational Data Intelligence",
-      content: content,
-      action: () => {
-        navigator.clipboard.writeText(content);
-        showMsg("Data copied for copy-paste reporting.");
-      }
-    });
-  };
-
   return (
     <div className="bg-white p-8 rounded-[2.5rem] shadow-xl grid md:grid-cols-2 gap-8 border border-gray-100">
       <div>
-        <h2 className="text-xl font-black text-[#424A9F] mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8">Intake Engine</h2>
-        <div className="p-5 bg-gray-50 rounded-[2rem] mb-8 border-2 border-dashed border-gray-200">
-          <textarea id="ai-input" className="w-full h-24 p-4 rounded-2xl border-2 border-gray-200 bg-white resize-none outline-none focus:ring-2 focus:ring-[#A3E635] text-sm italic" placeholder="Paste BEO Stream for intelligence extraction..."></textarea>
-          <button onClick={handleAiExtract} disabled={aiLoading} className="w-full mt-3 bg-[#A3E635] text-[#424A9F] font-black py-4 rounded-xl transition uppercase text-[10px] tracking-widest shadow-md flex items-center justify-center">
-            <Zap size={14} className={`mr-2 ${aiLoading ? 'animate-spin text-[#424A9F]' : ''}`} />
-            {aiLoading ? 'Analyzing Stream...' : 'Execute AI Extract'}
-          </button>
-        </div>
-        <form onSubmit={handleAdd} ref={formRef} className="space-y-4 font-bold text-sm italic">
+        <h2 className="text-xl font-black text-[#424A9F] mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8">
+          {editingId ? 'Edit Event Intel' : 'Intake Engine'}
+        </h2>
+        {!editingId && (
+          <div className="p-5 bg-gray-50 rounded-[2rem] mb-8 border-2 border-dashed border-gray-200">
+            <textarea id="ai-input" className="w-full h-24 p-4 rounded-2xl border-2 border-gray-200 bg-white resize-none outline-none focus:ring-2 focus:ring-[#A3E635] text-sm italic" placeholder="Paste BEO Stream for intelligence extraction..."></textarea>
+            <button onClick={handleAiExtract} disabled={aiLoading} className="w-full mt-3 bg-[#A3E635] text-[#424A9F] font-black py-4 rounded-xl transition uppercase text-[10px] tracking-widest shadow-md flex items-center justify-center">
+              <Zap size={14} className={`mr-2 ${aiLoading ? 'animate-spin text-[#424A9F]' : ''}`} />
+              {aiLoading ? 'Analyzing...' : 'Execute AI Extract'}
+            </button>
+          </div>
+        )}
+        <form onSubmit={editingId ? (e) => { e.preventDefault(); handleUpdate(editingId); } : handleAdd} ref={formRef} className="space-y-4 font-bold text-sm italic">
           <div className="grid grid-cols-2 gap-4">
-            <input name="eventName" placeholder="Event Name*" required className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white focus:border-[#424A9F] outline-none" />
-            <input name="eventPoc" placeholder="Event POC*" required className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white focus:border-[#424A9F] outline-none" />
+            <input name="eventName" placeholder="Event Name*" required className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+            <input name="eventPoc" placeholder="Event Lead*" required className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-[9px] font-black uppercase text-gray-400">Start Date<input name="startDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50 outline-none" /></div>
@@ -417,43 +459,49 @@ Session Support Duration: ${e.sessionSupportDuration || ''}`;
           </div>
           <input name="eventLocation" placeholder="Specific Room/Floor Designation" className="w-full p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           <div className="grid grid-cols-2 gap-4">
-             <input name="classification" placeholder="Classification" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
-             <input name="sessionType" placeholder="Session Type" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+             <input name="classification" placeholder="Classification" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+             <input name="sessionType" placeholder="Session Type" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           </div>
           <input name="attendees" placeholder="Attendees Count" className="w-full p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           <div className="grid grid-cols-2 gap-4">
-             <input name="demo" placeholder="Demo Requirements" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
-             <input name="selectResources" placeholder="SELECT Resources" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+             <input name="demo" placeholder="Demo Requirements" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+             <input name="selectResources" placeholder="SELECT Resources" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-             <input name="sessionDays" placeholder="Session Days" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+             <input name="sessionDays" placeholder="Session Days" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
              <select name="sessionSupportDuration" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none">
                 <option value="">Support Duration...</option>
                 {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
              </select>
           </div>
-          <button type="submit" className="w-full bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-4 hover:bg-[#343D84]">Commit to Dashboard</button>
+          <div className="flex gap-2">
+            <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A3E635] text-[#424A9F]' : 'bg-[#424A9F] text-white'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-4`}>
+              {editingId ? 'Update Intel' : 'Commit Entry'}
+            </button>
+            {editingId && <button onClick={() => { setEditingId(null); formRef.current.reset(); }} className="flex-none px-6 bg-gray-100 font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-4 text-gray-400">Cancel</button>}
+          </div>
         </form>
       </div>
+
       <div className="flex flex-col h-full">
         <h2 className="text-xl font-black text-[#424A9F] mb-6 uppercase italic">Operational Live Stream</h2>
         <div className="space-y-4 overflow-y-auto max-h-[75vh] pr-2 custom-scrollbar">
           {events.map(e => (
-            <div key={e.id} className="bg-white p-5 rounded-2xl shadow-md border-l-8 border-[#424A9F] flex justify-between items-center group transition border border-gray-50 hover:bg-indigo-50/50">
+            <div key={e.id} className={`bg-white p-5 rounded-2xl shadow-md border-l-8 ${editingId === e.id ? 'border-[#A3E635] bg-lime-50/20' : 'border-[#424A9F]'} flex justify-between items-center group transition border border-gray-50 hover:bg-indigo-50/50`}>
               <div>
                 <p className="font-black text-slate-800 uppercase text-xs italic leading-none mb-1">{e.eventName}</p>
                 <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 italic">{e.startDate} — {e.eventPoc}</p>
                 <div className="flex gap-2 mt-2">
-                  <button onClick={() => openDetails(e)} className="text-[9px] text-[#424A9F] font-black uppercase hover:text-[#A3E635] transition-all flex items-center">
-                    <FileText size={10} className="mr-1" /> View Details
+                  <button onClick={() => startEdit(e)} className="text-[9px] text-[#424A9F] font-black uppercase hover:text-[#A3E635] transition-all flex items-center">
+                    <Edit3 size={10} className="mr-1" /> Edit Intel
                   </button>
-                  <span className="text-[9px] font-black uppercase text-[#A3E635] italic">Lead: {e.selectPoc || 'TBD'}</span>
+                  <span className="text-[9px] font-black uppercase text-slate-400 italic">| {e.sessionSupportDuration || '0h'}</span>
                 </div>
               </div>
               <button onClick={async () => { if(window.confirm("Archive entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', e.id))}} className="text-gray-200 hover:text-red-500 transition p-2"><Trash2 size={16}/></button>
             </div>
           ))}
-          {events.length === 0 && <div className="text-center py-20 opacity-20 italic font-black uppercase text-[10px] tracking-widest">No Active Stream</div>}
+          {events.length === 0 && <div className="text-center py-20 opacity-20 italic font-black uppercase text-[10px] tracking-widest leading-relaxed">No Active Stream</div>}
         </div>
       </div>
     </div>
@@ -478,8 +526,8 @@ function KanbanPage({ tasks, showMsg }) {
           <div key={t.id} className="bg-white p-5 rounded-2xl shadow-md border-b-4 border-slate-200 group transition hover:scale-105 border border-gray-50/50">
             {editingId === t.id ? (
                <div className="space-y-2">
-                  <input id={`et-${t.id}`} defaultValue={t.title} className="w-full p-2 text-xs border rounded-lg italic font-bold outline-none focus:border-[#424A9F]" />
-                  <select id={`ea-${t.id}`} defaultValue={t.assignee} className="w-full p-2 text-xs border rounded-lg italic outline-none focus:border-[#424A9F]">
+                  <input id={`et-${t.id}`} defaultValue={t.title} className="w-full p-2 text-xs border rounded-lg italic font-bold outline-none" />
+                  <select id={`ea-${t.id}`} defaultValue={t.assignee} className="w-full p-2 text-xs border rounded-lg italic outline-none">
                     <option value="">Assign Member...</option>
                     {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
@@ -557,7 +605,7 @@ function IssuesPage({ issues, showMsg }) {
               <div className="flex justify-between items-center mt-6"><span className="px-3 py-1 rounded-full text-[8px] font-black uppercase bg-slate-800 text-white shadow-sm tracking-widest">{i.urgency}</span></div>
             </div>
           ))}
-          {issues.length === 0 && <div className="text-center py-20 opacity-20 font-black uppercase text-[10px] tracking-widest italic">Stable</div>}
+          {issues.length === 0 && <div className="text-center py-20 opacity-20 font-black uppercase text-[10px] tracking-widest italic leading-relaxed">Infrastructure Stable</div>}
         </div>
       </div>
     </div>
@@ -578,7 +626,7 @@ function AuthPage({ showMsg }) {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans text-slate-900">
       <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border border-gray-100">
         <div className="flex justify-center mb-8 font-black"><div className="bg-[#A3E635] p-4 rounded-3xl text-[#424A9F] shadow-lg"><Layout size={32}/></div></div>
-        <h1 className="text-3xl font-black text-center text-[#424A9F] mb-6 uppercase italic tracking-tighter">Accenture Hub</h1>
+        <h1 className="text-3xl font-black text-center text-[#424A9F] mb-2 tracking-tighter uppercase italic">Accenture Hub</h1>
         <form onSubmit={authSubmit} className="space-y-4">
           <input name="email" type="email" placeholder="Corporate ID" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
           <input name="password" type="password" placeholder="Key Phrase" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
