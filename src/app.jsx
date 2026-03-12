@@ -155,9 +155,11 @@ export default function App() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-fade-in" onClick={() => setModal(null)}>
           <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-xl w-full border border-gray-100" onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-black text-[#424A9F] mb-6 uppercase italic border-b pb-2">{modal.title}</h3>
-            <div className="text-gray-700 text-sm italic whitespace-pre-wrap leading-relaxed">{modal.content}</div>
+            <div className="text-gray-700 text-sm italic whitespace-pre-wrap leading-relaxed font-mono bg-gray-50 p-4 rounded-xl border border-gray-100">
+              {modal.content}
+            </div>
             <div className="flex gap-2 mt-8">
-              {modal.action && <button onClick={modal.action} className="flex-1 bg-[#A3E635] text-[#424A9F] font-black py-3 rounded-xl hover:bg-[#8CD02F] uppercase text-xs italic">Copy Update</button>}
+              {modal.action && <button onClick={modal.action} className="flex-1 bg-[#A3E635] text-[#424A9F] font-black py-3 rounded-xl hover:bg-[#8CD02F] uppercase text-xs italic">Copy Intelligence</button>}
               <button onClick={() => setModal(null)} className="flex-1 bg-gray-100 font-bold py-3 rounded-xl hover:bg-gray-200 uppercase text-xs italic">Close</button>
             </div>
           </div>
@@ -193,6 +195,32 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
       showMsg("AI populated the Hub form.");
     }
     setAiLoading(false);
+  };
+
+  const openDetails = (e) => {
+    const content = `Event Name: ${e.eventName || ''}
+Start Date: ${e.startDate || ''}
+End Date: ${e.endDate || ''}
+Event POC: ${e.eventPoc || ''}
+SELECT POC: ${e.selectPoc || ''}
+Location: ${e.location || 'NYIH'}
+Event Location: ${e.eventLocation || ''}
+Classification: ${e.classification || ''}
+Session Type: ${e.sessionType || ''}
+Attendees: ${e.attendees || ''}
+Demo: ${e.demo || ''}
+SELECT Resources: ${e.selectResources || ''}
+Session Days: ${e.sessionDays || ''}
+Session Support Duration: ${e.sessionSupportDuration || ''}`;
+
+    setModal({
+      title: "Operational Data Intelligence",
+      content: content,
+      action: () => {
+        navigator.clipboard.writeText(content);
+        showMsg("Event data copied to clipboard.");
+      }
+    });
   };
 
   return (
@@ -243,7 +271,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
               <div>
                 <p className="font-black text-slate-800 uppercase text-xs italic leading-none mb-1">{e.eventName}</p>
                 <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 italic">{e.startDate} — {e.eventPoc}</p>
-                <button onClick={() => setModal({ title: "Intelligence Overview", content: `Room: ${e.eventLocation}\nType: ${e.sessionType}\nAttendees: ${e.attendees}\nResources: ${e.selectResources}\nDuration: ${e.sessionSupportDuration}` })} className="text-[9px] text-[#424A9F] font-black uppercase mt-2 hover:text-[#A3E635] transition-all">Details</button>
+                <button onClick={() => openDetails(e)} className="text-[9px] text-[#424A9F] font-black uppercase mt-2 hover:text-[#A3E635] transition-all">Details</button>
               </div>
               <button onClick={async () => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', e.id))} className="text-gray-200 hover:text-red-500 transition p-2"><i className="fas fa-trash-alt"></i></button>
             </div>
@@ -299,73 +327,4 @@ function KanbanPage({ tasks, showMsg }) {
       <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 mb-12 max-w-3xl mx-auto bg-slate-50 p-2 rounded-2xl border-2 border-slate-200 shadow-inner">
         <input name="t" placeholder="Add Mission Objective..." className="flex-grow p-4 bg-transparent font-black outline-none text-[#424A9F] italic text-sm" />
         <input name="a" placeholder="Assign Team Member..." className="md:w-48 p-4 bg-transparent font-bold outline-none text-gray-500 italic text-sm border-l-2 border-slate-200" />
-        <button type="submit" className="bg-[#424A9F] text-white px-10 py-4 rounded-xl font-black hover:bg-[#A3E635] hover:text-[#424A9F] transition shadow-lg italic uppercase text-xs">Push</button>
-      </form>
-      <div className="grid md:grid-cols-3 gap-8"><Col status="todo" title="BACKLOG" color="text-slate-400" /><Col status="doing" title="ACTIVE" color="text-blue-500" /><Col status="complete" title="DELIVERED" color="text-[#A3E635]" /></div>
-    </div>
-  );
-}
-
-function IssuesPage({ issues, showMsg }) {
-  const handleReport = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues'), { ...Object.fromEntries(fd.entries()), timestamp: new Date().toISOString() });
-    e.target.reset();
-    showMsg("Incident report dispatched.");
-  };
-  return (
-    <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-gray-100 grid md:grid-cols-2 gap-12 animate-fade-in text-slate-900">
-      <div>
-        <h2 className="text-2xl font-black text-red-600 mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8 tracking-tighter leading-none">Log Blocker</h2>
-        <form onSubmit={handleReport} className="space-y-6">
-          <input name="title" placeholder="Summary of Tech Hurdle*" required className="w-full p-5 border-2 border-gray-100 rounded-3xl font-black bg-gray-50 focus:bg-white focus:border-red-500 transition outline-none text-sm italic" />
-          <textarea name="desc" placeholder="Deep Technical State..." required rows="4" className="w-full p-5 border-2 border-gray-100 rounded-3xl font-bold bg-gray-50 focus:bg-white focus:border-red-500 transition outline-none resize-none text-sm italic"></textarea>
-          <select name="urgency" className="w-full p-4 border-2 border-gray-100 rounded-2xl bg-gray-50 font-black text-slate-700 outline-none italic text-xs">
-            <option>Low Tier</option><option selected>Medium Diagnostic</option><option>High Criticality</option><option>Urgent Blocker</option>
-          </select>
-          <button type="submit" className="w-full bg-red-600 text-white font-black py-5 rounded-3xl hover:bg-red-700 transition shadow-xl uppercase italic tracking-widest text-sm">Dispatch Diagnostic Protocol</button>
-        </form>
-      </div>
-      <div className="flex flex-col h-full bg-slate-50 p-8 rounded-[3rem] border border-gray-200 shadow-inner">
-        <h2 className="text-xl font-black text-slate-800 mb-8 uppercase italic border-b-2 border-slate-200 pb-2 tracking-tight leading-none">Intelligence Feed</h2>
-        <div className="space-y-4 overflow-y-auto max-h-[550px] pr-2 custom-scrollbar">
-          {issues.map(i => (
-            <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 ${i.urgency?.includes('Urgent') ? 'border-red-600 bg-red-50/20' : 'border-yellow-400'}`}>
-              <div className="flex justify-between items-start mb-4"><h3 className="font-black text-slate-800 uppercase text-xs tracking-tight italic">"{i.title}"</h3><button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', i.id))} className="text-slate-200 hover:text-red-500 transition p-1"><i className="fas fa-trash-alt text-[10px]"></i></button></div>
-              <p className="text-[11px] text-slate-500 font-bold italic line-clamp-3 leading-relaxed">"${i.desc}"</p>
-              <div className="flex justify-between items-center mt-6"><span className="px-3 py-1 rounded-full text-[8px] font-black uppercase bg-slate-800 text-white shadow-sm tracking-widest">{i.urgency}</span></div>
-            </div>
-          ))}
-          {issues.length === 0 && <div className="text-center py-20 opacity-20 font-black uppercase text-[10px] tracking-widest italic">Stable</div>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AuthPage({ showMsg }) {
-  const [isLogin, setIsLogin] = useState(true);
-  const authSubmit = async (e) => {
-    e.preventDefault();
-    const { email, password } = Object.fromEntries(new FormData(e.target));
-    try {
-      if (isLogin) await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
-    } catch (err) { showMsg(err.message, true); }
-  };
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans text-slate-900">
-      <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border border-gray-100">
-        <div className="flex justify-center mb-8 font-black"><div className="bg-[#A3E635] p-4 rounded-3xl text-[#424A9F] shadow-lg"><i className="fas fa-project-diagram fa-2x"></i></div></div>
-        <h1 className="text-3xl font-black text-center text-[#424A9F] mb-6 uppercase italic tracking-tighter">Accenture Hub</h1>
-        <form onSubmit={authSubmit} className="space-y-4">
-          <input name="email" type="email" placeholder="Corporate ID" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
-          <input name="password" type="password" placeholder="Key Phrase" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
-          <button type="submit" className={`w-full font-black py-4 rounded-2xl shadow-xl mt-4 ${isLogin ? 'bg-[#424A9F] text-white' : 'bg-[#A3E635] text-gray-900'}`}>{isLogin ? 'INITIATE LOGIN' : 'CREATE PROFILE'}</button>
-        </form>
-        <button onClick={() => setIsLogin(!isLogin)} className="w-full mt-8 text-xs font-black text-gray-400 hover:text-[#424A9F] uppercase tracking-widest">{isLogin ? "Register Hub Access" : "Back to Login"}</button>
-      </div>
-    </div>
-  );
-}
+        <button type="submit" className="bg-[#424A9F] text-white px-10 py-4 rounded-xl font-black hover:bg-[#A3E635] hover:text-[#424A9F]
