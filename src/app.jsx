@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
 import { 
   getAuth, 
@@ -28,28 +28,29 @@ import {
   ChevronLeft, 
   ChevronRight,
   Zap, 
-  ArrowRight, 
   LogOut, 
   User, 
   Edit3,
   Clipboard,
-  FileText
+  FileText,
+  BarChart3,
+  Flame
 } from 'lucide-react';
 
 /**
  * CONFIGURATION
- * We use explicit literals for process.env. This is MANDATORY for 
- * react-scripts/Vercel to correctly "burn" the keys into your deployment.
+ * Explicit literals for Vercel/Production Build.
  */
 let firebaseConfig = {};
 let GEMINI_API_KEY = "";
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
 
-// 1. Check for Canvas Preview Config
+const TEAM_MEMBERS = ["Eric.Guzman", "Tommy.Flinch", "Donald.Salazar", "Mistral.Rojas"];
+const DURATION_OPTIONS = ["1 Hour", "2 Hours", "4 Hours", "6 Hours", "8 Hours", "Full Day", "Multi-Day"];
+
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
   firebaseConfig = JSON.parse(__firebase_config);
 } else {
-  // 2. Fallback to Vercel/Production Build Literals
   try {
     firebaseConfig = {
       apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -63,20 +64,9 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
   } catch (e) {}
 }
 
-// Initialize Firebase safely
-let auth = null;
-let db = null;
-const isConfigured = !!firebaseConfig.apiKey;
-
-if (isConfigured) {
-  try {
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (e) {
-    console.error("Firebase Init Failure:", e);
-  }
-}
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -92,7 +82,7 @@ export default function App() {
   const [issues, setIssues] = useState([]);
 
   useEffect(() => {
-    if (!isConfigured) {
+    if (!firebaseConfig.apiKey) {
       setLoading(false);
       return;
     }
@@ -116,7 +106,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!user || !isConfigured) return;
+    if (!user || !firebaseConfig.apiKey) return;
     const path = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
 
     const unsubEvents = onSnapshot(query(path('shared_events'), orderBy('timestamp', 'desc')), (snap) => {
@@ -163,16 +153,9 @@ export default function App() {
     const taskContext = tasks.filter(t => t.status === 'doing').map(t => t.title).join(', ');
     const blockerContext = issues.filter(i => i.urgency === 'Urgent').map(i => i.title).join(', ');
 
-    const briefing = await fetchGemini(`Act as an Accenture PM. Provide exactly TWO professional bullet points summarizing our current status: Events (${eventContext}), Active Tasks (${taskContext}), Blockers (${blockerContext}). Style: High-impact, concise.`);
+    const briefing = await fetchGemini(`Act as an Accenture PM. Provide exactly TWO professional bullet points summarizing status: Events (${eventContext}), Active Tasks (${taskContext}), Blockers (${blockerContext}). Style: High-impact.`);
     
-    setModal({ 
-      title: "Leadership Intelligence Brief", 
-      content: briefing,
-      action: () => {
-        navigator.clipboard.writeText(briefing);
-        showMsg("Summary copied to clipboard.");
-      }
-    });
+    setModal({ title: "Leadership Intelligence Brief", content: briefing, action: () => { navigator.clipboard.writeText(briefing); showMsg("Summary copied."); } });
     setIsBriefingLoading(false);
   };
 
@@ -183,13 +166,12 @@ export default function App() {
     </div>
   );
 
-  if (!isConfigured) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500 font-sans">
+  if (!firebaseConfig.apiKey) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4 font-sans">
+      <div className="max-w-md w-full bg-white p-10 rounded-[2.5rem] shadow-2xl text-center border-t-8 border-red-500">
         <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-        <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic">Config Sync Error</h1>
-        <p className="text-gray-600 mb-8 text-sm italic">The environment variables for Firebase were not found. Please ensure <strong>REACT_APP_FIREBASE_API_KEY</strong> is set and <strong>Redeploy</strong> in Vercel.</p>
-        <button onClick={() => window.location.reload()} className="w-full bg-gray-100 py-3 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition">Retry Sync</button>
+        <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic">Config Error</h1>
+        <button onClick={() => window.location.reload()} className="w-full bg-gray-100 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 transition">Retry</button>
       </div>
     </div>
   );
@@ -211,11 +193,11 @@ export default function App() {
             </button>
           </div>
         </div>
-        <p className="text-center text-gray-400 font-bold uppercase text-[10px] tracking-[0.3em] mb-6">High Performance. Delivered.</p>
-        <div className="flex justify-center space-x-2">
-          <button onClick={() => setCurrentPage('schedule')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${currentPage === 'schedule' ? 'bg-[#A3E635] text-[#424A9F] shadow-lg scale-105' : 'bg-gray-100 text-gray-500'}`}>Meetings</button>
-          <button onClick={() => setCurrentPage('kanban')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${currentPage === 'kanban' ? 'bg-[#A3E635] text-[#424A9F] shadow-lg scale-105' : 'bg-gray-100 text-gray-500'}`}>Task Board</button>
-          <button onClick={() => setCurrentPage('issues')} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs transition-all ${currentPage === 'issues' ? 'bg-[#A3E635] text-[#424A9F] shadow-lg scale-105' : 'bg-gray-100 text-gray-500'}`}>Tech Feed</button>
+        <div className="flex justify-center space-x-2 mt-4">
+          <NavBtn active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings" />
+          <NavBtn active={currentPage === 'kanban'} onClick={() => setCurrentPage('kanban')} label="Task Board" />
+          <NavBtn active={currentPage === 'issues'} onClick={() => setCurrentPage('issues')} label="Tech Feed" />
+          <NavBtn active={currentPage === 'analytics'} onClick={() => setCurrentPage('analytics')} label="Team Insights" icon={<BarChart3 size={12} />} />
         </div>
       </div>
 
@@ -232,6 +214,7 @@ export default function App() {
         {currentPage === 'schedule' && <SchedulePage events={events} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} />}
         {currentPage === 'kanban' && <KanbanPage tasks={tasks} showMsg={showMsg} />}
         {currentPage === 'issues' && <IssuesPage issues={issues} showMsg={showMsg} />}
+        {currentPage === 'analytics' && <AnalyticsDashboard events={events} tasks={tasks} />}
       </div>
 
       {modal && (
@@ -258,7 +241,98 @@ export default function App() {
   );
 }
 
+function NavBtn({ active, onClick, label, icon }) {
+  return (
+    <button onClick={onClick} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center ${active ? 'bg-[#A3E635] text-[#424A9F] shadow-lg scale-105' : 'bg-gray-100 text-gray-500'}`}>
+      {icon && <span className="mr-2">{icon}</span>} {label}
+    </button>
+  );
+}
+
 /* --- SUB-COMPONENTS --- */
+
+function AnalyticsDashboard({ events, tasks }) {
+  // Aggregate data for Team Insights
+  const stats = useMemo(() => {
+    const data = TEAM_MEMBERS.reduce((acc, name) => {
+      acc[name] = { events: 0, tasks: 0, hours: 0 };
+      return acc;
+    }, {});
+
+    events.forEach(e => {
+      if (data[e.selectPoc]) {
+        data[e.selectPoc].events += 1;
+        // Simple hour estimation for graph
+        const hMatch = e.sessionSupportDuration?.match(/\d+/);
+        data[e.selectPoc].hours += hMatch ? parseInt(hMatch[0]) : 8;
+      }
+    });
+
+    tasks.forEach(t => {
+      if (data[t.assignee]) data[t.assignee].tasks += 1;
+    });
+
+    return data;
+  }, [events, tasks]);
+
+  const maxHours = Math.max(...Object.values(stats).map(s => s.hours), 1);
+
+  return (
+    <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 grid md:grid-cols-2 gap-12 animate-fade-in">
+      <div>
+        <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8 flex items-center">
+          <BarChart3 className="mr-3" /> Support Bandwidth
+        </h2>
+        <div className="space-y-8">
+          {TEAM_MEMBERS.map(name => (
+            <div key={name}>
+              <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-2 italic">
+                <span>{name}</span>
+                <span className="text-[#424A9F]">{stats[name].hours} Hours Recorded</span>
+              </div>
+              <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden shadow-inner border border-gray-200">
+                <div 
+                  className="bg-[#424A9F] h-full transition-all duration-1000 border-r-4 border-[#A3E635]" 
+                  style={{ width: `${(stats[name].hours / maxHours) * 100}%` }}
+                />
+              </div>
+              <div className="flex gap-4 mt-2">
+                <span className="text-[9px] font-bold text-gray-400">Events: {stats[name].events}</span>
+                <span className="text-[9px] font-bold text-gray-400">Active Tasks: {stats[name].tasks}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-black text-[#424A9F] mb-8 uppercase italic flex items-center">
+          <Flame className="mr-3 text-orange-500" /> Support Intensity Heatmap
+        </h2>
+        <p className="text-[10px] font-bold text-slate-400 uppercase mb-6 italic">Weekly operational density by team member</p>
+        <div className="grid grid-cols-5 gap-3">
+          <div className="col-span-1"></div>
+          {["M", "T", "W", "T", "F"].map(d => <div key={d} className="text-center font-black text-[10px] text-gray-300">{d}</div>)}
+          
+          {TEAM_MEMBERS.map(name => (
+            <React.Fragment key={name}>
+              <div className="text-[9px] font-black text-[#424A9F] flex items-center italic">{name.split('.')[0]}</div>
+              {[1, 2, 3, 4, 5].map(day => {
+                const intensity = (stats[name].events + stats[name].tasks) > day ? "bg-indigo-600 shadow-indigo-200" : (stats[name].events > 0 ? "bg-[#A3E635] shadow-lime-100" : "bg-gray-100");
+                return <div key={day} className={`h-8 rounded-lg shadow-sm border border-gray-50 transition-all hover:scale-110 ${intensity}`} />
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+        <div className="mt-8 flex items-center justify-center space-x-6 text-[8px] font-black uppercase text-gray-400 italic">
+          <div className="flex items-center"><div className="w-2 h-2 bg-gray-100 mr-2 rounded" /> Idle</div>
+          <div className="flex items-center"><div className="w-2 h-2 bg-[#A3E635] mr-2 rounded" /> Assigned</div>
+          <div className="flex items-center"><div className="w-2 h-2 bg-indigo-600 mr-2 rounded" /> Peak Impact</div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
@@ -328,29 +402,35 @@ Session Support Duration: ${e.sessionSupportDuration || ''}`;
         <form onSubmit={handleAdd} ref={formRef} className="space-y-4 font-bold text-sm italic">
           <div className="grid grid-cols-2 gap-4">
             <input name="eventName" placeholder="Event Name*" required className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white focus:border-[#424A9F] outline-none" />
-            <input name="eventPoc" placeholder="Event Lead*" required className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white focus:border-[#424A9F] outline-none" />
+            <input name="eventPoc" placeholder="Event POC*" required className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white focus:border-[#424A9F] outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="text-[9px] font-black uppercase text-gray-400">Start Date<input name="startDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50 outline-none" /></div>
             <div className="text-[9px] font-black uppercase text-gray-400">End Date<input name="endDate" type="date" required className="w-full p-4 mt-1 border-2 rounded-2xl bg-gray-50 outline-none" /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-             <input name="selectPoc" placeholder="SELECT Lead" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+             <select name="selectPoc" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none">
+                <option value="">SELECT Lead...</option>
+                {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+             </select>
              <input name="location" defaultValue="NYIH" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           </div>
           <input name="eventLocation" placeholder="Specific Room/Floor Designation" className="w-full p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           <div className="grid grid-cols-2 gap-4">
-             <input name="classification" placeholder="Classification" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
-             <input name="sessionType" placeholder="Session Type" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+             <input name="classification" placeholder="Classification" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+             <input name="sessionType" placeholder="Session Type" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
           </div>
           <input name="attendees" placeholder="Attendees Count" className="w-full p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
           <div className="grid grid-cols-2 gap-4">
-             <input name="demo" placeholder="Demo Requirements" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
-             <input name="selectResources" placeholder="SELECT Resources" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+             <input name="demo" placeholder="Demo Requirements" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+             <input name="selectResources" placeholder="SELECT Resources" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-4">
-             <input name="sessionDays" placeholder="Session Days" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
-             <input name="sessionSupportDuration" placeholder="Support Duration" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none" />
+             <input name="sessionDays" placeholder="Session Days" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none" />
+             <select name="sessionSupportDuration" className="p-4 border-2 rounded-2xl bg-gray-50 focus:bg-white outline-none">
+                <option value="">Support Duration...</option>
+                {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
+             </select>
           </div>
           <button type="submit" className="w-full bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-4 hover:bg-[#343D84]">Commit to Dashboard</button>
         </form>
@@ -363,9 +443,12 @@ Session Support Duration: ${e.sessionSupportDuration || ''}`;
               <div>
                 <p className="font-black text-slate-800 uppercase text-xs italic leading-none mb-1">{e.eventName}</p>
                 <p className="text-[10px] text-gray-400 font-bold uppercase mt-1 italic">{e.startDate} — {e.eventPoc}</p>
-                <button onClick={() => openDetails(e)} className="text-[9px] text-[#424A9F] font-black uppercase mt-2 hover:text-[#A3E635] transition-all flex items-center">
-                  <FileText size={10} className="mr-1" /> View Details
-                </button>
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => openDetails(e)} className="text-[9px] text-[#424A9F] font-black uppercase hover:text-[#A3E635] transition-all flex items-center">
+                    <FileText size={10} className="mr-1" /> View Details
+                  </button>
+                  <span className="text-[9px] font-black uppercase text-[#A3E635] italic">Lead: {e.selectPoc || 'TBD'}</span>
+                </div>
               </div>
               <button onClick={async () => { if(window.confirm("Archive entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', e.id))}} className="text-gray-200 hover:text-red-500 transition p-2"><Trash2 size={16}/></button>
             </div>
@@ -396,7 +479,10 @@ function KanbanPage({ tasks, showMsg }) {
             {editingId === t.id ? (
                <div className="space-y-2">
                   <input id={`et-${t.id}`} defaultValue={t.title} className="w-full p-2 text-xs border rounded-lg italic font-bold outline-none focus:border-[#424A9F]" />
-                  <input id={`ea-${t.id}`} defaultValue={t.assignee} className="w-full p-2 text-xs border rounded-lg italic outline-none focus:border-[#424A9F]" />
+                  <select id={`ea-${t.id}`} defaultValue={t.assignee} className="w-full p-2 text-xs border rounded-lg italic outline-none focus:border-[#424A9F]">
+                    <option value="">Assign Member...</option>
+                    {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => updateTask(t.id, { title: document.getElementById(`et-${t.id}`).value, assignee: document.getElementById(`ea-${t.id}`).value })} className="flex-1 bg-[#A3E635] text-[#424A9F] text-[10px] py-2 rounded-lg font-black uppercase italic shadow-sm">Save</button>
                     <button onClick={()=>setEditingId(null)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] py-2 rounded-lg font-black uppercase italic">Cancel</button>
@@ -429,7 +515,10 @@ function KanbanPage({ tasks, showMsg }) {
     <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl border border-gray-100">
       <form onSubmit={handleAdd} className="flex flex-col md:flex-row gap-4 mb-12 max-w-3xl mx-auto bg-slate-50 p-2 rounded-2xl border-2 border-slate-200 shadow-inner">
         <input name="t" placeholder="Add Mission Objective..." className="flex-grow p-4 bg-transparent font-black outline-none text-[#424A9F] italic text-sm" />
-        <input name="a" placeholder="Assign Team Member..." className="md:w-48 p-4 bg-transparent font-bold outline-none text-gray-500 italic text-sm border-l-2 border-slate-200" />
+        <select name="a" className="md:w-56 p-4 bg-transparent font-bold outline-none text-gray-500 italic text-sm border-l-2 border-slate-200">
+           <option value="">Assignee...</option>
+           {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
         <button type="submit" className="bg-[#424A9F] text-white px-10 py-4 rounded-xl font-black hover:bg-[#A3E635] hover:text-[#424A9F] transition shadow-lg italic uppercase text-xs">Push</button>
       </form>
       <div className="grid md:grid-cols-3 gap-8"><Col status="todo" title="BACKLOG" color="text-slate-400" /><Col status="doing" title="ACTIVE" color="text-blue-500" /><Col status="complete" title="DELIVERED" color="text-[#A3E635]" /></div>
