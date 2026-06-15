@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import React, { useState, useEffect, useRef, useMemo } from 'react';import React, { useState, useEffect "Leadership", "Workshop", "Meeting", "Conference/ Boardroom", "Town Hall", "Other", "TBD"];
 
 const QUICK_FILL_CARDS = [
   { name: 'Proto', demo: 'Proto hologram', sessionType: 'Demo', note: 'Fast-fill demo' },
