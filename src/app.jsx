@@ -1161,7 +1161,7 @@ function KanbanPage({ tasks, showMsg }) {
     };
 
     if (data.title) {
-      await addDoc(collection(db, 'art
+      await addDoc(collection(db, 'art'
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
