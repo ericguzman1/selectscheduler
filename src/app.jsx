@@ -85,12 +85,14 @@ const blankEventForm = () => ({
 
 const safeParseJson = (text) => {
   try {
-    const cleaned = text?.replace(/```json|
-```/g, '').trim();
+    // Fixed: Using new RegExp() with standard quotes prevents the ESLint backtick crash
+    const cleaned = text?.replace(new RegExp('```json|```', 'g'), '').trim();
     const parsed = JSON.parse(cleaned);
     if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) return {};
     return parsed;
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 };
 
 const ALLOWED_EVENT_KEYS = [
