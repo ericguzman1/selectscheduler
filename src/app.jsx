@@ -85,7 +85,6 @@ const blankEventForm = () => ({
 
 const safeParseJson = (text) => {
   try {
-    // FIXED: Using new RegExp to prevent ESLint parsing crashes on backticks
     const cleaned = text?.replace(new RegExp('```json|```', 'g'), '').trim();
     const parsed = JSON.parse(cleaned);
     if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) return {};
@@ -154,9 +153,9 @@ const scoreSelectRelevance = (e) => {
 
 const classBadgeColor = (cls) => {
   if (cls === 'Leadership') return '#F59E0B';
-  if (cls === 'Client') return '#22C55E';
+  if (cls === 'Client') return '#A3E635';
   if (cls === 'Confidential') return '#EF4444';
-  return '#94A3B8';
+  return '#8C97BA';
 };
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
@@ -182,6 +181,17 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+/* --- STAT CARD COMPONENT (FIXED: Now globally available) --- */
+function StatCard({ icon, value, label }) {
+  return (
+    <div className="rounded-2xl p-4 border shadow-inner bg-[#2A2254] border-[#3B2F75] transition hover:border-[#A3E635]">
+      <div className="text-[#A3E635]">{icon}</div>
+      <div className="text-3xl font-black text-white mt-2 leading-none">{value}</div>
+      <div className="text-[10px] font-black uppercase tracking-widest text-[#8C97BA] mt-2 italic">{label}</div>
+    </div>
+  );
+}
 
 /* --- MAIN APP WRAPPER --- */
 export default function App() {
@@ -261,8 +271,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-slate-500">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#424A9F]"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B0819] text-[#8C97BA]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#A3E635]"></div>
         <p className="mt-4 font-bold uppercase tracking-widest text-[10px]">Syncing Hub Systems...</p>
       </div>
     );
@@ -270,11 +280,11 @@ export default function App() {
 
   if (!firebaseConfig.apiKey) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-sans text-slate-900">
-        <div className="max-w-md w-full bg-white p-10 rounded-3xl shadow-2xl text-center border-t-8 border-red-500">
+      <div className="min-h-screen flex items-center justify-center bg-[#0B0819] p-4 font-sans">
+        <div className="max-w-md w-full bg-[#17132A] p-10 rounded-3xl shadow-2xl text-center border-t-8 border-red-500">
           <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-          <h1 className="text-2xl font-black text-[#424A9F] mb-4 uppercase italic tracking-tighter">Handshake Error</h1>
-          <button onClick={() => window.location.reload()} className="w-full bg-gray-100 py-3 rounded-xl font-bold uppercase text-xs hover:bg-gray-200 transition">Retry Link</button>
+          <h1 className="text-2xl font-black text-white mb-4 uppercase italic tracking-tighter">Handshake Error</h1>
+          <button onClick={() => window.location.reload()} className="w-full bg-[#2A2254] py-3 rounded-xl font-bold uppercase text-xs text-white hover:bg-[#3B2F75] transition">Retry Link</button>
         </div>
       </div>
     );
@@ -283,24 +293,24 @@ export default function App() {
   if (!user) return <AuthPage showMsg={showMsg} />;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center font-sans text-slate-900">
-      <div className="w-full max-w-6xl bg-white p-6 rounded-[2rem] shadow-xl mb-6 border border-gray-50">
+    <div className="min-h-screen bg-[#0B0819] p-4 flex flex-col items-center font-sans text-slate-900">
+      <div className="w-full max-w-6xl bg-[#17132A] p-6 rounded-[2rem] shadow-2xl mb-6 border border-[#3B2F75]">
         <div className="flex justify-between items-center mb-2 flex-wrap gap-3">
-          <h1 className="text-3xl md:text-4xl font-black text-[#17132A] uppercase italic tracking-tighter leading-none flex items-center">
-            <span className="text-[#A3E635] mr-2 text-4xl">{">"}</span> Accenture <span className="text-[#424A9F] ml-2">Hub</span>
+          <h1 className="text-3xl md:text-4xl font-black text-white uppercase italic tracking-tighter leading-none flex items-center">
+            <span className="text-[#A3E635] mr-2 text-4xl">{">"}</span> Accenture <span className="text-[#8C97BA] ml-2">Hub</span>
           </h1>
           <div className="flex items-center space-x-4 flex-wrap">
-            <button onClick={generateLeadBriefing} disabled={isBriefingLoading} className="bg-[#17132A] text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2A2254] transition shadow-lg disabled:opacity-50 flex items-center border border-[#3B2F75]">
+            <button onClick={generateLeadBriefing} disabled={isBriefingLoading} className="bg-[#2A2254] text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#3B2F75] transition shadow-lg disabled:opacity-50 flex items-center border border-[#424A9F]">
               <Zap size={12} className={`mr-2 text-[#A3E635] ${isBriefingLoading ? 'animate-spin' : ''}`} />
               {isBriefingLoading ? 'COMPILING...' : 'LEAD UPDATE'}
             </button>
-            <button onClick={() => signOut(auth)} className="bg-gray-100 text-gray-400 font-bold px-4 py-2.5 rounded-xl hover:text-red-500 transition text-[10px] uppercase tracking-widest flex items-center shadow-sm">
+            <button onClick={() => signOut(auth)} className="bg-transparent text-[#8C97BA] font-bold px-4 py-2.5 rounded-xl hover:text-red-400 transition text-[10px] uppercase tracking-widest flex items-center border border-[#3B2F75]">
               <LogOut size={12} className="mr-2" /> EXIT
             </button>
           </div>
         </div>
 
-        <p className="text-center text-gray-400 font-bold uppercase text-[10px] tracking-[0.3em] mb-6">High Performance. Delivered.</p>
+        <p className="text-center text-[#8C97BA] font-bold uppercase text-[10px] tracking-[0.3em] mb-6">High Performance. Delivered.</p>
 
         <div className="flex justify-center space-x-2 flex-wrap gap-y-2">
           <NavBtn active={currentPage === 'schedule'} onClick={() => setCurrentPage('schedule')} label="Meetings" icon={<Calendar size={12} />} />
@@ -311,9 +321,9 @@ export default function App() {
       </div>
 
       {message.text && (
-        <div className={`w-full max-w-6xl p-4 mb-4 rounded-xl shadow-lg border-l-4 transition-all ${message.isError ? 'bg-red-50 border-red-500 text-red-700' : 'bg-lime-50 border-[#A3E635] text-slate-800'}`}>
+        <div className={`w-full max-w-6xl p-4 mb-4 rounded-xl shadow-lg border-l-4 transition-all ${message.isError ? 'bg-red-900/30 border-red-500 text-red-200' : 'bg-[#A3E635]/10 border-[#A3E635] text-[#A3E635]'}`}>
           <p className="font-bold text-sm leading-relaxed tracking-tight italic flex items-center">
-            {message.isError ? <AlertCircle size={16} className="mr-2" /> : <CheckCircle2 size={16} className="mr-2 text-[#424A9F]" />}
+            {message.isError ? <AlertCircle size={16} className="mr-2" /> : <CheckCircle2 size={16} className="mr-2" />}
             {message.text}
           </p>
         </div>
@@ -327,12 +337,12 @@ export default function App() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 bg-[#17132A]/80 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm" onClick={() => setModal(null)}>
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-2xl w-full border border-gray-100" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-[#17132A] mb-6 uppercase italic border-b pb-2 flex items-center">
+        <div className="fixed inset-0 bg-[#0B0819]/90 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm" onClick={() => setModal(null)}>
+          <div className="bg-[#17132A] p-8 rounded-[2.5rem] shadow-2xl max-w-2xl w-full border border-[#3B2F75]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-black text-white mb-6 uppercase italic border-b border-[#3B2F75] pb-2 flex items-center">
               <Zap size={20} className="mr-2 text-[#A3E635]" /> {modal.title}
             </h3>
-            <div className="text-gray-700 text-sm italic whitespace-pre-wrap leading-relaxed font-mono bg-gray-50 p-6 rounded-2xl border border-gray-100 shadow-inner max-h-[60vh] overflow-y-auto custom-scrollbar">
+            <div className="text-[#C9D2F2] text-sm italic whitespace-pre-wrap leading-relaxed font-mono bg-[#2A2254] p-6 rounded-2xl border border-[#3B2F75] shadow-inner max-h-[60vh] overflow-y-auto custom-scrollbar">
               {modal.content}
             </div>
             <div className="flex gap-2 mt-8">
@@ -341,7 +351,7 @@ export default function App() {
                   <Share2 size={14} className="mr-2" /> {modal.actionLabel || 'Copy Content'}
                 </button>
               )}
-              <button onClick={() => setModal(null)} className="flex-1 bg-gray-100 font-bold py-3 rounded-xl hover:bg-gray-200 uppercase text-xs italic text-gray-500">Close</button>
+              <button onClick={() => setModal(null)} className="flex-1 bg-[#2A2254] text-[#8C97BA] font-bold py-3 rounded-xl hover:bg-[#3B2F75] hover:text-white uppercase text-xs italic transition">Close</button>
             </div>
           </div>
         </div>
@@ -352,7 +362,7 @@ export default function App() {
 
 function NavBtn({ active, onClick, label, icon }) {
   return (
-    <button onClick={onClick} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center ${active ? 'bg-[#A3E635] text-[#17132A] shadow-lg scale-105' : 'bg-white text-gray-400 hover:bg-gray-50 shadow-sm border border-gray-100'}`}>
+    <button onClick={onClick} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center ${active ? 'bg-[#A3E635] text-[#17132A] shadow-lg scale-105' : 'bg-[#2A2254] text-[#8C97BA] hover:bg-[#3B2F75] hover:text-white shadow-sm border border-[#3B2F75]'}`}>
       {icon && <span className="mr-2">{icon}</span>} {label}
     </button>
   );
@@ -370,20 +380,20 @@ function AuthPage({ showMsg }) {
     } catch (err) { showMsg(err.message, true); }
   };
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#17132A] p-4 font-sans text-slate-900">
-      <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border-t-8 border-[#A3E635] text-center">
-        <div className="flex justify-center mb-8 font-black"><div className="bg-[#17132A] p-4 rounded-3xl text-[#A3E635] shadow-lg"><Layout size={32} /></div></div>
-        <h1 className="text-3xl font-black text-[#17132A] mb-6 uppercase italic tracking-tighter flex justify-center items-center">
-          <span className="text-[#A3E635] mr-2">{">"}</span> Accenture <span className="text-[#424A9F] ml-2">Hub</span>
+    <div className="min-h-screen flex items-center justify-center bg-[#0B0819] p-4 font-sans text-slate-900">
+      <div className="w-full max-w-md bg-[#17132A] p-10 rounded-[2.5rem] shadow-2xl border-t-8 border-[#A3E635] text-center">
+        <div className="flex justify-center mb-8 font-black"><div className="bg-[#2A2254] p-4 rounded-3xl text-[#A3E635] shadow-lg border border-[#3B2F75]"><Layout size={32} /></div></div>
+        <h1 className="text-3xl font-black text-white mb-6 uppercase italic tracking-tighter flex justify-center items-center">
+          <span className="text-[#A3E635] mr-2">{">"}</span> Accenture <span className="text-[#8C97BA] ml-2">Hub</span>
         </h1>
         <form onSubmit={authSubmit} className="space-y-4">
-          <input name="email" type="email" placeholder="Corporate ID (Email)" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
-          <input name="password" type="password" placeholder="Key Phrase" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
-          <button type="submit" className={`w-full font-black py-4 rounded-2xl shadow-xl mt-4 transition ${isLogin ? 'bg-[#17132A] text-white hover:bg-[#2A2254]' : 'bg-[#A3E635] text-[#17132A] hover:bg-[#8CD02F]'}`}>
+          <input name="email" type="email" placeholder="Corporate ID (Email)" required className="w-full p-4 rounded-2xl border-2 border-[#3B2F75] outline-none focus:border-[#A3E635] bg-[#2A2254] text-white font-bold placeholder-[#8C97BA] transition" />
+          <input name="password" type="password" placeholder="Key Phrase" required className="w-full p-4 rounded-2xl border-2 border-[#3B2F75] outline-none focus:border-[#A3E635] bg-[#2A2254] text-white font-bold placeholder-[#8C97BA] transition" />
+          <button type="submit" className={`w-full font-black py-4 rounded-2xl shadow-xl mt-4 transition tracking-widest ${isLogin ? 'bg-[#424A9F] text-white hover:bg-[#5C65C0]' : 'bg-[#A3E635] text-[#17132A] hover:bg-[#8CD02F]'}`}>
             {isLogin ? 'INITIATE LOGIN' : 'CREATE PROFILE'}
           </button>
         </form>
-        <button onClick={() => setIsLogin(!isLogin)} className="mt-8 text-xs font-black text-gray-400 hover:text-[#424A9F] uppercase tracking-widest transition">
+        <button onClick={() => setIsLogin(!isLogin)} className="mt-8 text-xs font-black text-[#8C97BA] hover:text-[#A3E635] uppercase tracking-widest transition">
           {isLogin ? "Register Access" : "Back to Login"}
         </button>
       </div>
@@ -391,7 +401,7 @@ function AuthPage({ showMsg }) {
   );
 }
 
-/* --- KANBAN PAGE (FULLY FUNCTIONAL) --- */
+/* --- KANBAN PAGE (FULLY FUNCTIONAL & THEMED) --- */
 export function KanbanPage({ tasks, showMsg }) {
   const [editingId, setEditingId] = useState(null);
 
@@ -399,12 +409,8 @@ export function KanbanPage({ tasks, showMsg }) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const data = {
-      title: fd.get('t'),
-      assignee: fd.get('a'),
-      dueDate: fd.get('d'),
-      timeSpent: fd.get('du'),
-      details: fd.get('det'),
-      status: 'todo',
+      title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'),
+      timeSpent: fd.get('du'), details: fd.get('det'), status: 'todo',
       timestamp: new Date().toISOString()
     };
     if (data.title) {
@@ -429,11 +435,8 @@ export function KanbanPage({ tasks, showMsg }) {
     e.preventDefault();
     const fd = new FormData(e.target);
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), {
-      title: fd.get('t'),
-      assignee: fd.get('a'),
-      dueDate: fd.get('d'),
-      timeSpent: fd.get('du'),
-      details: fd.get('det'),
+      title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'),
+      timeSpent: fd.get('du'), details: fd.get('det'),
     });
     setEditingId(null);
     showMsg("Task intelligence updated.");
@@ -442,66 +445,66 @@ export function KanbanPage({ tasks, showMsg }) {
   const renderTask = (task) => {
     if (editingId === task.id) {
       return (
-        <form key={task.id} onSubmit={(e) => handleUpdate(e, task.id)} className="bg-white p-4 rounded-2xl shadow-md border-2 border-[#A3E635] space-y-3 animate-fade-in">
-          <input name="t" defaultValue={task.title} placeholder="Task Title" required className="w-full p-2 text-xs border rounded-lg outline-none font-black text-slate-800 bg-gray-50 focus:border-[#424A9F]" />
-          <textarea name="det" defaultValue={task.details} placeholder="Notes / Details..." className="w-full p-2 text-xs border rounded-lg outline-none resize-none font-bold italic text-slate-600 bg-gray-50 focus:border-[#424A9F]" rows="2" />
+        <form key={task.id} onSubmit={(e) => handleUpdate(e, task.id)} className="bg-[#2A2254] p-4 rounded-2xl shadow-md border border-[#A3E635] space-y-3 animate-fade-in">
+          <input name="t" defaultValue={task.title} placeholder="Task Title" required className="w-full p-2 text-xs border border-[#3B2F75] rounded-lg outline-none font-black text-white bg-[#17132A] focus:border-[#A3E635]" />
+          <textarea name="det" defaultValue={task.details} placeholder="Notes / Details..." className="w-full p-2 text-xs border border-[#3B2F75] rounded-lg outline-none resize-none font-bold italic text-[#C9D2F2] bg-[#17132A] focus:border-[#A3E635]" rows="2" />
           <div className="grid grid-cols-2 gap-2">
-            <select name="a" defaultValue={task.assignee} className="p-2 text-xs border rounded-lg outline-none font-bold text-slate-600 bg-gray-50">
+            <select name="a" defaultValue={task.assignee} className="p-2 text-xs border border-[#3B2F75] rounded-lg outline-none font-bold text-[#C9D2F2] bg-[#17132A]">
               <option value="">Assignee...</option>
               {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            <input name="du" defaultValue={task.timeSpent} placeholder="Time (hrs)" className="p-2 text-xs border rounded-lg outline-none font-bold text-slate-600 bg-gray-50" />
+            <input name="du" defaultValue={task.timeSpent} placeholder="Time (hrs)" className="p-2 text-xs border border-[#3B2F75] rounded-lg outline-none font-bold text-white bg-[#17132A]" />
           </div>
-          <input name="d" type="date" defaultValue={task.dueDate} className="w-full p-2 text-xs border rounded-lg outline-none font-bold text-slate-600 bg-gray-50" />
+          <input name="d" type="date" defaultValue={task.dueDate} className="w-full p-2 text-xs border border-[#3B2F75] rounded-lg outline-none font-bold text-white bg-[#17132A]" />
           <div className="flex gap-2 pt-2">
-            <button type="submit" className="flex-1 bg-[#17132A] text-[#A3E635] text-[10px] font-black py-2 rounded-lg uppercase tracking-widest hover:bg-[#2A2254] transition">Save</button>
-            <button type="button" onClick={() => setEditingId(null)} className="flex-1 bg-gray-100 text-gray-500 text-[10px] font-black py-2 rounded-lg uppercase tracking-widest hover:bg-gray-200 transition">Cancel</button>
+            <button type="submit" className="flex-1 bg-[#A3E635] text-[#17132A] text-[10px] font-black py-2 rounded-lg uppercase tracking-widest hover:bg-[#8CD02F] transition">Save</button>
+            <button type="button" onClick={() => setEditingId(null)} className="flex-1 bg-[#17132A] text-[#8C97BA] border border-[#3B2F75] text-[10px] font-black py-2 rounded-lg uppercase tracking-widest hover:bg-[#3B2F75] hover:text-white transition">Cancel</button>
           </div>
         </form>
       );
     }
 
     return (
-      <div key={task.id} className="bg-white p-4 rounded-2xl shadow-sm border border-l-4 border-l-[#424A9F] hover:shadow-md transition flex flex-col h-full group">
+      <div key={task.id} className="bg-[#2A2254] p-4 rounded-2xl shadow-lg border border-l-4 border-[#3B2F75] border-l-[#424A9F] hover:border-l-[#A3E635] transition flex flex-col h-full group">
         <div className="flex justify-between items-start mb-2">
-          <p className="font-black text-slate-800 uppercase text-xs italic leading-tight">{task.title}</p>
-          <button onClick={() => deleteTask(task.id)} className="text-gray-200 hover:text-red-500 transition opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
+          <p className="font-black text-white uppercase text-xs italic leading-tight">{task.title}</p>
+          <button onClick={() => deleteTask(task.id)} className="text-[#8C97BA] hover:text-red-400 transition opacity-0 group-hover:opacity-100"><Trash2 size={12} /></button>
         </div>
-        {task.details && <p className="text-[10px] text-gray-500 font-bold italic mb-3 line-clamp-3 leading-relaxed">{task.details}</p>}
+        {task.details && <p className="text-[10px] text-[#8C97BA] font-bold italic mb-3 line-clamp-3 leading-relaxed">{task.details}</p>}
 
-        <div className="mt-auto space-y-1 bg-gray-50 p-3 rounded-xl border border-dashed mb-3">
-          <p className="text-[9px] text-slate-500 font-black uppercase flex items-center"><User size={10} className="mr-1 text-[#A3E635]" /> {task.assignee || 'Unassigned'}</p>
-          {task.dueDate && <p className="text-[9px] text-slate-500 font-black uppercase flex items-center mt-1"><CalendarDays size={10} className="mr-1 text-[#424A9F]" /> {task.dueDate}</p>}
-          {task.timeSpent && <p className="text-[9px] text-slate-500 font-black uppercase flex items-center mt-1"><Clock size={10} className="mr-1 text-[#424A9F]" /> {task.timeSpent} hrs</p>}
+        <div className="mt-auto space-y-1 bg-[#17132A] p-3 rounded-xl border border-[#3B2F75] mb-3">
+          <p className="text-[9px] text-[#C9D2F2] font-black uppercase flex items-center"><User size={10} className="mr-1 text-[#A3E635]" /> {task.assignee || 'Unassigned'}</p>
+          {task.dueDate && <p className="text-[9px] text-[#C9D2F2] font-black uppercase flex items-center mt-1"><CalendarDays size={10} className="mr-1 text-[#424A9F]" /> {task.dueDate}</p>}
+          {task.timeSpent && <p className="text-[9px] text-[#C9D2F2] font-black uppercase flex items-center mt-1"><Clock size={10} className="mr-1 text-[#424A9F]" /> {task.timeSpent} hrs</p>}
         </div>
 
-        <div className="flex justify-between items-center pt-3 border-t mt-auto">
-          <button onClick={() => updateTaskStatus(task.id, task.status === 'done' ? 'progress' : 'todo')} className={`p-1.5 rounded-lg hover:bg-gray-100 transition ${task.status === 'todo' ? 'invisible' : 'text-gray-400 hover:text-[#424A9F]'}`}><ChevronLeft size={14} /></button>
-          <button onClick={() => setEditingId(task.id)} className="text-[9px] font-black uppercase text-[#424A9F] hover:text-[#A3E635] flex items-center transition"><Edit3 size={10} className="mr-1" /> Edit Info</button>
-          <button onClick={() => updateTaskStatus(task.id, task.status === 'todo' ? 'progress' : 'done')} className={`p-1.5 rounded-lg hover:bg-gray-100 transition ${task.status === 'done' ? 'invisible' : 'text-gray-400 hover:text-[#424A9F]'}`}><ChevronRight size={14} /></button>
+        <div className="flex justify-between items-center pt-3 border-t border-[#3B2F75] mt-auto">
+          <button onClick={() => updateTaskStatus(task.id, task.status === 'done' ? 'progress' : 'todo')} className={`p-1.5 rounded-lg hover:bg-[#3B2F75] transition ${task.status === 'todo' ? 'invisible' : 'text-[#8C97BA] hover:text-white'}`}><ChevronLeft size={14} /></button>
+          <button onClick={() => setEditingId(task.id)} className="text-[9px] font-black uppercase text-[#A3E635] hover:text-white flex items-center transition"><Edit3 size={10} className="mr-1" /> Edit</button>
+          <button onClick={() => updateTaskStatus(task.id, task.status === 'todo' ? 'progress' : 'done')} className={`p-1.5 rounded-lg hover:bg-[#3B2F75] transition ${task.status === 'done' ? 'invisible' : 'text-[#8C97BA] hover:text-white'}`}><ChevronRight size={14} /></button>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
-      <div className="bg-[#17132A] rounded-[2rem] p-6 shadow-lg mb-8 border border-[#2A2254]">
+    <div className="bg-[#17132A] p-6 md:p-10 rounded-[3rem] shadow-2xl border border-[#3B2F75] animate-fade-in">
+      <div className="bg-[#0B0819] rounded-[2rem] p-6 shadow-lg mb-8 border border-[#3B2F75]">
         <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center mb-4">
           <ClipboardList size={18} className="mr-2 text-[#A3E635]" /> Create New Task
         </h2>
         <form onSubmit={handleAdd} className="grid gap-4 font-bold text-sm italic">
           <div className="grid md:grid-cols-2 gap-4">
-            <input name="t" placeholder="Task Title*" required className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-gray-400" />
-            <select name="a" className="p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-[#C9D2F2] outline-none focus:border-[#A3E635]">
+            <input name="t" placeholder="Task Title*" required className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-[#8C97BA] transition" />
+            <select name="a" className="p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-[#C9D2F2] outline-none focus:border-[#A3E635] transition">
               <option value="">Assignee...</option>
               {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div className="grid md:grid-cols-3 gap-4">
-            <input name="d" type="date" className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-gray-400 outline-none focus:border-[#A3E635]" />
-            <input name="du" placeholder="Time Spent (e.g. 2.5)" className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-gray-400" />
-            <input name="det" placeholder="Quick Notes..." className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-gray-400" />
+            <input name="d" type="date" className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-[#8C97BA] outline-none focus:border-[#A3E635] transition" />
+            <input name="du" placeholder="Time Spent (hrs)" className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-[#8C97BA] transition" />
+            <input name="det" placeholder="Quick Notes..." className="w-full p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-[#8C97BA] transition" />
           </div>
           <button type="submit" className="bg-[#A3E635] text-[#17132A] font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 hover:bg-[#8CD02F]">
             Add Task to Board
@@ -510,24 +513,24 @@ export function KanbanPage({ tasks, showMsg }) {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-gray-50 p-5 rounded-[2rem] border border-gray-100 shadow-inner">
+        <div className="bg-[#0B0819] p-5 rounded-[2rem] border border-[#3B2F75] shadow-inner">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-xs uppercase tracking-widest text-[#424A9F] italic">To Do</h3>
-            <span className="bg-white text-[#424A9F] text-[10px] font-black px-2 py-1 rounded-lg border shadow-sm">{tasks.filter(t => t.status === 'todo').length}</span>
+            <h3 className="font-black text-xs uppercase tracking-widest text-[#8C97BA] italic">To Do</h3>
+            <span className="bg-[#2A2254] text-[#A3E635] text-[10px] font-black px-2 py-1 rounded-lg border border-[#3B2F75]">{tasks.filter(t => t.status === 'todo').length}</span>
           </div>
           <div className="space-y-4">{tasks.filter(t => t.status === 'todo').map(renderTask)}</div>
         </div>
-        <div className="bg-gray-50 p-5 rounded-[2rem] border border-gray-100 shadow-inner">
+        <div className="bg-[#0B0819] p-5 rounded-[2rem] border border-[#3B2F75] shadow-inner">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black text-xs uppercase tracking-widest text-[#F59E0B] italic">In Progress</h3>
-            <span className="bg-white text-[#F59E0B] text-[10px] font-black px-2 py-1 rounded-lg border shadow-sm">{tasks.filter(t => t.status === 'progress').length}</span>
+            <span className="bg-[#2A2254] text-[#F59E0B] text-[10px] font-black px-2 py-1 rounded-lg border border-[#3B2F75]">{tasks.filter(t => t.status === 'progress').length}</span>
           </div>
           <div className="space-y-4">{tasks.filter(t => t.status === 'progress').map(renderTask)}</div>
         </div>
-        <div className="bg-[#17132A]/5 p-5 rounded-[2rem] border border-[#17132A]/10 shadow-inner">
+        <div className="bg-[#0B0819] p-5 rounded-[2rem] border border-[#3B2F75] shadow-inner">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-black text-xs uppercase tracking-widest text-[#22C55E] italic">Done</h3>
-            <span className="bg-white text-[#22C55E] text-[10px] font-black px-2 py-1 rounded-lg border shadow-sm">{tasks.filter(t => t.status === 'done').length}</span>
+            <span className="bg-[#2A2254] text-[#22C55E] text-[10px] font-black px-2 py-1 rounded-lg border border-[#3B2F75]">{tasks.filter(t => t.status === 'done').length}</span>
           </div>
           <div className="space-y-4">{tasks.filter(t => t.status === 'done').map(renderTask)}</div>
         </div>
@@ -536,7 +539,7 @@ export function KanbanPage({ tasks, showMsg }) {
   );
 }
 
-/* --- SCHEDULE / MEETINGS PAGE --- */
+/* --- SCHEDULE / MEETINGS PAGE (THEMED) --- */
 function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -698,9 +701,10 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   };
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-gray-100 grid gap-8 animate-fade-in">
+    <div className="bg-[#17132A] p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-[#3B2F75] grid gap-8 animate-fade-in">
       
-      <div className="bg-[#17132A] text-white border border-[#2A2254] rounded-[2rem] p-5 shadow-lg">
+      {/* BEO IMPORT */}
+      <div className="bg-[#0B0819] text-white border border-[#3B2F75] rounded-[2rem] p-5 shadow-lg">
         <div className="flex flex-col gap-4">
           <div>
             <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
@@ -716,7 +720,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
               <textarea
                 value={beoText}
                 onChange={(e) => setBeoText(e.target.value)}
-                className="w-full h-44 p-4 rounded-2xl border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] resize-none outline-none text-sm font-mono transition"
+                className="w-full h-44 p-4 rounded-2xl border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] resize-none outline-none text-sm font-mono transition"
                 placeholder="Paste BEO text here..."
               />
 
@@ -734,10 +738,10 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
               <div className="flex flex-col md:flex-row gap-2">
                 <textarea
                   id="ai-input"
-                  className="flex-1 h-24 p-4 rounded-2xl border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] resize-none outline-none text-sm italic transition"
+                  className="flex-1 h-24 p-4 rounded-2xl border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] resize-none outline-none text-sm italic transition"
                   placeholder="Optional: use your current /api/ai route to extract a single BEO event with AI..."
                 />
-                <button onClick={handleAiAutoCommit} disabled={aiLoading} className="bg-[#424A9F] text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#343D84] transition shadow-lg disabled:opacity-50 flex items-center justify-center min-w-[180px]">
+                <button onClick={handleAiAutoCommit} disabled={aiLoading} className="bg-[#424A9F] text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#5C65C0] transition shadow-lg disabled:opacity-50 flex items-center justify-center min-w-[180px]">
                   <BrainCircuit size={12} className={`mr-2 ${aiLoading ? 'animate-spin' : 'text-[#A3E635]'}`} />
                   {aiLoading ? 'ANALYZING...' : 'AI EXTRACT'}
                 </button>
@@ -754,11 +758,11 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
         </div>
       </div>
 
-      
+      {/* MAIN LAYOUT */}
       <div className="grid lg:grid-cols-[1.15fr,.85fr] gap-8">
-        
+        {/* LEFT */}
         <div className="space-y-8">
-          <div className="bg-[#17132A] text-white border border-[#2A2254] rounded-[2rem] p-5 shadow-lg">
+          <div className="bg-[#0B0819] text-white border border-[#3B2F75] rounded-[2rem] p-5 shadow-lg">
             <div className="flex flex-col lg:flex-row justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
@@ -775,7 +779,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
                     key={type}
                     type="button"
                     onClick={() => updateField('sessionType', type)}
-                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${formData.sessionType === type ? 'bg-[#A3E635] text-[#17132A]' : 'bg-[#2A2254] border border-[#3B2F75] text-[#C9D2F2] hover:border-[#424A9F]'}`}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${formData.sessionType === type ? 'bg-[#A3E635] text-[#17132A]' : 'bg-[#2A2254] border border-[#3B2F75] text-[#C9D2F2] hover:border-[#A3E635]'}`}
                   >
                     {type}
                   </button>
@@ -783,7 +787,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#2A2254] border border-[#3B2F75] text-sm text-[#E9DFFF] font-bold italic">
+            <div className="p-4 rounded-2xl bg-[#2A2254] border border-[#3B2F75] text-sm text-[#C9D2F2] font-bold italic">
               {importBanner}
             </div>
 
@@ -803,18 +807,18 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
 
             <form onSubmit={handleCommit} className="space-y-4 font-bold text-sm italic mt-6">
               <div className="grid md:grid-cols-2 gap-4">
-                <input value={formData.eventName} onChange={(e) => updateField('eventName', e.target.value)} placeholder="Event Name*" required className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
-                <input value={formData.eventPoc} onChange={(e) => updateField('eventPoc', e.target.value)} placeholder="Event POC*" required className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                <input value={formData.eventName} onChange={(e) => updateField('eventName', e.target.value)} placeholder="Event Name*" required className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                <input value={formData.eventPoc} onChange={(e) => updateField('eventPoc', e.target.value)} placeholder="Event POC*" required className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="text-[9px] font-black uppercase text-[#8C97BA]">
                   Start Date
-                  <input value={formData.startDate} onChange={(e) => updateField('startDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                  <input value={formData.startDate} onChange={(e) => updateField('startDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border border-[#3B2F75] bg-[#2A2254] text-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
                 </div>
                 <div className="text-[9px] font-black uppercase text-[#8C97BA]">
                   End Date
-                  <input value={formData.endDate} onChange={(e) => updateField('endDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                  <input value={formData.endDate} onChange={(e) => updateField('endDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border border-[#3B2F75] bg-[#2A2254] text-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
                 </div>
               </div>
 
@@ -823,7 +827,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
                   <option value="">SELECT Lead...</option>
                   {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <input value={formData.location} onChange={(e) => updateField('location', e.target.value)} placeholder="Location" className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                <input value={formData.location} onChange={(e) => updateField('location', e.target.value)} placeholder="Location" className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -840,14 +844,14 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
                 <select value={formData.sessionType} onChange={(e) => updateField('sessionType', e.target.value)} className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white focus:border-[#A3E635] rounded-2xl outline-none transition">
                   {SESSION_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <input value={formData.attendees} onChange={(e) => updateField('attendees', e.target.value)} placeholder="Attendees" className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                <input value={formData.attendees} onChange={(e) => updateField('attendees', e.target.value)} placeholder="Attendees" className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
               </div>
 
-              <input value={formData.demo} onChange={(e) => updateField('demo', e.target.value)} placeholder="Demo Requirements" className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
-              <input value={formData.selectResources} onChange={(e) => updateField('selectResources', e.target.value)} placeholder="SELECT Resources" className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+              <input value={formData.demo} onChange={(e) => updateField('demo', e.target.value)} placeholder="Demo Requirements" className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
+              <input value={formData.selectResources} onChange={(e) => updateField('selectResources', e.target.value)} placeholder="SELECT Resources" className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <input value={formData.sessionDays} onChange={(e) => updateField('sessionDays', e.target.value)} placeholder="Session Days" className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                <input value={formData.sessionDays} onChange={(e) => updateField('sessionDays', e.target.value)} placeholder="Session Days" className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
                 <select value={formData.sessionSupportDuration} onChange={(e) => updateField('sessionSupportDuration', e.target.value)} className="p-4 border border-[#3B2F75] bg-[#2A2254] text-white focus:border-[#A3E635] rounded-2xl outline-none transition">
                   <option value="">Support Duration...</option>
                   {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
@@ -860,18 +864,18 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
                 </select>
                 <div className="text-[9px] font-black uppercase text-[#8C97BA]">
                   Week Of
-                  <input value={formData.weekOf} onChange={(e) => updateField('weekOf', e.target.value)} type="date" className="w-full p-4 mt-1 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none transition" />
+                  <input value={formData.weekOf} onChange={(e) => updateField('weekOf', e.target.value)} type="date" className="w-full p-4 mt-1 border border-[#3B2F75] bg-[#2A2254] text-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none transition" />
                 </div>
               </div>
 
-              <textarea value={formData.notes} onChange={(e) => updateField('notes', e.target.value)} placeholder="Notes / dependencies / setup details..." rows="4" className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-gray-400 focus:border-[#A3E635] rounded-2xl outline-none resize-none transition"></textarea>
+              <textarea value={formData.notes} onChange={(e) => updateField('notes', e.target.value)} placeholder="Notes / dependencies / setup details..." rows="4" className="w-full p-4 border border-[#3B2F75] bg-[#2A2254] text-white placeholder-[#8C97BA] focus:border-[#A3E635] rounded-2xl outline-none resize-none transition"></textarea>
 
               <div className="flex gap-2 flex-wrap">
-                <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A3E635] text-[#17132A] hover:bg-[#8CD02F]' : 'bg-[#424A9F] text-white hover:bg-[#343D84]'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 flex items-center justify-center`}>
+                <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A3E635] text-[#17132A] hover:bg-[#8CD02F]' : 'bg-[#424A9F] text-white hover:bg-[#5C65C0]'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 flex items-center justify-center`}>
                   {editingId ? 'Update Intel' : 'Commit Intel'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={resetForm} className="flex-none px-6 bg-[#2A2254] font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 text-[#8C97BA] flex items-center hover:bg-gray-800 hover:text-red-400 border border-[#3B2F75]">
+                  <button type="button" onClick={resetForm} className="flex-none px-6 bg-[#2A2254] font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 text-[#8C97BA] flex items-center hover:bg-[#3B2F75] hover:text-white border border-[#3B2F75]">
                     <RefreshCcw size={14} className="mr-2" /> Cancel
                   </button>
                 )}
@@ -880,9 +884,9 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
           </div>
         </div>
 
-        
+        {/* RIGHT */}
         <div className="space-y-8">
-          <div className="bg-[#17132A] text-white border border-[#2A2254] rounded-[2rem] p-5 shadow-lg">
+          <div className="bg-[#0B0819] text-white border border-[#3B2F75] rounded-[2rem] p-5 shadow-lg">
             <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
               <BarChart3 size={18} className="mr-2 text-[#A3E635]" /> Quick Stats
             </h2>
@@ -894,7 +898,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
             </div>
           </div>
 
-          <div className="bg-[#17132A] text-white border border-[#2A2254] rounded-[2rem] p-5 shadow-lg">
+          <div className="bg-[#0B0819] text-white border border-[#3B2F75] rounded-[2rem] p-5 shadow-lg">
             <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
@@ -908,7 +912,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
               <div className="flex flex-col gap-3">
                 <div className="flex items-center gap-2 rounded-2xl border border-[#3B2F75] bg-[#2A2254] p-3 focus-within:border-[#A3E635] transition">
                   <Search size={14} className="text-[#8C97BA]" />
-                  <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search event, POC, demo, location..." className="w-full bg-transparent outline-none text-sm text-white placeholder-gray-500" />
+                  <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search event, POC, demo..." className="w-full bg-transparent outline-none text-sm text-white placeholder-[#8C97BA]" />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -922,7 +926,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
                       key={src || 'all'}
                       type="button"
                       onClick={() => setSourceFilter(src)}
-                      className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition border border-[#3B2F75] ${sourceFilter === src ? 'bg-[#A3E635] text-[#17132A]' : 'bg-[#2A2254] text-[#C9D2F2] hover:border-[#424A9F]'}`}
+                      className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition border border-[#3B2F75] ${sourceFilter === src ? 'bg-[#A3E635] text-[#17132A]' : 'bg-[#2A2254] text-[#C9D2F2] hover:border-[#A3E635]'}`}
                     >
                       <Filter size={10} className="inline mr-1" /> {src || 'All Sources'}
                     </button>
@@ -934,7 +938,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
 
           <div className="space-y-4 overflow-y-auto max-h-[72vh] pr-2 custom-scrollbar">
             {!filteredEvents.length && (
-              <div className="p-8 rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50 text-center text-slate-400 font-black uppercase text-xs tracking-widest italic">
+              <div className="p-8 rounded-3xl border-2 border-dashed border-[#3B2F75] bg-[#2A2254] text-center text-[#8C97BA] font-black uppercase text-xs tracking-widest italic">
                 No events yet. Import a BEO or add an event manually.
               </div>
             )}
@@ -942,35 +946,35 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
             {filteredEvents.map((entry) => {
               const badgeColor = classBadgeColor(entry.classification);
               return (
-                <div key={entry.id} className={`bg-white p-5 rounded-2xl shadow-md border-l-8 ${editingId === entry.id ? 'border-[#A3E635] bg-lime-50/20' : 'border-[#424A9F]'} flex justify-between items-start group transition border border-gray-50 hover:bg-indigo-50/50`}>
+                <div key={entry.id} className={`bg-[#2A2254] p-5 rounded-2xl shadow-md border-l-8 ${editingId === entry.id ? 'border-[#A3E635] bg-[#3B2F75]' : 'border-[#424A9F]'} flex justify-between items-start group transition border border-[#3B2F75] hover:border-[#A3E635]`}>
                   <div className="flex-1 pr-4">
-                    <p className="font-black text-slate-800 uppercase text-xs italic leading-none mb-1">{entry.eventName}</p>
+                    <p className="font-black text-white uppercase text-xs italic leading-none mb-1">{entry.eventName}</p>
 
                     <div className="flex flex-wrap gap-2 mt-2 mb-3">
-                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest" style={{ backgroundColor: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}` }}>
+                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-[#17132A]" style={{ color: badgeColor, border: `1px solid ${badgeColor}50` }}>
                         {entry.classification || 'Unclassified'}
                       </span>
-                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">{entry.sessionType || 'Session'}</span>
-                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">{entry.source || 'Manual'}</span>
+                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-[#17132A] text-[#C9D2F2] border border-[#3B2F75]">{entry.sessionType || 'Session'}</span>
+                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-[#17132A] text-[#C9D2F2] border border-[#3B2F75]">{entry.source || 'Manual'}</span>
                     </div>
 
-                    <p className="text-[10px] text-gray-400 font-bold uppercase italic flex items-center"><CalendarDays size={10} className="mr-1" /> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase italic mt-1 flex items-center"><User size={10} className="mr-1" /> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase italic mt-1 flex items-center"><MapPin size={10} className="mr-1" /> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room set'}</p>
+                    <p className="text-[10px] text-[#8C97BA] font-bold uppercase italic flex items-center"><CalendarDays size={10} className="mr-1 text-[#A3E635]" /> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
+                    <p className="text-[10px] text-[#8C97BA] font-bold uppercase italic mt-1 flex items-center"><User size={10} className="mr-1 text-[#A3E635]" /> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
+                    <p className="text-[10px] text-[#8C97BA] font-bold uppercase italic mt-1 flex items-center"><MapPin size={10} className="mr-1 text-[#A3E635]" /> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room set'}</p>
 
                     {(entry.demo || entry.selectResources) && (
-                      <p className="text-[10px] text-gray-500 font-bold italic mt-2 line-clamp-2">
+                      <p className="text-[10px] text-[#C9D2F2] font-bold italic mt-2 line-clamp-2">
                         Demo: {entry.demo || '—'} • Resources: {entry.selectResources || '—'}
                       </p>
                     )}
 
                     <div className="flex gap-2 mt-3 flex-wrap">
-                      <button onClick={() => startEdit(entry)} className="text-[9px] text-[#424A9F] font-black uppercase hover:text-[#A3E635] transition-all flex items-center"><Edit3 size={10} className="mr-1" /> Edit</button>
-                      <button onClick={() => openFullIntel(entry)} className="text-[9px] text-indigo-500 font-black uppercase hover:text-[#A3E635] transition-all flex items-center"><FileText size={10} className="mr-1" /> View Full Intel</button>
+                      <button onClick={() => startEdit(entry)} className="text-[9px] text-[#A3E635] font-black uppercase hover:text-white transition-all flex items-center"><Edit3 size={10} className="mr-1" /> Edit</button>
+                      <button onClick={() => openFullIntel(entry)} className="text-[9px] text-[#424A9F] font-black uppercase hover:text-white transition-all flex items-center"><FileText size={10} className="mr-1" /> View Full Intel</button>
                     </div>
                   </div>
 
-                  <button onClick={async () => { if(window.confirm("Archive entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); }} className="text-gray-200 hover:text-red-500 transition p-2">
+                  <button onClick={async () => { if(window.confirm("Archive entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); }} className="text-[#8C97BA] hover:text-red-400 transition p-2">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -983,7 +987,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   );
 }
 
-/* --- TECH FEED / ISSUES PAGE --- */
+/* --- TECH FEED / ISSUES PAGE (THEMED) --- */
 function IssuesPage({ issues, showMsg, fetchGemini }) {
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [analysis, setAnalysis] = useState('');
@@ -1009,43 +1013,43 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
 
   return (
     <div className="grid md:grid-cols-2 gap-8 animate-fade-in">
-      <div className="bg-white p-6 md:p-8 rounded-[3rem] shadow-2xl border border-gray-100">
-        <h2 className="text-2xl font-black text-[#17132A] mb-6 uppercase italic flex items-center">
+      <div className="bg-[#17132A] p-6 md:p-8 rounded-[3rem] shadow-2xl border border-[#3B2F75]">
+        <h2 className="text-2xl font-black text-white mb-6 uppercase italic flex items-center">
           <BrainCircuit className="mr-3 text-[#A3E635]" /> Log Infrastructure Blocker
         </h2>
-        <p className="text-xs text-slate-500 font-bold italic mb-6">Record operational bottlenecks, AV failures, or client-facing blockers directly into the live intelligence feed.</p>
+        <p className="text-xs text-[#8C97BA] font-bold italic mb-6">Record operational bottlenecks, AV failures, or client-facing blockers directly into the live intelligence feed.</p>
         <form onSubmit={handleAddIssue} className="grid gap-4 font-bold text-sm italic">
-          <input name="t" placeholder="Alert Title*" required className="p-4 border-2 rounded-2xl bg-gray-50 outline-none focus:border-[#424A9F]" />
-          <textarea name="d" placeholder="Provide context, impact, or required dependencies..." required className="p-4 border-2 rounded-2xl bg-gray-50 outline-none resize-none h-32 custom-scrollbar focus:border-[#424A9F]" />
-          <select name="u" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none text-slate-600 focus:border-[#424A9F]">
+          <input name="t" placeholder="Alert Title*" required className="p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none focus:border-[#A3E635] placeholder-[#8C97BA]" />
+          <textarea name="d" placeholder="Provide context, impact, or required dependencies..." required className="p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-white outline-none resize-none h-32 custom-scrollbar focus:border-[#A3E635] placeholder-[#8C97BA]" />
+          <select name="u" className="p-4 border border-[#3B2F75] rounded-2xl bg-[#2A2254] text-[#C9D2F2] outline-none focus:border-[#A3E635]">
             <option value="Normal">Normal Urgency</option>
             <option value="High">High Urgency</option>
             <option value="Urgent">Urgent / Showstopper</option>
           </select>
-          <button type="submit" className="bg-[#17132A] text-[#A3E635] font-black py-4 rounded-2xl shadow-xl uppercase italic mt-2 hover:bg-[#2A2254] transition tracking-widest">
+          <button type="submit" className="bg-[#A3E635] text-[#17132A] font-black py-4 rounded-2xl shadow-xl uppercase italic mt-2 hover:bg-[#8CD02F] transition tracking-widest">
             Log into System
           </button>
         </form>
       </div>
 
-      <div className="bg-gray-50 p-6 md:p-8 rounded-[3rem] shadow-inner border border-gray-100">
-        <div className="mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+      <div className="bg-[#0B0819] p-6 md:p-8 rounded-[3rem] shadow-inner border border-[#3B2F75]">
+        <div className="mb-6 bg-[#2A2254] p-5 rounded-2xl shadow-sm border border-[#3B2F75]">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-[10px] font-black uppercase tracking-widest text-[#424A9F]">AI Risk Intel</span>
-            <button onClick={runRiskAnalysis} className="text-[8px] bg-white border border-gray-100 px-3 py-1 rounded-full font-black uppercase text-gray-400 hover:text-[#424A9F] transition">Refresh Analysis</button>
+            <span className="text-[10px] font-black uppercase tracking-widest text-[#A3E635]">AI Risk Intel</span>
+            <button onClick={runRiskAnalysis} className="text-[8px] bg-[#17132A] border border-[#3B2F75] px-3 py-1 rounded-full font-black uppercase text-[#8C97BA] hover:text-white transition">Refresh Analysis</button>
           </div>
-          <p className="text-[11px] text-slate-500 font-bold italic leading-relaxed">{isAnalysing ? "Analyzing trends..." : (analysis || "Log blockers to unlock intelligence.")}</p>
+          <p className="text-[11px] text-[#C9D2F2] font-bold italic leading-relaxed">{isAnalysing ? "Analyzing trends..." : (analysis || "Log blockers to unlock intelligence.")}</p>
         </div>
         <div className="space-y-4 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
           {issues.map(i => (
-            <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 ${i.urgency?.includes('Urgent') ? 'border-red-600 bg-red-50/20' : i.urgency === 'High' ? 'border-yellow-400 bg-yellow-50/20' : 'border-[#424A9F] hover:bg-slate-50'}`}>
+            <div key={i.id} className={`p-6 bg-[#2A2254] rounded-3xl shadow-md transition border-l-8 ${i.urgency?.includes('Urgent') ? 'border-red-500 bg-red-900/20' : i.urgency === 'High' ? 'border-[#F59E0B] bg-[#F59E0B]/10' : 'border-[#424A9F] hover:bg-[#3B2F75]'}`}>
               <div className="flex justify-between items-start mb-4">
-                <h3 className="font-black text-slate-800 uppercase text-xs tracking-tight italic leading-tight">"{i.title}"</h3>
-                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', i.id))} className="text-slate-200 hover:text-red-500 transition p-1"><Trash2 size={12} /></button>
+                <h3 className="font-black text-white uppercase text-xs tracking-tight italic leading-tight">"{i.title}"</h3>
+                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', i.id))} className="text-[#8C97BA] hover:text-red-400 transition p-1"><Trash2 size={12} /></button>
               </div>
-              <p className="text-[11px] text-slate-500 font-bold italic line-clamp-2 leading-relaxed">"{i.desc}"</p>
+              <p className="text-[11px] text-[#C9D2F2] font-bold italic line-clamp-2 leading-relaxed">"{i.desc}"</p>
               <div className="mt-4">
-                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-sm tracking-widest ${i.urgency?.includes('Urgent') ? 'bg-red-600 text-white' : i.urgency === 'High' ? 'bg-yellow-400 text-yellow-900' : 'bg-[#17132A] text-white'}`}>{i.urgency}</span>
+                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-sm tracking-widest ${i.urgency?.includes('Urgent') ? 'bg-red-500 text-white' : i.urgency === 'High' ? 'bg-[#F59E0B] text-[#17132A]' : 'bg-[#17132A] text-white border border-[#3B2F75]'}`}>{i.urgency}</span>
               </div>
             </div>
           ))}
@@ -1055,7 +1059,7 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
   );
 }
 
-/* --- ANALYTICS DASHBOARD --- */
+/* --- ANALYTICS DASHBOARD (THEMED) --- */
 function AnalyticsDashboard({ events, tasks }) {
   const stats = useMemo(() => {
     const data = TEAM_MEMBERS.reduce((acc, name) => { acc[name] = { hours: 0, impact: 0 }; return acc; }, {});
@@ -1074,38 +1078,38 @@ function AnalyticsDashboard({ events, tasks }) {
     cumulativePercent += percent;
     const [endX, endY] = [Math.cos(2 * Math.PI * cumulativePercent), Math.sin(2 * Math.PI * cumulativePercent)];
     const largeArcFlag = percent > 0.5 ? 1 : 0;
-    const colors = ["#424A9F", "#A3E635", "#6366f1", "#17132A"];
+    const colors = ["#424A9F", "#A3E635", "#8A4FFF", "#22C55E"];
     return { path: `M ${startX} ${startY} A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY} L 0 0`, color: colors[i % colors.length], label: name, percent: (percent * 100).toFixed(0) };
   });
 
   return (
-    <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-gray-100 grid md:grid-cols-2 gap-12 animate-fade-in">
+    <div className="bg-[#17132A] p-10 rounded-[3rem] shadow-2xl border border-[#3B2F75] grid md:grid-cols-2 gap-12 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-black text-[#17132A] mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8 flex items-center leading-none">
-          <BarChart3 className="mr-3" /> Team Utilization
+        <h2 className="text-2xl font-black text-white mb-8 uppercase italic underline decoration-[#A3E635] decoration-4 underline-offset-8 flex items-center leading-none">
+          <BarChart3 className="mr-3 text-[#A3E635]" /> Team Utilization
         </h2>
         <div className="space-y-8">
           {TEAM_MEMBERS.map((name) => (
             <div key={name}>
-              <div className="flex justify-between text-[10px] font-black uppercase text-slate-400 mb-2 italic"><span>{name}</span><span className="text-[#424A9F]">{stats[name].hours.toFixed(1)} hrs</span></div>
-              <div className="w-full bg-gray-100 h-4 rounded-full border border-gray-200"><div className="bg-[#424A9F] h-full transition-all duration-1000 border-r-4 border-[#A3E635]" style={{ width: `${(stats[name].hours / maxHours) * 100}%` }} /></div>
+              <div className="flex justify-between text-[10px] font-black uppercase text-[#8C97BA] mb-2 italic"><span>{name}</span><span className="text-[#A3E635]">{stats[name].hours.toFixed(1)} hrs</span></div>
+              <div className="w-full bg-[#0B0819] h-4 rounded-full border border-[#3B2F75]"><div className="bg-[#424A9F] h-full transition-all duration-1000 border-r-4 border-[#A3E635]" style={{ width: `${(stats[name].hours / maxHours) * 100}%` }} /></div>
             </div>
           ))}
         </div>
       </div>
       <div className="flex flex-col items-center">
-        <h2 className="text-2xl font-black text-[#17132A] mb-8 uppercase italic flex items-center self-start">
+        <h2 className="text-2xl font-black text-white mb-8 uppercase italic flex items-center self-start">
           <PieIcon className="mr-3 text-[#A3E635]" /> Distribution
         </h2>
         <div className="relative w-48 h-48 mb-8">
           <svg viewBox="-1.2 -1.2 2.4 2.4" style={{ transform: 'rotate(-90deg)' }} className="w-full h-full drop-shadow-xl">
-            {totalHours > 0 ? pieSlices.map((slice, i) => (<path key={i} d={slice.path} fill={slice.color} className="transition-all hover:opacity-80" />)) : <circle r="1" fill="#f3f4f6" />}
+            {totalHours > 0 ? pieSlices.map((slice, i) => (<path key={i} d={slice.path} fill={slice.color} className="transition-all hover:opacity-80" />)) : <circle r="1" fill="#2A2254" />}
           </svg>
         </div>
         <div className="grid grid-cols-2 gap-4 w-full">
           {pieSlices.map((slice, i) => (
-            <div key={i} className="flex items-center text-[10px] font-black uppercase italic text-slate-500">
-              <div className="w-3 h-3 mr-2 rounded-sm shadow-sm border border-gray-200" style={{ backgroundColor: slice.color }} />{slice.label}: {slice.percent}%
+            <div key={i} className="flex items-center text-[10px] font-black uppercase italic text-[#C9D2F2]">
+              <div className="w-3 h-3 mr-2 rounded-sm shadow-sm border border-[#3B2F75]" style={{ backgroundColor: slice.color }} />{slice.label}: {slice.percent}%
             </div>
           ))}
         </div>
