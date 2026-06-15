@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react'; // <-- Fixed: Added missing hooks
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -63,6 +63,9 @@ const ROOMS = ["Interchange", "Vision", "Tank", "Training Room", "Meadow", "Comm
 const DURATION_OPTIONS = ["0.5 Hours", "1 Hour", "2 Hours", "4 Hours", "5 Hour", "6 Hours", "8 Hours", "Full Day (10h)", "Multi-Day (24h)"];
 const SUPPORT_TEAMS = ["NYIH SELECT", "CIC", "TXA Assist", "Other"];
 const CLASSIFICATIONS = ["Internal", "Client", "Leadership", "Community", "Confidential", "Public / External", "TBD"];
+
+// <-- Fixed: Added missing global session types constant array
+const SESSION_TYPES = ["Demo", "Meeting", "Workshop", "Client", "Leadership", "External", "Community", "TBD"];
 
 const SELECT_HINTS = [
   'select',
@@ -1199,7 +1202,7 @@ Additional Notes/Details: Standard cafe setup`;
 }
 
 /* --- KANBAN PAGE --- */
-function KanbanPage({ tasks, showMsg }) {
+export function KanbanPage({ tasks, showMsg }) {
   const [editingId, setEditingId] = useState(null);
 
   const handleAdd = async (e) => {
@@ -1216,7 +1219,53 @@ function KanbanPage({ tasks, showMsg }) {
     };
 
     if (data.title) {
-      await addDoc(collection(db, 'tasks'), data); // <-- Check line 1164 carefully!
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), {
+        ...data,
+      });
       e.target.reset();
-    } // <-- Is this closing brace missing?
-  }; // <-- Is this closing brace/semicolon missing?
+      showMsg("Task committed to board.");
+    }
+  };
+
+  return (
+    <div className="bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
+      <div className="accent-card rounded-[2rem] p-6 shadow-lg mb-8">
+        <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center mb-4">
+          <ClipboardList size={18} className="mr-2 text-[#A3E635]" /> Create New Task
+        </h2>
+        <form onSubmit={handleAdd} className="grid gap-4 font-bold text-sm italic">
+          <div className="grid md:grid-cols-2 gap-4">
+            <input name="t" placeholder="Task Title*" required className="w-full p-4 border-2 rounded-2xl accent-input outline-none text-slate-900 bg-gray-50" />
+            <select name="a" className="p-4 border-2 rounded-2xl bg-gray-50 text-slate-900 outline-none">
+              <option value="">Assignee...</option>
+              {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          <button type="submit" className="bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2">
+            Add Task to Board
+          </button>
+        </form>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="bg-gray-50 p-4 rounded-2xl border">
+          <h3 className="font-black text-xs uppercase tracking-wider text-slate-400 mb-4 italic">To Do ({tasks.filter(t => t.status === 'todo').length})</h3>
+          <div className="space-y-3">
+            {tasks.filter(t => t.status === 'todo').map(task => (
+              <div key={task.id} className="bg-white p-4 rounded-xl shadow-sm border border-l-4 border-l-[#424A9F]">
+                <p className="font-black text-slate-800 uppercase text-xs italic">{task.title}</p>
+                <p className="text-[10px] text-gray-400 font-bold mt-1">OWNER: {task.assignee || 'Unassigned'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-gray-50 p-4 rounded-2xl border">
+          <h3 className="font-black text-xs uppercase tracking-wider text-slate-400 mb-4 italic">In Progress ({tasks.filter(t => t.status === 'progress').length})</h3>
+        </div>
+        <div className="bg-gray-50 p-4 rounded-2xl border">
+          <h3 className="font-black text-xs uppercase tracking-wider text-slate-400 mb-4 italic">Done ({tasks.filter(t => t.status === 'done').length})</h3>
+        </div>
+      </div>
+    </div>
+  );
+}
