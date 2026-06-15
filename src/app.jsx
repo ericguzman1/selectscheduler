@@ -1269,3 +1269,48 @@ export function KanbanPage({ tasks, showMsg }) {
     </div>
   );
 }
+/* --- FALLBACK AUTH PAGE --- */
+function AuthPage({ showMsg }) {
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+      <form onSubmit={handleLogin} className="bg-white p-8 rounded-[2rem] shadow-xl max-w-sm w-full border">
+        <h2 className="text-2xl font-black text-[#424A9F] mb-6 uppercase italic tracking-tighter text-center">Hub Authentication</h2>
+        <input name="email" type="email" placeholder="Email" required className="w-full p-4 mb-3 border rounded-xl outline-none bg-gray-50 text-slate-900 font-bold" />
+        <input name="password" type="password" placeholder="Password" required className="w-full p-4 mb-4 border rounded-xl outline-none bg-gray-50 text-slate-900 font-bold" />
+        <button type="submit" className="w-full bg-[#424A9F] text-white font-black py-4 rounded-xl uppercase tracking-wider text-xs shadow-md">Sign In</button>
+      </form>
+    </div>
+  );
+}
+
+/* --- FALLBACK ISSUES PAGE --- */
+function IssuesPage({ issues, showMsg }) {
+  return (
+    <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
+      <h2 className="text-2xl font-black text-[#424A9F] mb-6 uppercase italic flex items-center"><BrainCircuit className="mr-3 text-[#A3E635]" /> Tech Feed / Blockers</h2>
+      <div className="space-y-4">
+        {!issues.length ? (
+          <p className="text-slate-400 italic font-bold uppercase text-xs tracking-wider text-center py-6 bg-gray-50 rounded-2xl border border-dashed">No active infrastructure alerts logged.</p>
+        ) : (
+          issues.map(issue => (
+            <div key={issue.id} className="p-4 bg-gray-50 rounded-xl border border-l-4 border-l-red-500">
+              <p className="font-black text-slate-800 uppercase text-xs italic">{issue.title || "Untitled Alert"}</p>
+              <p className="text-[10px] text-gray-400 font-bold mt-1">Urgency: {issue.urgency || 'Normal'}</p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
