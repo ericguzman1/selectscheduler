@@ -1216,10 +1216,7 @@ function KanbanPage({ tasks, showMsg }) {
     };
 
     if (data.title) {
-      // Fixed the broken line and closed it properly:
-      await addDoc(collection(db, 'tasks'), data);
-      e.target.reset(); // Clears the form fields after submitting
-    }
-  };
-
-  // ... The rest of your KanbanPage component (the HTML/JSX return statement) goes here
+      await addDoc(collection(db, 'tasks'), data); // <-- Check line 1164 carefully!
+      e.target.reset();
+    } // <-- Is this closing brace missing?
+  }; // <-- Is this closing brace/semicolon missing?
