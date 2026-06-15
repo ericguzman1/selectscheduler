@@ -1,4 +1,53 @@
 import React, { useState } from 'react';
+import { initializeApp, getApps } from 'firebase/app';
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  signInWithCustomToken,
+} from 'firebase/auth';
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  deleteDoc,
+  doc,
+  updateDoc,
+  orderBy,
+} from 'firebase/firestore';
+import {
+  Layout,
+  AlertCircle,
+  Trash2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Zap,
+  LogOut,
+  User,
+  Edit3,
+  FileText,
+  BarChart3,
+  PieChart as PieIcon,
+  Calendar,
+  Clock,
+  TrendingUp,
+  Share2,
+  BrainCircuit,
+  MapPin,
+  Upload,
+  Search,
+  Filter,
+  CopyPlus,
+  RefreshCcw,
+  ClipboardList,
+  Users,
+  CalendarDays,
+} from 'lucide-react';
 
 const QUICK_FILL_CARDS = [
   { name: 'Proto', demo: 'Proto hologram', sessionType: 'Demo', note: 'Fast-fill demo' },
@@ -8,6 +57,12 @@ const QUICK_FILL_CARDS = [
   { name: 'Surface Hub', demo: 'Surface Hub', sessionType: 'Meeting', note: 'Room / VC support' },
   { name: 'Signage', demo: 'Signage only', sessionType: 'Leadership', note: 'Lobby / room signage' },
 ];
+
+const TEAM_MEMBERS = ["Eric.Guzman", "Tommy.Flinch", "Donald.Salazar", "Mistral.Rojas"];
+const ROOMS = ["Interchange", "Vision", "Tank", "Training Room", "Meadow", "Common Grounds", "Ginsberg", "Globe", "Office Tour", "212W64", "214W64", "215W64"];
+const DURATION_OPTIONS = ["0.5 Hours", "1 Hour", "2 Hours", "4 Hours", "5 Hour", "6 Hours", "8 Hours", "Full Day (10h)", "Multi-Day (24h)"];
+const SUPPORT_TEAMS = ["NYIH SELECT", "CIC", "TXA Assist", "Other"];
+const CLASSIFICATIONS = ["Internal", "Client", "Leadership", "Community", "Confidential", "Public / External", "TBD"];
 
 const SELECT_HINTS = [
   'select',
@@ -1161,62 +1216,10 @@ function KanbanPage({ tasks, showMsg }) {
     };
 
     if (data.title) {
-      await addDoc(collection(db, 'art'
-import { initializeApp, getApps } from 'firebase/app';
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  signInWithCustomToken,
-} from 'firebase/auth';
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  onSnapshot,
-  query,
-  deleteDoc,
-  doc,
-  updateDoc,
-  orderBy,
-} from 'firebase/firestore';
-import {
-  Layout,
-  AlertCircle,
-  Trash2,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  Zap,
-  LogOut,
-  User,
-  Edit3,
-  FileText,
-  BarChart3,
-  PieChart as PieIcon,
-  Calendar,
-  Clock,
-  TrendingUp,
-  Share2,
-  BrainCircuit,
-  MapPin,
-  Upload,
-  Search,
-  Filter,
-  CopyPlus,
-  RefreshCcw,
-  ClipboardList,
-  Users,
-  CalendarDays,
-} from 'lucide-react';
+      // Fixed the broken line and closed it properly:
+      await addDoc(collection(db, 'tasks'), data);
+      e.target.reset(); // Clears the form fields after submitting
+    }
+  };
 
-/**
- * CONFIGURATION & CONSTANTS
- */
-const TEAM_MEMBERS = ["Eric.Guzman", "Tommy.Flinch", "Donald.Salazar", "Mistral.Rojas"];
-const ROOMS = ["Interchange", "Vision", "Tank", "Training Room", "Meadow", "Common Grounds", "Ginsberg", "Globe", "Office Tour", "212W64", "214W64", "215W64"];
-const DURATION_OPTIONS = ["0.5 Hours", "1 Hour", "2 Hours", "4 Hours", "5 Hour", "6 Hours", "8 Hours", "Full Day (10h)", "Multi-Day (24h)"];
-const SUPPORT_TEAMS = ["NYIH SELECT", "CIC", "TXA Assist", "Other"];
-const CLASSIFICATIONS = ["Internal", "Client", "Leadership", "Community", "Confidential", "Public / External", "TBD"];
+  // ... The rest of your KanbanPage component (the HTML/JSX return statement) goes here
