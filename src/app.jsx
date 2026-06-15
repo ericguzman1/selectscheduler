@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'; // <-- Fixed: Added missing hooks
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth,
@@ -63,8 +63,6 @@ const ROOMS = ["Interchange", "Vision", "Tank", "Training Room", "Meadow", "Comm
 const DURATION_OPTIONS = ["0.5 Hours", "1 Hour", "2 Hours", "4 Hours", "5 Hour", "6 Hours", "8 Hours", "Full Day (10h)", "Multi-Day (24h)"];
 const SUPPORT_TEAMS = ["NYIH SELECT", "CIC", "TXA Assist", "Other"];
 const CLASSIFICATIONS = ["Internal", "Client", "Leadership", "Community", "Confidential", "Public / External", "TBD"];
-
-// <-- Fixed: Added missing global session types constant array
 const SESSION_TYPES = ["Demo", "Meeting", "Workshop", "Client", "Leadership", "External", "Community", "TBD"];
 
 const SELECT_HINTS = [
@@ -225,6 +223,7 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+/* --- MAIN APP WRAPPER --- */
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -370,7 +369,9 @@ export default function App() {
     <div className="min-h-screen bg-gray-100 p-4 flex flex-col items-center font-sans text-slate-900">
       <div className="w-full max-w-6xl bg-white p-6 rounded-[2rem] shadow-xl mb-6 border border-gray-50">
         <div className="flex justify-between items-center mb-2 flex-wrap gap-3">
-          <h1 className="text-4xl font-black text-[#424A9F] uppercase italic tracking-tighter leading-none">Accenture Hub</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-[#424A9F] uppercase italic tracking-tighter leading-none flex items-center">
+            <span className="text-[#A3E635] mr-2">{">"}</span> Accenture Hub
+          </h1>
           <div className="flex items-center space-x-4 flex-wrap">
             <button onClick={generateLeadBriefing} disabled={isBriefingLoading} className="bg-[#424A9F] text-white px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#343D84] transition shadow-lg disabled:opacity-50 flex items-center">
               <Zap size={12} className={`mr-2 text-[#A3E635] ${isBriefingLoading ? 'animate-spin' : ''}`} />
@@ -437,6 +438,39 @@ function NavBtn({ active, onClick, label, icon }) {
     <button onClick={onClick} className={`px-6 py-2.5 rounded-xl font-black uppercase text-xs tracking-widest transition-all flex items-center ${active ? 'bg-[#A3E635] text-[#424A9F] shadow-lg scale-105' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
       {icon && <span className="mr-2">{icon}</span>} {label}
     </button>
+  );
+}
+
+/* --- AUTH PAGE --- */
+function AuthPage({ showMsg }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const authSubmit = async (e) => {
+    e.preventDefault();
+    const { email, password } = Object.fromEntries(new FormData(e.target));
+    try {
+      if (isLogin) await signInWithEmailAndPassword(auth, email, password);
+      else await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) { showMsg(err.message, true); }
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#17132A] p-4 font-sans text-slate-900">
+      <div className="w-full max-w-md bg-white p-10 rounded-[2.5rem] shadow-2xl border border-gray-100 text-center">
+        <div className="flex justify-center mb-8 font-black"><div className="bg-[#A3E635] p-4 rounded-3xl text-[#424A9F] shadow-lg"><Layout size={32}/></div></div>
+        <h1 className="text-3xl font-black text-[#424A9F] mb-6 uppercase italic tracking-tighter flex justify-center items-center">
+          <span className="text-[#A3E635] mr-2">{">"}</span> Accenture Hub
+        </h1>
+        <form onSubmit={authSubmit} className="space-y-4">
+          <input name="email" type="email" placeholder="Corporate ID (Email)" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
+          <input name="password" type="password" placeholder="Key Phrase" required className="w-full p-4 rounded-2xl border-2 border-gray-100 outline-none focus:border-[#424A9F] bg-gray-50 font-bold" />
+          <button type="submit" className={`w-full font-black py-4 rounded-2xl shadow-xl mt-4 ${isLogin ? 'bg-[#424A9F] text-white hover:bg-[#343D84]' : 'bg-[#A3E635] text-gray-900 hover:bg-[#8CD02F]'}`}>
+            {isLogin ? 'INITIATE LOGIN' : 'CREATE PROFILE'}
+          </button>
+        </form>
+        <button onClick={() => setIsLogin(!isLogin)} className="mt-8 text-xs font-black text-gray-400 hover:text-[#424A9F] uppercase tracking-widest transition">
+          {isLogin ? "Register Access" : "Back to Login"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -541,7 +575,91 @@ function StatCard({ icon, value, label }) {
   );
 }
 
-/* --- MEETINGS PAGE (TEAM HUB + BEO IMPORT + ORIGINAL FIREBASE/API FLOW) --- */
+/* --- TECH FEED / ISSUES PAGE --- */
+function IssuesPage({ issues, showMsg, fetchGemini }) {
+  const [isAnalysing, setIsAnalysing] = useState(false);
+  const [analysis, setAnalysis] = useState('');
+
+  const runRiskAnalysis = async () => {
+    if (!issues.length) {
+      setAnalysis("No blockers logged. Operations are nominal.");
+      return;
+    }
+    setIsAnalysing(true);
+    const context = issues.map(i => `${i.title}: ${i.desc} (Urgency: ${i.urgency})`).join(' | ');
+    const result = await fetchGemini(
+      "Act as an Accenture technical lead. Provide a 2-sentence operational risk analysis based strictly on these active infrastructure blockers.", 
+      context
+    );
+    setAnalysis(result);
+    setIsAnalysing(false);
+  };
+
+  const handleAddIssue = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = {
+      title: fd.get('t'),
+      desc: fd.get('d'),
+      urgency: fd.get('u'),
+      timestamp: new Date().toISOString()
+    };
+    if (data.title) {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues'), data);
+      e.target.reset();
+      showMsg("Blocker successfully logged to the Tech Feed.");
+    }
+  };
+
+  return (
+    <div className="grid md:grid-cols-2 gap-8 animate-fade-in">
+      <div className="bg-white p-6 md:p-8 rounded-[3rem] shadow-2xl border border-gray-100">
+        <h2 className="text-2xl font-black text-[#424A9F] mb-6 uppercase italic flex items-center">
+          <BrainCircuit className="mr-3 text-[#A3E635]" /> Log Infrastructure Blocker
+        </h2>
+        <p className="text-xs text-slate-500 font-bold italic mb-6">Record operational bottlenecks, AV failures, or client-facing blockers directly into the live intelligence feed.</p>
+        <form onSubmit={handleAddIssue} className="grid gap-4 font-bold text-sm italic">
+          <input name="t" placeholder="Alert Title*" required className="p-4 border-2 rounded-2xl bg-gray-50 outline-none focus:border-[#424A9F]" />
+          <textarea name="d" placeholder="Provide context, impact, or required dependencies..." required className="p-4 border-2 rounded-2xl bg-gray-50 outline-none resize-none h-32 custom-scrollbar focus:border-[#424A9F]" />
+          <select name="u" className="p-4 border-2 rounded-2xl bg-gray-50 outline-none text-slate-600 focus:border-[#424A9F]">
+            <option value="Normal">Normal Urgency</option>
+            <option value="High">High Urgency</option>
+            <option value="Urgent">Urgent / Showstopper</option>
+          </select>
+          <button type="submit" className="bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl uppercase italic mt-2 hover:bg-[#343D84] transition">
+            Log into System
+          </button>
+        </form>
+      </div>
+
+      <div className="bg-gray-50 p-6 md:p-8 rounded-[3rem] shadow-inner border border-gray-100">
+        <div className="mb-6 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-[#424A9F]">AI Risk Intel</span>
+            <button onClick={runRiskAnalysis} className="text-[8px] bg-white border border-gray-100 px-3 py-1 rounded-full font-black uppercase text-gray-400 hover:text-[#424A9F] transition">Refresh Analysis</button>
+          </div>
+          <p className="text-[11px] text-slate-500 font-bold italic leading-relaxed">{isAnalysing ? "Analyzing trends..." : (analysis || "Log blockers to unlock intelligence.")}</p>
+        </div>
+        <div className="space-y-4 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+          {issues.map(i => (
+            <div key={i.id} className={`p-6 bg-white rounded-3xl shadow-md transition border-l-8 ${i.urgency?.includes('Urgent') ? 'border-red-600 bg-red-50/20' : i.urgency === 'High' ? 'border-yellow-400 bg-yellow-50/20' : 'border-[#424A9F] hover:bg-slate-50'}`}>
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="font-black text-slate-800 uppercase text-xs tracking-tight italic leading-tight">"{i.title}"</h3>
+                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', i.id))} className="text-slate-200 hover:text-red-500 transition p-1"><Trash2 size={12}/></button>
+              </div>
+              <p className="text-[11px] text-slate-500 font-bold italic line-clamp-2 leading-relaxed">"{i.desc}"</p>
+              <div className="mt-4">
+                <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase shadow-sm tracking-widest ${i.urgency?.includes('Urgent') ? 'bg-red-600 text-white' : i.urgency === 'High' ? 'bg-yellow-400 text-yellow-900' : 'bg-slate-800 text-white'}`}>{i.urgency}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* --- SCHEDULE / MEETINGS PAGE --- */
 function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -588,27 +706,12 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   };
 
   const openFullIntel = (e) => {
-    const content = `Event Name: ${e.eventName || ''}
-Start Date: ${e.startDate || ''}
-End Date: ${e.endDate || ''}
-Event POC: ${e.eventPoc || ''}
-SELECT POC: ${e.selectPoc || ''}
-Location: ${e.location || 'NYIH'}
-Event Location: ${e.eventLocation || ''}
-Classification: ${e.classification || ''}
-Session Type: ${e.sessionType || ''}
-Attendees: ${e.attendees || ''}
-Demo: ${e.demo || ''}
-SELECT Resources: ${e.selectResources || ''}
-Session Days: ${e.sessionDays || ''}
-Session Support Duration: ${e.sessionSupportDuration || ''}
-Support Team / Hub: ${e.supportTeam || ''}
-Week Of: ${e.weekOf || ''}
-Notes: ${e.notes || ''}`;
+    const content = `Event Name: ${e.eventName || ''}\nStart Date: ${e.startDate || ''}\nEnd Date: ${e.endDate || ''}\nEvent POC: ${e.eventPoc || ''}\nSELECT POC: ${e.selectPoc || ''}\nLocation: ${e.location || 'NYIH'}\nEvent Location: ${e.eventLocation || ''}\nClassification: ${e.classification || ''}\nSession Type: ${e.sessionType || ''}\nAttendees: ${e.attendees || ''}\nDemo: ${e.demo || ''}\nSELECT Resources: ${e.selectResources || ''}\nSession Days: ${e.sessionDays || ''}\nSession Support Duration: ${e.sessionSupportDuration || ''}\nSupport Team / Hub: ${e.supportTeam || ''}\nWeek Of: ${e.weekOf || ''}\nNotes: ${e.notes || ''}`;
 
     setModal({
       title: "Operational Intelligence Summary",
       content,
+      actionLabel: "Copy Intelligence",
       action: () => {
         navigator.clipboard.writeText(content);
         showMsg("Copied for pasting.");
@@ -992,6 +1095,7 @@ Additional Notes/Details: Standard cafe setup`;
                 {['Demo', 'Client', 'Leadership', 'Workshop'].map((type) => (
                   <button
                     key={type}
+                    type="button"
                     onClick={() => updateField('sessionType', type)}
                     className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${formData.sessionType === type ? 'bg-[#A3E635] text-[#424A9F]' : 'accent-chip'}`}
                   >
@@ -1021,75 +1125,75 @@ Additional Notes/Details: Standard cafe setup`;
 
             <form onSubmit={handleCommit} className="space-y-4 font-bold text-sm italic mt-6">
               <div className="grid md:grid-cols-2 gap-4">
-                <input value={formData.eventName} onChange={(e) => updateField('eventName', e.target.value)} placeholder="Event Name*" required className="w-full p-4 border-2 rounded-2xl accent-input outline-none" />
-                <input value={formData.eventPoc} onChange={(e) => updateField('eventPoc', e.target.value)} placeholder="Event POC*" required className="w-full p-4 border-2 rounded-2xl accent-input outline-none" />
+                <input value={formData.eventName} onChange={(e) => updateField('eventName', e.target.value)} placeholder="Event Name*" required className="w-full p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
+                <input value={formData.eventPoc} onChange={(e) => updateField('eventPoc', e.target.value)} placeholder="Event POC*" required className="w-full p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="text-[9px] font-black uppercase accent-muted">
                   Start Date
-                  <input value={formData.startDate} onChange={(e) => updateField('startDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" />
+                  <input value={formData.startDate} onChange={(e) => updateField('startDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
                 </div>
                 <div className="text-[9px] font-black uppercase accent-muted">
                   End Date
-                  <input value={formData.endDate} onChange={(e) => updateField('endDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" />
+                  <input value={formData.endDate} onChange={(e) => updateField('endDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
                 </div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <select value={formData.selectPoc} onChange={(e) => updateField('selectPoc', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none">
+                <select value={formData.selectPoc} onChange={(e) => updateField('selectPoc', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]">
                   <option value="">SELECT Lead...</option>
                   {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <input value={formData.location} onChange={(e) => updateField('location', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none" />
+                <input value={formData.location} onChange={(e) => updateField('location', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <select value={formData.eventLocation} onChange={(e) => updateField('eventLocation', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none">
+                <select value={formData.eventLocation} onChange={(e) => updateField('eventLocation', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]">
                   <option value="">Room Location...</option>
                   {ROOMS.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
-                <select value={formData.classification} onChange={(e) => updateField('classification', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none">
+                <select value={formData.classification} onChange={(e) => updateField('classification', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]">
                   {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <select value={formData.sessionType} onChange={(e) => updateField('sessionType', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none">
+                <select value={formData.sessionType} onChange={(e) => updateField('sessionType', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]">
                   {SESSION_TYPES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <input value={formData.attendees} onChange={(e) => updateField('attendees', e.target.value)} placeholder="Attendees" className="p-4 border-2 rounded-2xl accent-input outline-none" />
+                <input value={formData.attendees} onChange={(e) => updateField('attendees', e.target.value)} placeholder="Attendees" className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
               </div>
 
-              <input value={formData.demo} onChange={(e) => updateField('demo', e.target.value)} placeholder="Demo Requirements" className="w-full p-4 border-2 rounded-2xl accent-input outline-none" />
-              <input value={formData.selectResources} onChange={(e) => updateField('selectResources', e.target.value)} placeholder="SELECT Resources" className="w-full p-4 border-2 rounded-2xl accent-input outline-none" />
+              <input value={formData.demo} onChange={(e) => updateField('demo', e.target.value)} placeholder="Demo Requirements" className="w-full p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
+              <input value={formData.selectResources} onChange={(e) => updateField('selectResources', e.target.value)} placeholder="SELECT Resources" className="w-full p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <input value={formData.sessionDays} onChange={(e) => updateField('sessionDays', e.target.value)} placeholder="Session Days" className="p-4 border-2 rounded-2xl accent-input outline-none" />
-                <select value={formData.sessionSupportDuration} onChange={(e) => updateField('sessionSupportDuration', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none">
+                <input value={formData.sessionDays} onChange={(e) => updateField('sessionDays', e.target.value)} placeholder="Session Days" className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
+                <select value={formData.sessionSupportDuration} onChange={(e) => updateField('sessionSupportDuration', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]">
                   <option value="">Support Duration...</option>
                   {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <select value={formData.supportTeam} onChange={(e) => updateField('supportTeam', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none">
+                <select value={formData.supportTeam} onChange={(e) => updateField('supportTeam', e.target.value)} className="p-4 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]">
                   {SUPPORT_TEAMS.map((team) => <option key={team} value={team}>{team}</option>)}
                 </select>
                 <div className="text-[9px] font-black uppercase accent-muted">
                   Week Of
-                  <input value={formData.weekOf} onChange={(e) => updateField('weekOf', e.target.value)} type="date" className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" />
+                  <input value={formData.weekOf} onChange={(e) => updateField('weekOf', e.target.value)} type="date" className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none focus:border-[#A3E635]" />
                 </div>
               </div>
 
-              <textarea value={formData.notes} onChange={(e) => updateField('notes', e.target.value)} placeholder="Notes / dependencies / setup details..." rows="4" className="w-full p-4 border-2 rounded-2xl accent-input outline-none resize-none"></textarea>
+              <textarea value={formData.notes} onChange={(e) => updateField('notes', e.target.value)} placeholder="Notes / dependencies / setup details..." rows="4" className="w-full p-4 border-2 rounded-2xl accent-input outline-none resize-none focus:border-[#A3E635]"></textarea>
 
               <div className="flex gap-2 flex-wrap">
-                <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A3E635] text-[#424A9F]' : 'bg-[#424A9F] text-white'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 flex items-center justify-center`}>
+                <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A3E635] text-[#424A9F]' : 'bg-[#424A9F] text-white hover:bg-[#343D84]'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 flex items-center justify-center`}>
                   {editingId ? 'Update Intel' : 'Commit Intel'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={resetForm} className="flex-none px-6 bg-gray-100 font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 text-gray-400 flex items-center">
+                  <button type="button" onClick={resetForm} className="flex-none px-6 bg-gray-100 font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 text-gray-400 flex items-center hover:bg-gray-200 hover:text-red-500">
                     <RefreshCcw size={14} className="mr-2" /> Cancel
                   </button>
                 )}
@@ -1124,13 +1228,13 @@ Additional Notes/Details: Standard cafe setup`;
               </div>
 
               <div className="flex flex-col gap-3">
-                <div className="flex items-center gap-2 rounded-2xl border p-3 accent-input">
+                <div className="flex items-center gap-2 rounded-2xl border p-3 accent-input focus-within:border-[#A3E635] transition">
                   <Search size={14} className="text-[#8C97BA]" />
                   <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search event, POC, demo, location..." className="w-full bg-transparent outline-none text-sm" />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <select value={classificationFilter} onChange={(e) => setClassificationFilter(e.target.value)} className="flex-1 min-w-[180px] p-3 rounded-xl accent-input border">
+                  <select value={classificationFilter} onChange={(e) => setClassificationFilter(e.target.value)} className="flex-1 min-w-[180px] p-3 rounded-xl accent-input border outline-none">
                     <option value="">All classifications</option>
                     {CLASSIFICATIONS.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
@@ -1229,19 +1333,19 @@ export function KanbanPage({ tasks, showMsg }) {
 
   return (
     <div className="bg-white p-6 md:p-10 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
-      <div className="accent-card rounded-[2rem] p-6 shadow-lg mb-8">
+      <div className="bg-[#17132A] rounded-[2rem] p-6 shadow-lg mb-8 border border-[#23283A]">
         <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center mb-4">
           <ClipboardList size={18} className="mr-2 text-[#A3E635]" /> Create New Task
         </h2>
         <form onSubmit={handleAdd} className="grid gap-4 font-bold text-sm italic">
           <div className="grid md:grid-cols-2 gap-4">
-            <input name="t" placeholder="Task Title*" required className="w-full p-4 border-2 rounded-2xl accent-input outline-none text-slate-900 bg-gray-50" />
-            <select name="a" className="p-4 border-2 rounded-2xl bg-gray-50 text-slate-900 outline-none">
+            <input name="t" placeholder="Task Title*" required className="w-full p-4 border-2 rounded-2xl bg-[#0C1018] border-[#23283A] text-white outline-none focus:border-[#A3E635]" />
+            <select name="a" className="p-4 border-2 rounded-2xl bg-[#0C1018] border-[#23283A] text-gray-400 outline-none focus:border-[#A3E635]">
               <option value="">Assignee...</option>
               {TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-          <button type="submit" className="bg-[#424A9F] text-white font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2">
+          <button type="submit" className="bg-[#A3E635] text-[#17132A] font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 hover:bg-[#8CD02F]">
             Add Task to Board
           </button>
         </form>
@@ -1254,7 +1358,7 @@ export function KanbanPage({ tasks, showMsg }) {
             {tasks.filter(t => t.status === 'todo').map(task => (
               <div key={task.id} className="bg-white p-4 rounded-xl shadow-sm border border-l-4 border-l-[#424A9F]">
                 <p className="font-black text-slate-800 uppercase text-xs italic">{task.title}</p>
-                <p className="text-[10px] text-gray-400 font-bold mt-1">OWNER: {task.assignee || 'Unassigned'}</p>
+                <p className="text-[10px] text-gray-400 font-bold mt-1 flex items-center"><User size={10} className="mr-1"/> {task.assignee || 'Unassigned'}</p>
               </div>
             ))}
           </div>
@@ -1265,51 +1369,6 @@ export function KanbanPage({ tasks, showMsg }) {
         <div className="bg-gray-50 p-4 rounded-2xl border">
           <h3 className="font-black text-xs uppercase tracking-wider text-slate-400 mb-4 italic">Done ({tasks.filter(t => t.status === 'done').length})</h3>
         </div>
-      </div>
-    </div>
-  );
-}
-/* --- FALLBACK AUTH PAGE --- */
-function AuthPage({ showMsg }) {
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    const email = e.target.email.value;
-    const password = e.target.password.value;
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      showMsg(err.message, true);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <form onSubmit={handleLogin} className="bg-white p-8 rounded-[2rem] shadow-xl max-w-sm w-full border">
-        <h2 className="text-2xl font-black text-[#424A9F] mb-6 uppercase italic tracking-tighter text-center">Hub Authentication</h2>
-        <input name="email" type="email" placeholder="Email" required className="w-full p-4 mb-3 border rounded-xl outline-none bg-gray-50 text-slate-900 font-bold" />
-        <input name="password" type="password" placeholder="Password" required className="w-full p-4 mb-4 border rounded-xl outline-none bg-gray-50 text-slate-900 font-bold" />
-        <button type="submit" className="w-full bg-[#424A9F] text-white font-black py-4 rounded-xl uppercase tracking-wider text-xs shadow-md">Sign In</button>
-      </form>
-    </div>
-  );
-}
-
-/* --- FALLBACK ISSUES PAGE --- */
-function IssuesPage({ issues, showMsg }) {
-  return (
-    <div className="bg-white p-8 rounded-[3rem] shadow-2xl border border-gray-100 animate-fade-in">
-      <h2 className="text-2xl font-black text-[#424A9F] mb-6 uppercase italic flex items-center"><BrainCircuit className="mr-3 text-[#A3E635]" /> Tech Feed / Blockers</h2>
-      <div className="space-y-4">
-        {!issues.length ? (
-          <p className="text-slate-400 italic font-bold uppercase text-xs tracking-wider text-center py-6 bg-gray-50 rounded-2xl border border-dashed">No active infrastructure alerts logged.</p>
-        ) : (
-          issues.map(issue => (
-            <div key={issue.id} className="p-4 bg-gray-50 rounded-xl border border-l-4 border-l-red-500">
-              <p className="font-black text-slate-800 uppercase text-xs italic">{issue.title || "Untitled Alert"}</p>
-              <p className="text-[10px] text-gray-400 font-bold mt-1">Urgency: {issue.urgency || 'Normal'}</p>
-            </div>
-          ))
-        )}
       </div>
     </div>
   );
