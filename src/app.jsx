@@ -127,26 +127,6 @@ const sanitizeForPrompt = (text) => {
     .trim();
 };
 
-const blankEventForm = () => ({
-  eventName: '',
-  startDate: '',
-  endDate: '',
-  eventPoc: '',
-  selectPoc: '',
-  location: 'NYIH',
-  eventLocation: '',
-  classification: 'Internal',
-  sessionType: 'Demo',
-  attendees: '',
-  demo: '',
-  selectResources: '',
-  sessionDays: '',
-  sessionSupportDuration: '',
-  supportTeam: 'NYIH SELECT',
-  weekOf: '',
-  notes: '',
-  source: 'Manual',
-});
 
 const safeParseJson = (text) => {
   try {
@@ -660,12 +640,12 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   }, [events, searchTerm, classificationFilter, sourceFilter]);
 
   const updateField = (key, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [key]: value,
-      ...(key === 'startDate' && !prev.weekOf ? { weekOf: weekOfFromDateTime(value) } : {})
-    }));
-  };
+  setFormData((prev) => ({
+    ...prev,
+    value,
+    ...(key === 'startDate' && !prev.weekOf ? { weekOf: weekOfFromDateTime(value) } : {})
+  }));
+};
 
   const resetForm = () => {
     setEditingId(null);
