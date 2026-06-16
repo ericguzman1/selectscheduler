@@ -145,7 +145,7 @@ const ALLOWED_EVENT_KEYS = [
   'selectResources','sessionDays','sessionSupportDuration',
   'supportTeam','weekOf','notes','source'
 ];
-``
+
 
 const sanitizeEventData = (obj) => {
   const safe = {};
@@ -605,10 +605,11 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
     });
   }, [events, searchTerm, classificationFilter, sourceFilter]);
 
-  const updateField = (key, value) => {
+  // ✅ FIX — use computed property [key]
+const updateField = (key, value) => {
   setFormData((prev) => ({
     ...prev,
-    value,
+    [key]: value,  // ← CORRECT
     ...(key === 'startDate' && !prev.weekOf ? { weekOf: weekOfFromDateTime(value) } : {})
   }));
 };
@@ -1399,17 +1400,6 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
     </div>
   );
 }
-
-function StatCard({ icon, value, label }) {
-  return (
-    <div className="rounded-2xl p-4 border shadow-inner bg-[#0C1018] border-[#23283A]">
-      <div className="text-[#D8CBFF]">{icon}</div>
-      <div className="text-3xl font-black text-white mt-2 leading-none">{value}</div>
-      <div className="text-[10px] font-black uppercase tracking-widest text-[#8C97BA] mt-2 italic">{label}</div>
-    </div>
-  );
-}
-``
 
 function AuthPage({ showMsg }) {
   const [isLogin, setIsLogin] = useState(true);
