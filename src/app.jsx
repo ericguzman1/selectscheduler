@@ -620,39 +620,65 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
      blocks, and auto-populates them into the event queue.
      ============================================================ */
   const handleSmartImport = async () => {
-    let text = beoText || '';
-    const file = fileRef.current?.files?.[0];
+    try {
+      let text = beoText || '';
+      const file = fileRef.current?.files?.[0];
 
-    /* Step 1: Get raw text from file or textarea */
-    if (!text.trim() && file) {
-      try {
-        setPdfLoading(true);
-        if (file.name.toLowerCase().endsWith('.pdf')) {
-          text = await extractTextFromPdf(file);
-        } else {
-          text = await new Promise((ok, no) => {
-            const r = new FileReader();
-            r.onload = () => ok(String(r.result || ''));
-            r.onerror = no;
-            r.readAsText(file);
-          });
+      console.log('[BEO Import] Starting...', { hasText: !!text.trim(), hasFile: !!file, fileName: file?.name });
+
+      /* Step 1: Get text from file if textarea is empty */
+      if (!text.trim() && file) {
+        try {
+          setPdfLoading(true);
+          setImportBanner('Reading file...');
+
+          if (file.name.toLowerCase().endsWith('.pdf')) {
+            console.log('[BEO Import] Reading PDF:', file.name, file.size, 'bytes');
+            text = await extractTextFromPdf(file);
+          } else {
+            console.log('[BEO Import] Reading text file:', file.name);
+            text = await new Promise((ok, no) => {
+              const reader = new FileReader();
+              reader.onload = () => ok(String(reader.result || ''));
+              reader.onerror = (err) => no(new Error('FileReader failed: ' + err));
+              reader.readAsText(file);
+            });
+          }
+
+          setPdfLoading(false);
+          console.log('[BEO Import] Text extracted:', text.length, 'chars');
+          console.log('[BEO Import] First 200 chars:', text.slice(0, 200));
+
+          /* Keep extracted text visible in textarea so user can see it worked */
+          setBeoText(text);
+
+        } catch (err) {
+          setPdfLoading(false);
+          console.error('[BEO Import] File read error:', err);
+          setImportBanner(`File read failed: ${err.message}. Try pasting the BEO text directly.`);
+          showMsg(`Could not read file: ${err.message}`, true);
+          return;
         }
-        setPdfLoading(false);
-        setBeoText(text);
-      } catch (err) {
-        setPdfLoading(false);
-        showMsg(`File error: ${err.message}`, true);
+      }
+
+      /* Bail if still no text */
+      if (!text.trim()) {
+        showMsg('Upload a PDF or paste BEO text first.', true);
+        setImportBanner('No text to process. Paste BEO text or pick a file and try again.');
         return;
       }
-    }
 
-    if (!text.trim()) { showMsg("Upload a PDF or paste BEO text first.", true); return; }
+      if (text.trim().length < 50) {
+        showMsg('Text is too short to be a BEO. Try a different file.', true);
+        setImportBanner('Extracted text was too short. The PDF may be image-based (scanned). Try pasting the text manually.');
+        return;
+      }
 
-    /* Step 2: Send to AI with BEO-specific prompt */
-    setAiLoading(true);
-    setImportBanner('Reading BEO and extracting SELECT events...');
+      /* Step 2: Send to AI */
+      setAiLoading(true);
+      setImportBanner(`Sending ${text.length.toLocaleString()} chars to AI for extraction...`);
 
-    const aiPrompt = `You are an expert at reading Accenture NYIH Daily BEO (Banquet Event Order) documents.
+      const aiPrompt = `You are an expert at reading Accenture NYIH Daily BEO (Banquet Event Order) documents.
 
 DOCUMENT FORMAT:
 - Header line has the date, e.g. "DAILY BEO  Tuesday, June 16, 2026"
@@ -665,101 +691,132 @@ DOCUMENT FORMAT:
     - A building emoji followed by "FACILITIES" = facilities only (SKIP these)
 - After "*SELECT Required" there is usually: Time, POC name, and equipment needs (mics, surface hubs, signage, music, clickers, loaner laptops, etc.)
 - After the FACILITIES section there are setup details (catering tables, signage, rope & stanchion, chairs, etc.)
-- Named events appear as separate lines: "Event Name  Room  Start - End  CLASSIFICATION"
+- Named events appear as separate lines with format: "EventName  RoomNumber RoomName  StartTime - EndTime  CLASSIFICATION"
   where CLASSIFICATION is one of: INTERNAL, CLIENT VISIT, COMMUNITY, BUSINESS DEV, TRAINING, CLIENT PREP
 
 YOUR TASK:
 Extract ONLY the WRES blocks that contain "*SELECT Required". Ignore all TXA-only and Facilities-only blocks.
 
-For each *SELECT Required block, return a JSON object with:
-- "eventName": The nearby named event title if you can match one, otherwise use "SELECT Support - Floor [number]"
-- "startDate": Combine the BEO header date with the time from the SELECT line. Use ISO format "YYYY-MM-DDTHH:mm". If no time found, use the event time from the named event line.
-- "endDate": If an end time is found (e.g. "Event: 4 PM - 7 PM" or from named event), use it in ISO format. Otherwise leave as "".
+For each *SELECT Required block, return a JSON object with these exact keys:
+- "eventName": The closest named event title if you can match one to this WRES block, otherwise "SELECT Support - Floor [number]"
+- "startDate": Combine the BEO header date with the time from the *SELECT Required line. ISO format "YYYY-MM-DDTHH:mm". If no time, use the named event start time.
+- "endDate": If an end time is found (from "Event: 4 PM - 7 PM" or named event line), ISO format. Otherwise "".
 - "eventPoc": The POC name(s) from the *SELECT Required line
-- "selectPoc": Leave as "" (team will assign)
+- "selectPoc": "" (leave blank)
 - "location": "NYIH"
-- "eventLocation": The room name from the nearby named event line if found, otherwise "Floor [number]"
-- "classification": From the named event (INTERNAL, CLIENT VISIT, etc.) or "TBD"
-- "sessionType": Best guess from context (Demo, Meeting, Workshop, Town Hall, Other)
-- "attendees": Number of people if mentioned
-- "demo": Equipment/tech needs from the SELECT line (e.g. "2 mics + 2 surface hubs", "Music: classic jazz")
-- "selectResources": Same as demo - all tech/equipment needs
-- "sessionDays": If multi-day, note it, otherwise ""
-- "sessionSupportDuration": Estimate from start/end times if available, else ""
+- "eventLocation": Room name from the nearby named event, or "Floor [number]"
+- "classification": From the named event line (e.g. "CLIENT VISIT", "INTERNAL") or "TBD"
+- "sessionType": Best guess (Demo, Meeting, Workshop, Town Hall, Other)
+- "attendees": Number of people if mentioned, otherwise ""
+- "demo": Tech/equipment from the *SELECT Required line (mics, surface hubs, music, etc.)
+- "selectResources": Same as demo
+- "sessionDays": Multi-day info if present, otherwise ""
+- "sessionSupportDuration": Estimate from times if possible, otherwise ""
 - "supportTeam": "NYIH SELECT"
-- "weekOf": "" (will be auto-calculated)
-- "notes": Combine ALL details - WRES ID, Host, S&E, facilities setup notes, signage, furniture, catering details. Include everything so the team has full context.
+- "weekOf": "" 
+- "notes": ALL context — WRES ID, Host, S&E, all facilities/setup details, signage, furniture, catering, rope & stanchion, etc.
 
-Return ONLY a valid JSON array. No markdown, no explanation.
-Example: [{"eventName":"...","startDate":"...","endDate":"...", ...}]`;
+Return ONLY a valid JSON array. No markdown fences, no explanation.
+Example: [{"eventName":"...","startDate":"2026-06-16T15:30", ...}]`;
 
-    const result = await fetchGemini(aiPrompt, text, false);
+      console.log('[BEO Import] Sending to AI, text length:', text.length);
+      const result = await fetchGemini(aiPrompt, text, false);
+      console.log('[BEO Import] AI response type:', typeof result);
+      console.log('[BEO Import] AI response preview:', String(result).slice(0, 500));
 
-    /* Step 3: Parse response */
-    let parsed = [];
-    try {
-      const cleaned = (result || '').replace(/```json|```/g, '').trim();
-      const obj = JSON.parse(cleaned);
-      parsed = Array.isArray(obj) ? obj : [obj];
-    } catch {
+      /* Check for AI errors */
+      if (!result) {
+        setAiLoading(false);
+        setImportBanner('AI returned empty response. The /api/ai endpoint may not be configured.');
+        showMsg('AI returned no response. Check your Gemini API setup.', true);
+        return;
+      }
+
+      if (typeof result === 'string' && result.startsWith('AI Error:')) {
+        setAiLoading(false);
+        setImportBanner(result);
+        showMsg(result, true);
+        return;
+      }
+
+      /* Step 3: Parse JSON from response */
+      let parsed = [];
       try {
-        const m = (result || '').match(/\[[\s\S]*\]/);
-        if (m) parsed = JSON.parse(m[0]);
-      } catch { /* ignore */ }
-    }
+        const cleaned = String(result).replace(/```json|```/g, '').trim();
+        const obj = JSON.parse(cleaned);
+        parsed = Array.isArray(obj) ? obj : [obj];
+      } catch (jsonErr) {
+        console.warn('[BEO Import] Direct JSON parse failed, trying regex...');
+        try {
+          const m = String(result).match(/\[[\s\S]*\]/);
+          if (m) parsed = JSON.parse(m[0]);
+        } catch (regexErr) {
+          console.error('[BEO Import] All JSON parsing failed');
+        }
+      }
 
-    /* Filter out any objects that are clearly empty or invalid */
-    parsed = parsed.filter(e => e && typeof e === 'object' && (e.eventName || e.eventPoc || e.demo));
+      parsed = parsed.filter(e => e && typeof e === 'object' && (e.eventName || e.eventPoc || e.demo));
+      console.log('[BEO Import] Parsed events:', parsed.length, parsed);
 
-    if (!parsed.length) {
+      if (!parsed.length) {
+        setAiLoading(false);
+        const preview = String(result).slice(0, 300);
+        setImportBanner(`No events parsed from AI response. Raw response preview: "${preview}..."`);
+        showMsg('Could not parse events from AI response. Check console for details.', true);
+        return;
+      }
+
+      /* Step 4: Deduplicate and save */
+      let saved = 0;
+      let skipped = 0;
+      for (const raw of parsed) {
+        const evt = {
+          ...blankEventForm(),
+          ...Object.fromEntries(
+            ALLOWED_EVENT_KEYS.filter(k => raw[k] !== undefined && raw[k] !== null)
+              .map(k => [k, String(raw[k] || '').slice(0, 500)])
+          ),
+          source: 'Imported',
+          supportTeam: raw.supportTeam || 'NYIH SELECT',
+          location: raw.location || 'NYIH',
+          weekOf: weekOfFromDateTime(raw.startDate),
+        };
+
+        const isDupe = events.some(x =>
+          x.eventName === evt.eventName &&
+          x.startDate === evt.startDate &&
+          x.eventLocation === evt.eventLocation
+        );
+        if (isDupe) { skipped++; continue; }
+
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
+          ...sanitizeEventData(evt),
+          timestamp: new Date().toISOString(),
+        });
+        saved++;
+      }
+
+      /* Step 5: Report */
+      const banner = `Found ${parsed.length} SELECT event(s) \u2022 ${saved} saved${skipped > 0 ? ` \u2022 ${skipped} duplicate(s) skipped` : ''}`;
+      setImportBanner(banner);
       setAiLoading(false);
-      setImportBanner('No *SELECT Required events found in this BEO. Only SELECT-tagged blocks are extracted.');
-      showMsg("No SELECT events found.", true);
-      return;
+      /* Only clear text on success */
+      if (saved > 0) {
+        setBeoText('');
+        if (fileRef.current) fileRef.current.value = '';
+      }
+      showMsg(saved > 0 ? `Imported ${saved} SELECT event(s). Edit or delete below.` : 'No new events to import.');
+
+    } catch (outerErr) {
+      /* Catch-all so the button never silently fails */
+      console.error('[BEO Import] Unexpected error:', outerErr);
+      setPdfLoading(false);
+      setAiLoading(false);
+      setImportBanner(`Unexpected error: ${outerErr.message}`);
+      showMsg(`Import failed: ${outerErr.message}`, true);
     }
-
-    /* Step 4: Normalize and save */
-    let saved = 0;
-    let skipped = 0;
-    for (const raw of parsed) {
-      const evt = {
-        ...blankEventForm(),
-        ...Object.fromEntries(
-          ALLOWED_EVENT_KEYS.filter(k => raw[k] !== undefined && raw[k] !== null)
-            .map(k => [k, String(raw[k] || '').slice(0, 500)])
-        ),
-        source: 'Imported',
-        supportTeam: raw.supportTeam || 'NYIH SELECT',
-        location: raw.location || 'NYIH',
-        weekOf: weekOfFromDateTime(raw.startDate),
-      };
-
-      /* Skip dupes */
-      const isDupe = events.some(x =>
-        x.eventName === evt.eventName &&
-        x.startDate === evt.startDate &&
-        x.eventLocation === evt.eventLocation
-      );
-      if (isDupe) { skipped++; continue; }
-
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
-        ...sanitizeEventData(evt),
-        timestamp: new Date().toISOString(),
-      });
-      saved++;
-    }
-
-    /* Step 5: Report */
-    const banner = `Found ${parsed.length} SELECT event(s) \u2022 ${saved} saved${skipped > 0 ? ` \u2022 ${skipped} duplicate(s) skipped` : ''}`;
-    setImportBanner(banner);
-    setAiLoading(false);
-    setBeoText('');
-    if (fileRef.current) fileRef.current.value = '';
-    showMsg(saved > 0 ? `Imported ${saved} SELECT event(s). Edit or delete below.` : 'No new events to import.');
   };
 
-  return (
-    <div className="space-y-5 anim-in">
       {/* ---- BEO SMART IMPORT ---- */}
       <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
         <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]"/> Smart BEO Import</h2>
