@@ -229,23 +229,6 @@ const classBadgeColor = (cls) => {
   return '#94A3B8';
 };
 
-
-  let score = 0;
-  SELECT_HINTS.forEach((k) => { if (hay.includes(k)) score += 1; });
-  if ((e.selectResources || '').trim()) score += 2;
-  if ((e.demo || '').trim() && !['n/a', 'tbd'].includes((e.demo || '').trim().toLowerCase())) score += 2;
-  if ((e.eventName || '').toLowerCase().includes('workshop')) score += 1;
-  if ((e.location || '').toLowerCase().includes('nyih')) score += 1;
-  return score;
-};
-
-const classBadgeColor = (cls) => {
-  if (cls === 'Leadership') return '#F59E0B';
-  if (cls === 'Client') return '#22C55E';
-  if (cls === 'Confidential') return '#EF4444';
-  return '#94A3B8';
-};
-
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
 let firebaseConfig = {};
 let GEMINI_API_KEY = "";
