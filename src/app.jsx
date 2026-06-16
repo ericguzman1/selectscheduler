@@ -230,13 +230,6 @@ const classBadgeColor = (cls) => {
 };
 
 
-const scoreSelectRelevance = (e) => {
-  const hay = [
-    e.eventName, e.eventPoc, e.selectPoc, e.location, e.eventLocation,
-    e.classification, e.sessionType, e.attendees, e.demo, e.selectResources,
-    e.sessionSupportDuration, e.notes, e.supportTeam
-  ].join(' ').toLowerCase();
-
   let score = 0;
   SELECT_HINTS.forEach((k) => { if (hay.includes(k)) score += 1; });
   if ((e.selectResources || '').trim()) score += 2;
