@@ -543,14 +543,13 @@ function KanbanPage({ tasks, showMsg }) {
     </div>
   );
 }
-/* ======== SCHEDULE PAGE ======== */
+/* ======== SCHEDULE PAGE (AI-powered BEO import) ======== */
 function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(blankEventForm());
   const [beoText, setBeoText] = useState('');
-  const [parserPreview, setParserPreview] = useState('No BEO parsed yet.');
-  const [importBanner, setImportBanner] = useState('Imported events appear instantly. Edit below if the BEO had mistakes.');
+  const [importBanner, setImportBanner] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -569,153 +568,229 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
     return (!searchTerm || h.includes(searchTerm.toLowerCase())) && (!classificationFilter || e.classification === classificationFilter) && (!sourceFilter || (e.source || 'Manual') === sourceFilter);
   }), [events, searchTerm, classificationFilter, sourceFilter]);
 
-  const updateField = (key, value) => setFormData((p) => ({ ...p, [key]: value, ...(key === 'startDate' && !p.weekOf ? { weekOf: weekOfFromDateTime(value) } : {}) }));
+  const updateField = (key, value) => setFormData((p) => ({
+    ...p,
+    [key]: value,
+    ...(key === 'startDate' && !p.weekOf ? { weekOf: weekOfFromDateTime(value) } : {}),
+  }));
   const resetForm = () => { setEditingId(null); setFormData(blankEventForm()); };
 
+  /* --- Full detail modal --- */
   const openFullIntel = (e) => {
     const c = `Event: ${e.eventName || ''}\nStart: ${e.startDate || ''}\nEnd: ${e.endDate || ''}\nPOC: ${e.eventPoc || ''}\nSELECT POC: ${e.selectPoc || ''}\nLocation: ${e.location || 'NYIH'}\nRoom: ${e.eventLocation || ''}\nClassification: ${e.classification || ''}\nType: ${e.sessionType || ''}\nAttendees: ${e.attendees || ''}\nDemo: ${e.demo || ''}\nResources: ${e.selectResources || ''}\nDays: ${e.sessionDays || ''}\nDuration: ${e.sessionSupportDuration || ''}\nTeam: ${e.supportTeam || ''}\nWeek Of: ${e.weekOf || ''}\nNotes: ${e.notes || ''}`;
     setModal({ title: "Event Details", content: c, actionLabel: "Copy", action: () => { navigator.clipboard.writeText(c); showMsg("Copied."); } });
   };
 
+  /* --- Edit existing event --- */
   const startEdit = (e) => {
     setEditingId(e.id);
-    setFormData({ eventName: e.eventName || '', startDate: e.startDate || '', endDate: e.endDate || '', eventPoc: e.eventPoc || '', selectPoc: e.selectPoc || '', location: e.location || 'NYIH', eventLocation: e.eventLocation || '', classification: e.classification || 'Internal', sessionType: e.sessionType || 'Demo', attendees: e.attendees || '', demo: e.demo || '', selectResources: e.selectResources || '', sessionDays: e.sessionDays || '', sessionSupportDuration: e.sessionSupportDuration || '', supportTeam: e.supportTeam || 'NYIH SELECT', weekOf: e.weekOf || '', notes: e.notes || '', source: e.source || 'Manual' });
+    setFormData({
+      eventName: e.eventName || '', startDate: e.startDate || '', endDate: e.endDate || '',
+      eventPoc: e.eventPoc || '', selectPoc: e.selectPoc || '', location: e.location || 'NYIH',
+      eventLocation: e.eventLocation || '', classification: e.classification || 'Internal',
+      sessionType: e.sessionType || 'Demo', attendees: e.attendees || '', demo: e.demo || '',
+      selectResources: e.selectResources || '', sessionDays: e.sessionDays || '',
+      sessionSupportDuration: e.sessionSupportDuration || '', supportTeam: e.supportTeam || 'NYIH SELECT',
+      weekOf: e.weekOf || '', notes: e.notes || '', source: e.source || 'Manual',
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /* --- Save / Update event via form --- */
   const handleCommit = async (e) => {
     e.preventDefault();
-    const d = sanitizeEventData({ ...formData, source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'), weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate) });
+    const d = sanitizeEventData({
+      ...formData,
+      source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
+      weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
+    });
     if (!d.eventName || !d.eventPoc) { showMsg("Event name and POC required.", true); return; }
     try {
-      if (editingId) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d); setEditingId(null); }
-      else { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...d, timestamp: new Date().toISOString() }); }
-      resetForm(); showMsg("Event saved.");
+      if (editingId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
+        setEditingId(null);
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...d, timestamp: new Date().toISOString() });
+      }
+      resetForm();
+      showMsg("Event saved.");
     } catch { showMsg("Save failed.", true); }
   };
 
-  const handleAiAutoCommit = async () => {
-    const t = beoText || document.getElementById('ai-input')?.value || '';
-    if (!t.trim()) return;
-    setAiLoading(true);
-    const r = await fetchGemini('Extract event details from BEO text as JSON.\nKeys: eventName,startDate,endDate,eventPoc,selectPoc,location,eventLocation,classification,sessionType,attendees,demo,selectResources,sessionDays,sessionSupportDuration,supportTeam,weekOf,notes,source.\nReturn one object for the clearest SELECT-related event.', t, true);
-    if (r && r.eventName) {
-      const sr = sanitizeEventData({ ...blankEventForm(), ...r, source: 'Imported', supportTeam: r.supportTeam || 'NYIH SELECT', weekOf: r.weekOf || weekOfFromDateTime(r.startDate) });
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...sr, timestamp: new Date().toISOString() });
-      setBeoText(''); const ai = document.getElementById('ai-input'); if (ai) ai.value = ''; showMsg("AI extraction committed.");
-    }
-    setAiLoading(false);
-  };
+  /* ============================================================
+     ONE-CLICK AI IMPORT
+     1. Read PDF / pasted text
+     2. Send to Gemini -> get JSON array of ALL events
+     3. Filter for SELECT relevance
+     4. Auto-save to Firestore
+     ============================================================ */
+  const handleSmartImport = async () => {
+    let text = beoText || '';
+    const file = fileRef.current?.files?.[0];
 
-  const mapField = (o, k, v) => {
-    const val = normalizeLine(v);
-    if (k === 'Event Name') o.eventName = val;
-    else if (k === 'Start Date') o.startDate = parseDateTime(val) || val;
-    else if (k === 'End Date') o.endDate = parseDateTime(val) || val;
-    else if (k === 'Event POC') o.eventPoc = val;
-    else if (k === 'SELECT POC') o.selectPoc = val;
-    else if (k === 'Location') o.location = val || 'NYIH';
-    else if (k === 'Event Location') o.eventLocation = val;
-    else if (k === 'Classification') o.classification = val || 'TBD';
-    else if (k === 'Session Type') o.sessionType = val || 'TBD';
-    else if (k === 'Attendees') o.attendees = val;
-    else if (k === 'Demo') o.demo = val;
-    else if (k === 'SELECT Resources') o.selectResources = val;
-    else if (k === 'Session Days') o.sessionDays = val;
-    else if (k === 'Session Support Duration') o.sessionSupportDuration = val;
-  };
-
-  const parseBEOText = (text) => {
-    const raw = String(text || '');
-    const lines = raw.split(/\r?\n/).map(normalizeLine).filter(Boolean);
-    const blocks = []; let cur = null; let notes = [];
-    const mk = () => ({ ...blankEventForm(), source: 'Imported' });
-    const fin = () => { if (!cur) return; if (notes.length) cur.notes = notes.join(' | '); cur.weekOf = cur.weekOf || weekOfFromDateTime(cur.startDate); blocks.push(cur); cur = null; notes = []; };
-    for (let i = 0; i < lines.length; i++) {
-      const ln = lines[i];
-      if (/^-{5,}$/.test(ln)) { fin(); continue; }
-      const m = ln.match(/^(Event Name|Start Date|End Date|Event POC|SELECT POC|Location|Event Location|Classification|Session Type|Attendees|Demo|SELECT Resources|Session Days|Session Support Duration)\s*:\s*(.*)$/i);
-      if (m) { const key = m[1].replace(/\s+/g, ' ').trim(), val = m[2] || ''; if (key === 'Event Name') { if (cur && cur.eventName) fin(); cur = cur || mk(); } cur = cur || mk(); mapField(cur, key, val); continue; }
-      if (cur) notes.push(ln);
-    }
-    fin();
-    if (!blocks.length && raw.includes('Event Name') && raw.includes('Session Support Duration')) {
-      raw.split(/(?=Event Name\s*:)/g).map(s => s.trim()).filter(Boolean).forEach((ch) => {
-        const o = mk();
-        const ms = ch.matchAll(/(Event Name|Start Date|End Date|Event POC|SELECT POC|Location|Event Location|Classification|Session Type|Attendees|Demo|SELECT Resources|Session Days|Session Support Duration)\s*:\s*([\s\S]*?)(?=(?:Event Name|Start Date|End Date|Event POC|SELECT POC|Location|Event Location|Classification|Session Type|Attendees|Demo|SELECT Resources|Session Days|Session Support Duration)\s*:|$)/g);
-        for (const mm of ms) mapField(o, mm[1], mm[2]); o.weekOf = weekOfFromDateTime(o.startDate); blocks.push(o);
-      });
-    }
-    return { all: blocks, selected: blocks.filter(i => scoreSelectRelevance(i) >= 2 && i.eventName) };
-  };
-
-  const showParserPreview = (r) => {
-    const l = [`Parsed: ${r.all.length} blocks`, `SELECT-related: ${r.selected.length}`, ''];
-    r.selected.slice(0, 8).forEach((e, i) => { l.push(`${i + 1}. ${e.eventName || '(Untitled)'}`); l.push(`   ${e.startDate || '\u2014'} \u2192 ${e.endDate || '\u2014'}`); l.push(`   Room: ${e.eventLocation || '\u2014'} | Demo: ${e.demo || '\u2014'}`); l.push(''); });
-    if (!r.selected.length && r.all.length) l.push('No entries passed SELECT filter.');
-    setParserPreview(l.join('\n'));
-  };
-
-  const importParsed = async (r) => {
-    let n = 0;
-    for (const e of r.selected) {
-      if (!events.some(x => x.eventName === e.eventName && x.startDate === e.startDate && x.eventLocation === e.eventLocation)) {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...sanitizeEventData(e), timestamp: new Date().toISOString() }); n++;
-      }
-    }
-    setImportBanner(n ? `Imported ${n} SELECT event(s). Review below.` : 'No new events imported.');
-  };
-
-  const parseAndImportBEO = async () => {
-    let text = beoText || ''; const file = fileRef.current?.files?.[0];
+    /* Step 1: get raw text */
     if (!text.trim() && file) {
       try {
-        if (file.name.toLowerCase().endsWith('.pdf')) { setPdfLoading(true); text = await extractTextFromPdf(file); setPdfLoading(false); }
-        else { text = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result || '')); r.onerror = no; r.readAsText(file); }); }
+        setPdfLoading(true);
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+          text = await extractTextFromPdf(file);
+        } else {
+          text = await new Promise((ok, no) => {
+            const r = new FileReader();
+            r.onload = () => ok(String(r.result || ''));
+            r.onerror = no;
+            r.readAsText(file);
+          });
+        }
+        setPdfLoading(false);
         setBeoText(text);
-      } catch (err) { setPdfLoading(false); showMsg(`File error: ${err.message}`, true); return; }
+      } catch (err) {
+        setPdfLoading(false);
+        showMsg(`File error: ${err.message}`, true);
+        return;
+      }
     }
-    if (!text.trim()) { showMsg("Paste BEO text or upload a file.", true); return; }
-    const r = parseBEOText(text); showParserPreview(r); await importParsed(r); showMsg("BEO parse complete.");
+
+    if (!text.trim()) { showMsg("Upload a PDF or paste BEO text first.", true); return; }
+
+    /* Step 2: AI extraction */
+    setAiLoading(true);
+    setImportBanner('Reading BEO and extracting events...');
+
+    const aiPrompt = `You are an event data extractor for the Accenture NYIH SELECT team.
+Extract ALL events from this BEO (Banquet Event Order) document.
+
+Return a JSON ARRAY of objects. Each object MUST have these keys:
+  eventName, startDate, endDate, eventPoc, selectPoc, location,
+  eventLocation, classification, sessionType, attendees, demo,
+  selectResources, sessionDays, sessionSupportDuration, supportTeam, weekOf, notes
+
+Rules:
+- startDate and endDate should be ISO format (YYYY-MM-DDTHH:mm) when possible
+- classification: one of Internal, Client, Leadership, Community, Confidential, TBD
+- sessionType: one of Demo, Client, Leadership, Workshop, Meeting, Conference / Boardroom, Town Hall, Other, TBD
+- supportTeam defaults to "NYIH SELECT"
+- location defaults to "NYIH"
+- If a field is unknown, use empty string ""
+- Extract EVERY event/session you can find, even partial ones
+- For demo/selectResources, look for mentions of: Proto, Vu AI, Spot, Cyviz, Surface Hub, signage, loaner, clicker, microphone, Teams call, web conference
+- Return ONLY the JSON array, no extra text`;
+
+    const result = await fetchGemini(aiPrompt, text, false);
+
+    /* Step 3: Parse AI response into array */
+    let parsed = [];
+    try {
+      const cleaned = (result || '').replace(/```json|```/g, '').trim();
+      const obj = JSON.parse(cleaned);
+      parsed = Array.isArray(obj) ? obj : [obj];
+    } catch {
+      /* try to extract array from partial response */
+      try {
+        const m = (result || '').match(/\[[\s\S]*\]/);
+        if (m) parsed = JSON.parse(m[0]);
+      } catch { /* ignore */ }
+    }
+
+    if (!parsed.length) {
+      setAiLoading(false);
+      setImportBanner('AI could not extract any events. Try pasting cleaner text or a different PDF.');
+      showMsg("No events extracted.", true);
+      return;
+    }
+
+    /* Step 4: Filter for SELECT relevance */
+    const allEvents = parsed.map((e) => ({
+      ...blankEventForm(),
+      ...Object.fromEntries(ALLOWED_EVENT_KEYS.filter(k => e[k] !== undefined).map(k => [k, String(e[k] || '').slice(0, 500)])),
+      source: 'Imported',
+      supportTeam: e.supportTeam || 'NYIH SELECT',
+      weekOf: e.weekOf || weekOfFromDateTime(e.startDate),
+    }));
+
+    const selectEvents = allEvents.filter((e) => scoreSelectRelevance(e) >= 2 && e.eventName);
+    /* If nothing passes the filter, import everything that has a name */
+    const toImport = selectEvents.length > 0 ? selectEvents : allEvents.filter(e => e.eventName);
+
+    /* Step 5: Deduplicate and save */
+    let saved = 0;
+    let skipped = 0;
+    for (const evt of toImport) {
+      const isDupe = events.some(x =>
+        x.eventName === evt.eventName &&
+        x.startDate === evt.startDate &&
+        x.eventLocation === evt.eventLocation
+      );
+      if (isDupe) { skipped++; continue; }
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
+        ...sanitizeEventData(evt),
+        timestamp: new Date().toISOString(),
+      });
+      saved++;
+    }
+
+    /* Step 6: Report */
+    const banner = [
+      `Found ${parsed.length} event(s) in BEO`,
+      selectEvents.length > 0 ? `${selectEvents.length} SELECT-relevant` : 'none passed SELECT filter, imported all named events',
+      `${saved} saved${skipped > 0 ? `, ${skipped} duplicates skipped` : ''}`,
+    ].join(' \u2022 ');
+
+    setImportBanner(banner);
+    setAiLoading(false);
+    setBeoText('');
+    if (fileRef.current) fileRef.current.value = '';
+    showMsg(saved > 0 ? `Imported ${saved} event(s). Edit or delete below.` : 'No new events to import.');
   };
 
   return (
     <div className="space-y-5 anim-in">
-      {/* BEO IMPORT */}
+      {/* ---- BEO SMART IMPORT ---- */}
       <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-3"><Upload size={16} className="text-[#A100FF]"/> Import from BEO</h2>
-        <p className="text-[11px] text-[#6B6B8A] mb-3">Upload a PDF or text BEO. SELECT-supported events are auto-extracted.</p>
-        <div className="grid md:grid-cols-2 gap-4">
+        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]"/> Smart BEO Import</h2>
+        <p className="text-[11px] text-[#6B6B8A] mb-4">Upload a PDF or paste BEO text. AI reads it, extracts SELECT events, and adds them to your queue automatically.</p>
+
+        {importBanner && (
+          <div className="bg-[#A100FF]/10 border border-[#A100FF]/30 rounded-xl p-3 text-xs text-[#C0C0D8] font-bold mb-4 flex items-center gap-2">
+            {aiLoading ? <RefreshCcw size={13} className="animate-spin text-[#A100FF]"/> : <CheckCircle2 size={13} className="text-[#A100FF]"/>}
+            {importBanner}
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-[1fr,auto] gap-4 items-end">
           <div className="space-y-3">
-            <textarea value={beoText} onChange={(e) => setBeoText(e.target.value)} className={`w-full h-36 resize-none text-xs font-mono ${DK}`} placeholder="Paste BEO text..." />
-            <div className="flex gap-2">
-              <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.json" className={`flex-1 text-xs ${DK}`} />
-              <button onClick={parseAndImportBEO} className="bg-[#A100FF] text-white px-4 rounded-xl text-[10px] font-bold uppercase hover:bg-[#B733FF] transition flex items-center gap-1.5">
-                <Upload size={11}/> {pdfLoading ? 'Reading...' : 'Parse'}
-              </button>
-            </div>
-            <div className="flex gap-2">
-              <textarea id="ai-input" className={`flex-1 h-16 resize-none text-xs ${DK}`} placeholder="Optional: AI extract single event..." />
-              <button onClick={handleAiAutoCommit} disabled={aiLoading} className="bg-[#1A1A2E] border border-[#A100FF] text-[#A100FF] px-4 rounded-xl text-[10px] font-bold uppercase hover:bg-[#A100FF] hover:text-white transition disabled:opacity-50 flex items-center gap-1.5 min-w-[120px]">
-                <BrainCircuit size={11} className={aiLoading ? 'animate-spin' : ''}/> {aiLoading ? '...' : 'AI Extract'}
-              </button>
-            </div>
+            <textarea
+              value={beoText}
+              onChange={(e) => setBeoText(e.target.value)}
+              className={`w-full h-32 resize-none text-xs font-mono ${DK}`}
+              placeholder="Paste BEO text here... or upload a file below"
+            />
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.json" className={`w-full text-xs ${DK}`} />
           </div>
-          <div>
-            <div className="text-[10px] font-bold text-[#6B6B8A] uppercase tracking-wider mb-1.5">Preview</div>
-            <div className={`h-[220px] overflow-auto text-xs font-mono whitespace-pre-wrap ${DK}`}>{parserPreview}</div>
-          </div>
+          <button
+            onClick={handleSmartImport}
+            disabled={aiLoading || pdfLoading}
+            className="bg-[#A100FF] text-white px-8 py-4 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-[#B733FF] transition disabled:opacity-50 flex items-center gap-2 h-fit whitespace-nowrap"
+          >
+            {pdfLoading ? (
+              <><RefreshCcw size={14} className="animate-spin"/> Reading PDF...</>
+            ) : aiLoading ? (
+              <><BrainCircuit size={14} className="animate-spin"/> Extracting...</>
+            ) : (
+              <><Zap size={14}/> Import Events</>
+            )}
+          </button>
         </div>
       </div>
 
-      {/* LAYOUT */}
+      {/* ---- MAIN LAYOUT ---- */}
       <div className="grid lg:grid-cols-[1.2fr,.8fr] gap-5">
-        {/* LEFT: Form */}
+        {/* LEFT: Event Form */}
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
           <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2"><ClipboardList size={16} className="text-[#A100FF]"/> Event Intake</h2>
-              <p className="text-[11px] text-[#6B6B8A] mt-0.5">Log SELECT-supported sessions</p>
+              <h2 className="text-base font-bold text-white flex items-center gap-2"><ClipboardList size={16} className="text-[#A100FF]"/> {editingId ? 'Edit Event' : 'New Event'}</h2>
+              <p className="text-[11px] text-[#6B6B8A] mt-0.5">{editingId ? 'Editing imported or manual event' : 'Add event manually or use import above'}</p>
             </div>
             <div className="flex gap-1.5 flex-wrap">
               {['Demo','Client','Leadership','Workshop'].map(t => (
@@ -726,8 +801,6 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
               ))}
             </div>
           </div>
-
-          <div className="bg-[#A100FF]/10 border border-[#A100FF]/30 rounded-xl p-3 text-xs text-[#C0C0D8] font-bold mb-4">{importBanner}</div>
 
           <div className="grid grid-cols-3 gap-2 mb-4">
             {QUICK_FILL_CARDS.map(c => (
@@ -771,13 +844,13 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
             </div>
             <textarea value={formData.notes} onChange={e => updateField('notes', e.target.value)} placeholder="Notes / setup details..." rows="3" className={`w-full resize-none ${DK}`} />
             <div className="flex gap-2">
-              <button type="submit" className={`flex-1 font-bold py-3 rounded-xl text-sm uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>{editingId ? 'Update' : 'Save Event'}</button>
+              <button type="submit" className={`flex-1 font-bold py-3 rounded-xl text-sm uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>{editingId ? 'Update Event' : 'Save Event'}</button>
               {editingId && <button type="button" onClick={resetForm} className="px-5 bg-[#1A1A2E] text-[#6B6B8A] font-bold py-3 rounded-xl text-sm uppercase hover:text-white transition flex items-center gap-1"><RefreshCcw size={13}/> Cancel</button>}
             </div>
           </form>
         </div>
 
-        {/* RIGHT: Stats + Queue */}
+        {/* RIGHT: Stats + Event Queue */}
         <div className="space-y-5">
           <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
             <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><BarChart3 size={14} className="text-[#A100FF]"/> Stats</h2>
@@ -805,8 +878,13 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
             </div>
           </div>
 
+          {/* ---- Event Cards ---- */}
           <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-            {!filteredEvents.length && <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">No events yet</div>}
+            {!filteredEvents.length && (
+              <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
+                No events yet. Import a BEO or add one manually.
+              </div>
+            )}
             {filteredEvents.map(entry => {
               const bc = classBadgeColor(entry.classification);
               return (
@@ -824,133 +902,22 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
                         <p className="flex items-center gap-1"><User size={9}/> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
                         <p className="flex items-center gap-1"><MapPin size={9}/> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room'}</p>
                       </div>
-                      {(entry.demo || entry.selectResources) && <p className="text-[10px] text-[#4A4A6A] mt-1.5 line-clamp-1">Demo: {entry.demo || '—'} • Resources: {entry.selectResources || '—'}</p>}
-                      <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition">
-                        <button onClick={() => startEdit(entry)} className="text-[9px] text-[#A100FF] font-bold uppercase flex items-center gap-0.5"><Edit3 size={9}/> Edit</button>
-                        <button onClick={() => openFullIntel(entry)} className="text-[9px] text-[#6B6B8A] font-bold uppercase flex items-center gap-0.5 hover:text-white"><FileText size={9}/> Details</button>
+                      {(entry.demo || entry.selectResources) && (
+                        <p className="text-[10px] text-[#4A4A6A] mt-1.5 line-clamp-1">
+                          Demo: {entry.demo || '—'} • Resources: {entry.selectResources || '—'}
+                        </p>
+                      )}
+                      <div className="flex gap-3 mt-2.5">
+                        <button onClick={() => startEdit(entry)} className="text-[10px] text-[#A100FF] font-bold uppercase flex items-center gap-1 hover:text-[#B733FF] transition"><Edit3 size={10}/> Edit</button>
+                        <button onClick={() => openFullIntel(entry)} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-white transition"><FileText size={10}/> Details</button>
+                        <button onClick={async () => { if (window.confirm("Delete this event?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); showMsg("Event deleted."); } }} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-red-400 transition"><Trash2 size={10}/> Delete</button>
                       </div>
                     </div>
-                    <button onClick={async () => { if (window.confirm("Delete?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); }} className="text-[#2A2A3E] hover:text-red-400 transition p-1"><Trash2 size={14}/></button>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ======== ISSUES PAGE ======== */
-function IssuesPage({ issues, showMsg, fetchGemini }) {
-  const [analysis, setAnalysis] = useState('');
-  const [isAnalysing, setIsAnalysing] = useState(false);
-
-  const runRisk = async () => {
-    if (!issues.length) { setAnalysis("No blockers logged. Operations nominal."); return; }
-    setIsAnalysing(true);
-    const c = issues.slice(0, 5).map(i => `${i.title}: ${i.desc} (${i.urgency})`).join(' | ');
-    setAnalysis(await fetchGemini('Act as an Accenture tech lead. Give a 2-sentence risk analysis of these blockers:', c));
-    setIsAnalysing(false);
-  };
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const d = { title: fd.get('t'), desc: fd.get('d'), urgency: fd.get('u'), timestamp: new Date().toISOString() };
-    if (d.title) { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues'), d); e.target.reset(); showMsg("Blocker logged."); }
-  };
-
-  return (
-    <div className="grid md:grid-cols-2 gap-5 anim-in">
-      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4"><BrainCircuit size={16} className="text-[#A100FF]"/> Log Blocker</h2>
-        <form onSubmit={handleAdd} className="space-y-3">
-          <input name="t" placeholder="Issue title *" required className={`w-full ${DK}`} />
-          <textarea name="d" placeholder="Details & impact..." required rows="4" className={`w-full resize-none ${DK}`} />
-          <select name="u" className={`w-full ${DK}`}>
-            <option value="Normal">Normal</option>
-            <option value="High">High</option>
-            <option value="Urgent">Urgent / Showstopper</option>
-          </select>
-          <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-xl text-sm uppercase hover:bg-red-700 transition">Report</button>
-        </form>
-      </div>
-
-      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <div className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3.5 mb-4">
-          <div className="flex justify-between items-center mb-1.5">
-            <span className="text-[10px] font-bold text-[#A100FF] uppercase tracking-wider">AI Risk Intel</span>
-            <button onClick={runRisk} className="text-[9px] text-[#6B6B8A] hover:text-white font-bold uppercase transition">Refresh</button>
-          </div>
-          <p className="text-[11px] text-[#6B6B8A] leading-relaxed">{isAnalysing ? 'Analyzing...' : (analysis || 'Log blockers to unlock intelligence.')}</p>
-        </div>
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-          {issues.map(i => (
-            <div key={i.id} className={`bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-4 border-l-4 ${i.urgency?.includes('Urgent') ? 'border-l-red-500' : i.urgency === 'High' ? 'border-l-[#F59E0B]' : 'border-l-[#A100FF]'}`}>
-              <div className="flex justify-between items-start mb-2">
-                <p className="text-xs font-bold text-white">{i.title}</p>
-                <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', i.id))} className="text-[#2A2A3E] hover:text-red-400 transition"><Trash2 size={12}/></button>
-              </div>
-              <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{i.desc}</p>
-              <span className={`text-[8px] font-bold uppercase px-2 py-0.5 rounded ${i.urgency?.includes('Urgent') ? 'bg-red-500/20 text-red-400' : i.urgency === 'High' ? 'bg-[#F59E0B]/20 text-[#F59E0B]' : 'bg-[#A100FF]/20 text-[#A100FF]'}`}>{i.urgency}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ======== ANALYTICS DASHBOARD ======== */
-function AnalyticsDashboard({ events, tasks }) {
-  const stats = useMemo(() => {
-    const d = TEAM_MEMBERS.reduce((a, n) => { a[n] = { hours: 0 }; return a; }, {});
-    const ph = (s) => { if (!s) return 0; const m = String(s).match(/[\d.]+/); return m ? parseFloat(m[0]) : 0; };
-    events.forEach(e => { if (d[e.selectPoc]) d[e.selectPoc].hours += ph(e.sessionSupportDuration); });
-    tasks.forEach(t => { if (d[t.assignee]) d[t.assignee].hours += ph(t.timeSpent); });
-    return d;
-  }, [events, tasks]);
-
-  const totalH = Object.values(stats).reduce((a, s) => a + s.hours, 0);
-  const maxH = Math.max(...Object.values(stats).map(s => s.hours), 1);
-  let cum = 0;
-  const colors = ["#A100FF", "#A3E635", "#8A4FFF", "#22C55E"];
-  const slices = TEAM_MEMBERS.map((n, i) => {
-    const h = stats[n].hours, pct = totalH > 0 ? h / totalH : 0;
-    const [sx, sy] = [Math.cos(2 * Math.PI * cum), Math.sin(2 * Math.PI * cum)];
-    cum += pct;
-    const [ex, ey] = [Math.cos(2 * Math.PI * cum), Math.sin(2 * Math.PI * cum)];
-    return { path: `M ${sx} ${sy} A 1 1 0 ${pct > .5 ? 1 : 0} 1 ${ex} ${ey} L 0 0`, color: colors[i % 4], label: n, pct: (pct * 100).toFixed(0) };
-  });
-
-  return (
-    <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-6 md:p-8 grid md:grid-cols-2 gap-10 anim-in">
-      <div>
-        <h2 className="text-lg font-black text-white mb-6 flex items-center gap-2"><BarChart3 size={18} className="text-[#A100FF]"/> Utilization</h2>
-        <div className="space-y-5">
-          {TEAM_MEMBERS.map(n => (
-            <div key={n}>
-              <div className="flex justify-between text-[10px] font-bold text-[#6B6B8A] mb-1.5"><span>{n}</span><span className="text-[#A100FF]">{stats[n].hours.toFixed(1)}h</span></div>
-              <div className="w-full bg-[#0D0D15] h-3 rounded-full border border-[#2A2A3E]"><div className="bg-gradient-to-r from-[#A100FF] to-[#A3E635] h-full rounded-full transition-all duration-700" style={{ width: `${(stats[n].hours / maxH) * 100}%` }}/></div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col items-center">
-        <h2 className="text-lg font-black text-white mb-6 flex items-center gap-2 self-start"><PieIcon size={18} className="text-[#A100FF]"/> Distribution</h2>
-        <div className="w-44 h-44 mb-6">
-          <svg viewBox="-1.2 -1.2 2.4 2.4" style={{ transform: 'rotate(-90deg)' }} className="w-full h-full drop-shadow-lg">
-            {totalH > 0 ? slices.map((s, i) => <path key={i} d={s.path} fill={s.color} className="hover:opacity-80 transition"/>) : <circle r="1" fill="#1A1A2E"/>}
-          </svg>
-        </div>
-        <div className="grid grid-cols-2 gap-3 w-full">
-          {slices.map((s, i) => (
-            <div key={i} className="flex items-center text-[10px] font-bold text-[#6B6B8A]">
-              <div className="w-2.5 h-2.5 rounded-sm mr-2" style={{ backgroundColor: s.color }}/>{s.label}: {s.pct}%
-            </div>
-          ))}
         </div>
       </div>
     </div>
