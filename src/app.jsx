@@ -636,6 +636,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
   const fileRef = useRef(null);
 
   const totalStats = useMemo(() => ({
@@ -661,7 +662,7 @@ function SchedulePage({ events, issues, showMsg, fetchGemini, setModal }) {
   const updateField = (key, value) => {
     setFormData((prev) => ({
       ...prev,
-      value,
+      [key]: value,
       ...(key === 'startDate' && !prev.weekOf ? { weekOf: weekOfFromDateTime(value) } : {})
     }));
   };
@@ -926,7 +927,21 @@ Return one object only for the clearest SELECT-related event.`,
     );
   };
 
-  const loadFileText = async (file) => {
+  const loadAnySupportedFile = async (file) => {
+    if (!file) return '';
+
+    const lower = file.name.toLowerCase();
+
+    if (lower.endsWith('.pdf')) {
+      setPdfLoading(true);
+      try {
+        const text = await extractTextFromPdf(file);
+        return text;
+      } finally {
+        setPdfLoading(false);
+      }
+    }
+
     return await new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ''));
@@ -940,12 +955,12 @@ Return one object only for the clearest SELECT-related event.`,
     const file = fileRef.current?.files?.[0];
 
     if (!text.trim() && file) {
-      text = await loadFileText(file);
+      text = await loadAnySupportedFile(file);
       setBeoText(text);
     }
 
     if (!text.trim()) {
-      showMsg("Paste BEO text or choose a text-based file first.", true);
+      showMsg("Paste BEO text or choose a supported file first.", true);
       return;
     }
 
@@ -971,23 +986,7 @@ Demo: TBD
 SELECT Resources: TBD
 Session Days: 1 Day
 Session Support Duration: 9.0 Hours
-Additional Notes/Details: Client Visit needs tech enablement
----------------------------------
-Event Name: Arts and Culture Club x Interfaith-Christian ERG Easter Celebration
-Start Date: 4/16/2025 05:00 PM
-End Date: 4/16/2025 07:30 PM
-Event POC: Deryn Oates / Jimmy Sek
-SELECT POC: TBD
-Location: NYIH
-Event Location: 65 Interchange - Cafe
-Classification: Internal
-Session Type: Community
-Attendees: 80
-Demo: N/A
-SELECT Resources: 1 surface hub, music support
-Session Days: 1 Day
-Session Support Duration: 2.5 Hours
-Additional Notes/Details: Standard cafe setup`;
+Additional Notes/Details: Client Visit needs tech enablement`;
 
   return (
     <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-gray-100 grid gap-8 animate-fade-in">
@@ -996,7 +995,6 @@ Additional Notes/Details: Standard cafe setup`;
         .accent-muted{color:#8C97BA}
         .accent-input{background:#0C1018;border-color:#23283A;color:#F7F8FC}
         .accent-chip{background:#0C1018;border:1px solid #23283A;color:#C9D2F2}
-        .accent-stat{background:#0C1018;border:1px solid #23283A}
       `}</style>
 
       {/* BEO IMPORT */}
@@ -1004,10 +1002,10 @@ Additional Notes/Details: Standard cafe setup`;
         <div className="flex flex-col gap-4">
           <div>
             <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
-              <Upload size={18} className="mr-2 text-[#A3E635]" /> Import from BEO
+              <Upload size={18} className="mr-2 text-[#7A3EF0]" /> Import from BEO
             </h2>
             <p className="accent-muted text-xs mt-2 font-bold italic">
-              Paste BEO text or upload a text-based BEO export. Matching events are auto-populated into the live stream for review and editing.
+              Paste BEO text or upload a BEO PDF / text export. Matching events are auto-populated into the live stream for review and editing.
             </p>
           </div>
 
@@ -1021,17 +1019,17 @@ Additional Notes/Details: Standard cafe setup`;
               />
 
               <div className="flex flex-col md:flex-row gap-2">
-                <input ref={fileRef} type="file" accept=".txt,.csv,.json" className="flex-1 p-3 rounded-xl border-2 accent-input text-xs" />
-                <button onClick={parseAndImportBEO} className="bg-[#424A9F] text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#343D84] transition shadow-lg flex items-center justify-center">
-                  <Upload size={12} className="mr-2" /> Parse BEO
+                <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.json" className="flex-1 p-3 rounded-xl border-2 accent-input text-xs" />
+                <button onClick={parseAndImportBEO} className="bg-[#7A3EF0] text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#6A33D3] transition shadow-lg flex items-center justify-center">
+                  <Upload size={12} className="mr-2" /> {pdfLoading ? 'READING PDF...' : 'Parse BEO'}
                 </button>
-                <button onClick={() => setBeoText(sampleBEO)} className="bg-gray-100 text-gray-600 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-200 transition shadow-sm flex items-center justify-center">
+                <button onClick={() => setBeoText(sampleBEO)} className="bg-gray-800 text-gray-200 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-700 transition shadow-sm flex items-center justify-center">
                   <CopyPlus size={12} className="mr-2" /> Sample
                 </button>
               </div>
 
-              <div className="p-3 rounded-xl border border-dashed border-[#3B2F75] bg-[#17132A] text-[11px] accent-muted font-bold italic">
-                This version keeps your existing Firebase/Auth/API wiring intact. BEO import works in-browser with pasted text or text-based files. No API changes needed.
+              <div className="p-3 rounded-xl border border-dashed border-[#7A3EF0] bg-[#17132A] text-[11px] accent-muted font-bold italic">
+                Supports PDF BEO files plus pasted/text-based imports while keeping your existing Firebase/Auth/API wiring intact.
               </div>
 
               <div className="flex flex-col md:flex-row gap-2">
@@ -1040,7 +1038,7 @@ Additional Notes/Details: Standard cafe setup`;
                   className="flex-1 h-24 p-4 rounded-2xl border-2 accent-input resize-none outline-none text-sm italic"
                   placeholder="Optional: use your current /api/ai route to extract a single BEO event with AI..."
                 />
-                <button onClick={handleAiAutoCommit} disabled={aiLoading} className="bg-[#A3E635] text-[#424A9F] px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#8CD02F] transition shadow-lg disabled:opacity-50 flex items-center justify-center min-w-[180px]">
+                <button onClick={handleAiAutoCommit} disabled={aiLoading} className="bg-[#A56BFF] text-white px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#8D56F5] transition shadow-lg disabled:opacity-50 flex items-center justify-center min-w-[180px]">
                   <BrainCircuit size={12} className={`mr-2 ${aiLoading ? 'animate-spin' : ''}`} />
                   {aiLoading ? 'ANALYZING...' : 'AI EXTRACT'}
                 </button>
@@ -1065,10 +1063,10 @@ Additional Notes/Details: Standard cafe setup`;
             <div className="flex flex-col lg:flex-row justify-between gap-4 mb-4">
               <div>
                 <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
-                  <ClipboardList size={18} className="mr-2 text-[#A3E635]" /> Team Event Intake
+                  <ClipboardList size={18} className="mr-2 text-[#A56BFF]" /> Team Event Intake
                 </h2>
                 <p className="accent-muted text-xs mt-2 font-bold italic">
-                  Designed for all SELECT teams to log weekly support consistently while keeping the same Firestore collections and API route you already use.
+                  Darker Accenture-styled intake for all SELECT teams while keeping the same Firestore collections and API route you already use.
                 </p>
               </div>
 
@@ -1077,7 +1075,7 @@ Additional Notes/Details: Standard cafe setup`;
                   <button
                     key={type}
                     onClick={() => updateField('sessionType', type)}
-                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${formData.sessionType === type ? 'bg-[#A3E635] text-[#424A9F]' : 'accent-chip'}`}
+                    className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${formData.sessionType === type ? 'bg-[#7A3EF0] text-white' : 'accent-chip'}`}
                   >
                     {type}
                   </button>
@@ -1085,7 +1083,7 @@ Additional Notes/Details: Standard cafe setup`;
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-[#17132A] border border-[#3B2F75] text-sm text-[#E9DFFF] font-bold italic">
+            <div className="p-4 rounded-2xl bg-[#17132A] border border-[#7A3EF0] text-sm text-[#E9DFFF] font-bold italic">
               {importBanner}
             </div>
 
@@ -1095,7 +1093,7 @@ Additional Notes/Details: Standard cafe setup`;
                   key={card.name}
                   type="button"
                   onClick={() => setFormData((prev) => ({ ...prev, demo: card.demo, sessionType: card.sessionType }))}
-                  className="text-left p-4 rounded-2xl border accent-chip hover:border-[#4A38A0] transition shadow-sm"
+                  className="text-left p-4 rounded-2xl border accent-chip hover:border-[#7A3EF0] transition shadow-sm"
                 >
                   <div className="font-black uppercase text-xs italic text-white">{card.name}</div>
                   <div className="text-[10px] accent-muted font-bold italic mt-1">{card.note}</div>
@@ -1110,14 +1108,8 @@ Additional Notes/Details: Standard cafe setup`;
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="text-[9px] font-black uppercase accent-muted">
-                  Start Date
-                  <input value={formData.startDate} onChange={(e) => updateField('startDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" />
-                </div>
-                <div className="text-[9px] font-black uppercase accent-muted">
-                  End Date
-                  <input value={formData.endDate} onChange={(e) => updateField('endDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" />
-                </div>
+                <div className="text-[9px] font-black uppercase accent-muted">Start Date<input value={formData.startDate} onChange={(e) => updateField('startDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" /></div>
+                <div className="text-[9px] font-black uppercase accent-muted">End Date<input value={formData.endDate} onChange={(e) => updateField('endDate', e.target.value)} type="datetime-local" required className="w-full p-4 mt-1 border-2 rounded-2xl accent-input outline-none" /></div>
               </div>
 
               <div className="grid md:grid-cols-2 gap-4">
@@ -1169,11 +1161,11 @@ Additional Notes/Details: Standard cafe setup`;
               <textarea value={formData.notes} onChange={(e) => updateField('notes', e.target.value)} placeholder="Notes / dependencies / setup details..." rows="4" className="w-full p-4 border-2 rounded-2xl accent-input outline-none resize-none"></textarea>
 
               <div className="flex gap-2 flex-wrap">
-                <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A3E635] text-[#424A9F]' : 'bg-[#424A9F] text-white'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 flex items-center justify-center`}>
+                <button type="submit" className={`flex-1 ${editingId ? 'bg-[#A56BFF] text-white' : 'bg-[#7A3EF0] text-white'} font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 flex items-center justify-center`}>
                   {editingId ? 'Update Intel' : 'Commit Intel'}
                 </button>
                 {editingId && (
-                  <button type="button" onClick={resetForm} className="flex-none px-6 bg-gray-100 font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 text-gray-400 flex items-center">
+                  <button type="button" onClick={resetForm} className="flex-none px-6 bg-gray-800 font-black py-4 rounded-2xl shadow-xl transition uppercase italic mt-2 text-gray-300 flex items-center">
                     <RefreshCcw size={14} className="mr-2" /> Cancel
                   </button>
                 )}
@@ -1186,7 +1178,7 @@ Additional Notes/Details: Standard cafe setup`;
         <div className="space-y-8">
           <div className="accent-card rounded-[2rem] p-5 shadow-lg">
             <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
-              <BarChart3 size={18} className="mr-2 text-[#A3E635]" /> Quick Stats
+              <BarChart3 size={18} className="mr-2 text-[#A56BFF]" /> Quick Stats
             </h2>
             <div className="grid grid-cols-2 gap-3 mt-4">
               <StatCard icon={<ClipboardList size={18} />} value={totalStats.events} label="Events" />
@@ -1200,7 +1192,7 @@ Additional Notes/Details: Standard cafe setup`;
             <div className="flex flex-col gap-4">
               <div>
                 <h2 className="text-xl font-black text-white uppercase italic tracking-tight flex items-center">
-                  <Search size={18} className="mr-2 text-[#A3E635]" /> Weekly Event Queue
+                  <Search size={18} className="mr-2 text-[#A56BFF]" /> Weekly Event Queue
                 </h2>
                 <p className="accent-muted text-xs mt-2 font-bold italic">
                   Imported + manual events. Search, filter, then edit or copy the full intel.
@@ -1224,7 +1216,7 @@ Additional Notes/Details: Standard cafe setup`;
                       key={src || 'all'}
                       type="button"
                       onClick={() => setSourceFilter(src)}
-                      className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${sourceFilter === src ? 'bg-[#A3E635] text-[#424A9F]' : 'accent-chip'}`}
+                      className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition ${sourceFilter === src ? 'bg-[#7A3EF0] text-white' : 'accent-chip'}`}
                     >
                       <Filter size={10} className="inline mr-1" /> {src || 'All Sources'}
                     </button>
@@ -1236,7 +1228,7 @@ Additional Notes/Details: Standard cafe setup`;
 
           <div className="space-y-4 overflow-y-auto max-h-[72vh] pr-2 custom-scrollbar">
             {!filteredEvents.length && (
-              <div className="p-8 rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50 text-center text-slate-400 font-black uppercase text-xs tracking-widest italic">
+              <div className="p-8 rounded-3xl border-2 border-dashed border-gray-700 bg-[#11131C] text-center text-slate-400 font-black uppercase text-xs tracking-widest italic">
                 No events yet. Import a BEO or add an event manually.
               </div>
             )}
@@ -1244,35 +1236,35 @@ Additional Notes/Details: Standard cafe setup`;
             {filteredEvents.map((entry) => {
               const badgeColor = classBadgeColor(entry.classification);
               return (
-                <div key={entry.id} className={`bg-white p-5 rounded-2xl shadow-md border-l-8 ${editingId === entry.id ? 'border-[#A3E635] bg-lime-50/20' : 'border-[#424A9F]'} flex justify-between items-start group transition border border-gray-50 hover:bg-indigo-50/50`}>
+                <div key={entry.id} className={`bg-[#11131C] p-5 rounded-2xl shadow-md border-l-8 ${editingId === entry.id ? 'border-[#A56BFF]' : 'border-[#7A3EF0]'} flex justify-between items-start group transition border border-[#23283A] hover:bg-[#151826]`}>
                   <div className="flex-1 pr-4">
-                    <p className="font-black text-slate-800 uppercase text-xs italic leading-none mb-1">{entry.eventName}</p>
+                    <p className="font-black text-white uppercase text-xs italic leading-none mb-1">{entry.eventName}</p>
 
                     <div className="flex flex-wrap gap-2 mt-2 mb-3">
                       <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest" style={{ backgroundColor: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}` }}>
                         {entry.classification || 'Unclassified'}
                       </span>
-                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">{entry.sessionType || 'Session'}</span>
-                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-100 text-slate-500">{entry.source || 'Manual'}</span>
+                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-[#0C1018] text-[#C9D2F2]">{entry.sessionType || 'Session'}</span>
+                      <span className="px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-[#0C1018] text-[#C9D2F2]">{entry.source || 'Manual'}</span>
                     </div>
 
-                    <p className="text-[10px] text-gray-400 font-bold uppercase italic flex items-center"><CalendarDays size={10} className="mr-1" /> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase italic mt-1 flex items-center"><User size={10} className="mr-1" /> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase italic mt-1 flex items-center"><MapPin size={10} className="mr-1" /> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room set'}</p>
+                    <p className="text-[10px] text-[#8C97BA] font-bold uppercase italic flex items-center"><CalendarDays size={10} className="mr-1" /> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
+                    <p className="text-[10px] text-[#8C97BA] font-bold uppercase italic mt-1 flex items-center"><User size={10} className="mr-1" /> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
+                    <p className="text-[10px] text-[#8C97BA] font-bold uppercase italic mt-1 flex items-center"><MapPin size={10} className="mr-1" /> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room set'}</p>
 
                     {(entry.demo || entry.selectResources) && (
-                      <p className="text-[10px] text-gray-500 font-bold italic mt-2 line-clamp-2">
+                      <p className="text-[10px] text-[#C9D2F2] font-bold italic mt-2 line-clamp-2">
                         Demo: {entry.demo || '—'} • Resources: {entry.selectResources || '—'}
                       </p>
                     )}
 
                     <div className="flex gap-2 mt-3 flex-wrap">
-                      <button onClick={() => startEdit(entry)} className="text-[9px] text-[#424A9F] font-black uppercase hover:text-[#A3E635] transition-all flex items-center"><Edit3 size={10} className="mr-1" /> Edit</button>
-                      <button onClick={() => openFullIntel(entry)} className="text-[9px] text-indigo-500 font-black uppercase hover:text-[#A3E635] transition-all flex items-center"><FileText size={10} className="mr-1" /> View Full Intel</button>
+                      <button onClick={() => startEdit(entry)} className="text-[9px] text-[#A56BFF] font-black uppercase hover:text-white transition-all flex items-center"><Edit3 size={10} className="mr-1" /> Edit</button>
+                      <button onClick={() => openFullIntel(entry)} className="text-[9px] text-[#D8CBFF] font-black uppercase hover:text-white transition-all flex items-center"><FileText size={10} className="mr-1" /> View Full Intel</button>
                     </div>
                   </div>
 
-                  <button onClick={async () => { if(window.confirm("Archive entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); }} className="text-gray-200 hover:text-red-500 transition p-2">
+                  <button onClick={async () => { if(window.confirm("Archive entry?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); }} className="text-gray-500 hover:text-red-400 transition p-2">
                     <Trash2 size={16} />
                   </button>
                 </div>
