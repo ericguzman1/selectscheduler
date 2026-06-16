@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { initializeApp, getApps } from 'firebase/app';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf';
+import pdfWorker from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs';
 import {
   getAuth,
   onAuthStateChanged,
@@ -20,34 +22,41 @@ import {
   orderBy,
 } from 'firebase/firestore';
 import {
-  Layout,
-  AlertCircle,
-  Trash2,
-  CheckCircle2,
-  ChevronLeft,
+  Layout, 
+  AlertCircle, 
+  Trash2, 
+  CheckCircle2, 
+  ChevronLeft, 
   ChevronRight,
-  Zap,
-  LogOut,
-  User,
+  Zap, 
+  LogOut, 
+  User, 
   Edit3,
+  Clipboard,
   FileText,
   BarChart3,
+  Flame,
   PieChart as PieIcon,
   Calendar,
+  Info,
   Clock,
+  MessageSquare,
   TrendingUp,
   Share2,
   BrainCircuit,
+  History,
   MapPin,
   Upload,
   Search,
   Filter,
   CopyPlus,
   RefreshCcw,
+  Sparkles,
   ClipboardList,
   Users,
-  CalendarDays,
+  CalendarDays
 } from 'lucide-react';
+
 
 /**
  * CONFIGURATION & CONSTANTS
@@ -86,6 +95,28 @@ const SELECT_HINTS = [
   'mic',
   'teams call',
 ];
+
+const blankEventForm = () => ({
+  eventName: '',
+  startDate: '',
+  endDate: '',
+  eventPoc: '',
+  selectPoc: '',
+  location: 'NYIH',
+  eventLocation: '',
+  classification: 'Internal',
+  sessionType: 'Demo',
+  attendees: '',
+  demo: '',
+  selectResources: '',
+  sessionDays: '',
+  sessionSupportDuration: '',
+  supportTeam: 'NYIH SELECT',
+  weekOf: '',
+  notes: '',
+  source: 'Manual',
+});
+
 
 const sanitizeForPrompt = (text) => {
   if (typeof text !== 'string') return '';
@@ -129,11 +160,12 @@ const safeParseJson = (text) => {
 };
 
 const ALLOWED_EVENT_KEYS = [
-  'eventName', 'startDate', 'endDate', 'eventPoc', 'selectPoc', 'location',
-  'eventLocation', 'classification', 'sessionType', 'attendees', 'demo',
-  'selectResources', 'sessionDays', 'sessionSupportDuration',
-  'supportTeam', 'weekOf', 'notes', 'source'
+  'eventName','startDate','endDate','eventPoc','selectPoc','location',
+  'eventLocation','classification','sessionType','attendees','demo',
+  'selectResources','sessionDays','sessionSupportDuration',
+  'supportTeam','weekOf','notes','source'
 ];
+``
 
 const sanitizeEventData = (obj) => {
   const safe = {};
@@ -195,6 +227,55 @@ const scoreSelectRelevance = (e) => {
   return score;
 };
 
+const extractTextFromPdf = async (file) => {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  const pageTexts = [];
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+    const page = await pdf.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items.map((item) => item.str).join(' ');
+    pageTexts.push(pageText);
+  }
+
+  return pageTexts.join('\n');
+};
+
+const classBadgeColor = (cls) => {
+  if (cls === 'Leadership') return '#F59E0B';
+  if (cls === 'Client') return '#22C55E';
+  if (cls === 'Confidential') return '#EF4444';
+  return '#94A3B8';
+};
+
+
+const weekOfFromDateTime = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  const x = new Date(d);
+  const day = x.getDay();
+  x.setDate(x.getDate() - day);
+  return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+
+const scoreSelectRelevance = (e) => {
+  const hay = [
+    e.eventName, e.eventPoc, e.selectPoc, e.location, e.eventLocation,
+    e.classification, e.sessionType, e.attendees, e.demo, e.selectResources,
+    e.sessionSupportDuration, e.notes, e.supportTeam
+  ].join(' ').toLowerCase();
+
+  let score = 0;
+  SELECT_HINTS.forEach((k) => { if (hay.includes(k)) score += 1; });
+  if ((e.selectResources || '').trim()) score += 2;
+  if ((e.demo || '').trim() && !['n/a', 'tbd'].includes((e.demo || '').trim().toLowerCase())) score += 2;
+  if ((e.eventName || '').toLowerCase().includes('workshop')) score += 1;
+  if ((e.location || '').toLowerCase().includes('nyih')) score += 1;
+  return score;
+};
+
 const classBadgeColor = (cls) => {
   if (cls === 'Leadership') return '#F59E0B';
   if (cls === 'Client') return '#22C55E';
@@ -225,6 +306,8 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -1378,6 +1461,17 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
     </div>
   );
 }
+
+function StatCard({ icon, value, label }) {
+  return (
+    <div className="rounded-2xl p-4 border shadow-inner bg-[#0C1018] border-[#23283A]">
+      <div className="text-[#D8CBFF]">{icon}</div>
+      <div className="text-3xl font-black text-white mt-2 leading-none">{value}</div>
+      <div className="text-[10px] font-black uppercase tracking-widest text-[#8C97BA] mt-2 italic">{label}</div>
+    </div>
+  );
+}
+``
 
 function AuthPage({ showMsg }) {
   const [isLogin, setIsLogin] = useState(true);
