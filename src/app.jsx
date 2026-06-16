@@ -230,16 +230,6 @@ const classBadgeColor = (cls) => {
 };
 
 
-const weekOfFromDateTime = (v) => {
-  if (!v) return '';
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return '';
-  const x = new Date(d);
-  const day = x.getDay();
-  x.setDate(x.getDate() - day);
-  return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-};
-
 const scoreSelectRelevance = (e) => {
   const hay = [
     e.eventName, e.eventPoc, e.selectPoc, e.location, e.eventLocation,
