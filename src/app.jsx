@@ -813,10 +813,13 @@ Example: [{"eventName":"...","startDate":"2026-06-16T15:30", ...}]`;
       setPdfLoading(false);
       setAiLoading(false);
       setImportBanner(`Unexpected error: ${outerErr.message}`);
-      showMsg(`Import failed: ${outerErr.message}`, true);
+     showMsg(`Import failed: ${outerErr.message}`, true);
     }
   };
 
+  return (
+    <div className="space-y-5 anim-in">
+      
       {/* ---- BEO SMART IMPORT ---- */}
       <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
         <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]"/> Smart BEO Import</h2>
