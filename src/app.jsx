@@ -15,6 +15,106 @@ import {
   Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays,
 } from 'lucide-react';
 
+import * as pdfjsLib from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+// ============================================================
+// 🧠 GEMINI AI - BEO PARSER (inline, no separate file needed)
+// ============================================================
+const GEMINI_MODEL = "gemini-3.1-flash-lite";
+const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY;
+
+const BEO_PROMPT = `You are an assistant that extracts SELECT-required event 
+details from Accenture BEO (Banquet Event Order) documents for the 1MW NYIH 
+Innovation Hub.
+
+Rules:
+- ONLY extract events that mention SELECT, Innovation Hub, NYIH, Cyviz, Proto, 
+  Hypervsn, Spot, Surface Hub, or other SELECT-supported tech.
+- If the BEO contains multiple events, return ALL qualifying ones.
+- Use ISO date format (YYYY-MM-DD) for dates, 24h (HH:MM) for times.
+- If a field is missing, return null — do NOT guess.
+- Classification: "Internal" | "Client" | "Partner" | "Public"
+- Session Type: "Briefing" | "Workshop" | "Demo" | "Tour" | "Event" | "Meeting" | "Other"
+
+Return ONLY valid JSON:
+{
+  "events": [
+    {
+      "eventName": string,
+      "startDate": string,
+      "endDate": string,
+      "startTime": string | null,
+      "endTime": string | null,
+      "eventPOC": string | null,
+      "selectPOC": string | null,
+      "location": string | null,
+      "nyihEventLocation": string | null,
+      "classification": string | null,
+      "sessionType": string | null,
+      "attendees": number | null,
+      "demos": string[],
+      "resources": string[],
+      "supportDuration": string | null,
+      "notes": string | null
+    }
+  ]
+}`;
+
+async function extractSelectEventsFromBEO(pdfText) {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "Missing GEMINI_API_KEY. Add it in Vercel → Settings → Environment Variables, then redeploy."
+    );
+  }
+  if (!pdfText || pdfText.trim().length < 20) {
+    throw new Error("PDF text is empty or too short to parse.");
+  }
+
+  const endpoint =
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const body = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: `${BEO_PROMPT}\n\n--- BEO DOCUMENT TEXT ---\n${pdfText}` }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.1,
+      responseMimeType: "application/json",
+      maxOutputTokens: 8192
+    }
+  };
+
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errText}`);
+  }
+
+  const data = await res.json();
+  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!rawText) throw new Error("Gemini returned no content. Try a different BEO file.");
+
+  let parsed;
+  try {
+    parsed = JSON.parse(rawText);
+  } catch {
+    throw new Error(`Failed to parse Gemini JSON: ${rawText.slice(0, 200)}`);
+  }
+  return parsed.events || [];
+}
+// ============================================================
+
 /* --- PDF.js CDN Loader --- */
 const loadPdfJs = (() => {
   let promise = null;
@@ -198,6 +298,9 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState(null);
+  const [importSuccess, setImportSuccess] = useState(null);
 
   useEffect(() => {
     if (!firebaseConfig.apiKey) { setLoading(false); return; }
@@ -219,6 +322,65 @@ export default function App() {
     return () => { u1(); u2(); u3(); };
   }, [user]);
 
+const handleBEOImport = async (file) => {
+  setImporting(true);
+  setImportError(null);
+  setImportSuccess(null);
+
+  try {
+    // 1. Extract text from PDF
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      fullText += content.items.map((item) => item.str).join(" ") + "\n";
+    }
+
+    console.log("📄 PDF text length:", fullText.length);
+
+    // 2. Send to Gemini
+    const aiEvents = await extractSelectEventsFromBEO(fullText);
+    console.log("✨ Gemini events:", aiEvents);
+
+    if (aiEvents.length === 0) {
+      setImportError("No SELECT-required events found in this BEO.");
+      return;
+    }
+
+    // 3. Map → your existing events shape
+    const mapped = aiEvents.map((e) => ({
+      id: crypto.randomUUID(),
+      eventName: e.eventName || "",
+      startDate: e.startDate || "",
+      endDate: e.endDate || "",
+      eventPOC: e.eventPOC || "",
+      selectPOC: e.selectPOC || "",
+      location: e.location || "",
+      nyihEventLocation: e.nyihEventLocation || "",
+      classification: e.classification || "",
+      sessionType: e.sessionType || "",
+      attendees: e.attendees || 0,
+      demos: e.demos || [],
+      resources: e.resources || [],
+      supportDuration: e.supportDuration || "",
+      notes: e.notes || "",
+      source: "BEO-AI-Import",
+      importedAt: new Date().toISOString()
+    }));
+
+    setEvents((prev) => [...prev, ...mapped]);
+    setImportSuccess(`✅ Imported ${mapped.length} SELECT event(s) from BEO.`);
+  } catch (err) {
+    console.error("BEO import failed:", err);
+    setImportError(err.message);
+  } finally {
+    setImporting(false);
+  }
+};
+  
   const showMsg = (text, isError = false) => {
     setMessage({ text, isError });
     setTimeout(() => setMessage({ text: '', isError: false }), 5000);
@@ -951,7 +1113,39 @@ Example: [{"eventName":"...","startDate":"2026-06-16T15:30", ...}]`;
               </div>
             </div>
           </div>
-
+<div style={{ margin: "1rem 0" }}>
+  <label
+    style={{
+      display: "inline-block",
+      padding: "0.6rem 1.2rem",
+      background: "#a100ff",
+      color: "#fff",
+      borderRadius: "6px",
+      cursor: importing ? "wait" : "pointer",
+      fontFamily: "Graphik, sans-serif",
+      opacity: importing ? 0.6 : 1
+    }}
+  >
+    {importing ? "🧠 Parsing with AI..." : "📥 Import BEO (PDF)"}
+    <input
+      type="file"
+      accept="application/pdf"
+      hidden
+      disabled={importing}
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) handleBEOImport(f);
+        e.target.value = ""; // allow re-importing same file
+      }}
+    />
+  </label>
+  {importError && (
+    <div style={{ color: "#ff5b5b", marginTop: "0.5rem" }}>⚠️ {importError}</div>
+  )}
+  {importSuccess && (
+    <div style={{ color: "#7CFC9C", marginTop: "0.5rem" }}>{importSuccess}</div>
+  )}
+</div>
           {/* ---- Event Cards ---- */}
           <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
             {!filteredEvents.length && (
