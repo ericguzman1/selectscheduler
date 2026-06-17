@@ -25,10 +25,9 @@ const loadPdfJs = (() => {
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
       s.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        resolve(window.pdfjsLib);
-      };
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  resolve(window.pdfjsLib);
+};
       s.onerror = () => reject(new Error('Failed to load PDF.js'));
       document.head.appendChild(s);
     });
