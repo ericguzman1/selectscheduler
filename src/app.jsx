@@ -653,6 +653,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
     } catch { showMsg("Save failed.", true); }
   };
 
+
 /* ======== ISSUES / TECH FEED PAGE ======== */
 function IssuesPage({ issues, showMsg, fetchGemini }) {
   const [editingId, setEditingId] = useState(null);
@@ -788,6 +789,115 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ======== ANALYTICS / INSIGHTS DASHBOARD ======== */
+function AnalyticsDashboard({ events, tasks }) {
+  const stats = useMemo(() => {
+    const totalAttendees = events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0);
+    const byClass = {};
+    const bySession = {};
+    const bySource = {};
+    const byRoom = {};
+    events.forEach(e => {
+      const c = e.classification || 'TBD';
+      const t = e.sessionType || 'Other';
+      const s = e.source || 'Manual';
+      const r = e.eventLocation || 'Unknown';
+      byClass[c] = (byClass[c] || 0) + 1;
+      bySession[t] = (bySession[t] || 0) + 1;
+      bySource[s] = (bySource[s] || 0) + 1;
+      byRoom[r] = (byRoom[r] || 0) + 1;
+    });
+    const taskByStatus = {
+      todo: tasks.filter(t => t.status === 'todo').length,
+      progress: tasks.filter(t => t.status === 'progress').length,
+      done: tasks.filter(t => t.status === 'done').length,
+    };
+    return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
+  }, [events, tasks]);
+
+  const Bar = ({ label, value, max, color }) => (
+    <div className="mb-2">
+      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1">
+        <span>{label}</span>
+        <span style={{ color }}>{value}</span>
+      </div>
+      <div className="h-2 bg-[#0D0D15] rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
+      </div>
+    </div>
+  );
+
+  const sortedClass = Object.entries(stats.byClass).sort((a, b) => b[1] - a[1]);
+  const sortedSession = Object.entries(stats.bySession).sort((a, b) => b[1] - a[1]);
+  const sortedRoom = Object.entries(stats.byRoom).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxClass = Math.max(...Object.values(stats.byClass), 1);
+  const maxSession = Math.max(...Object.values(stats.bySession), 1);
+  const maxRoom = Math.max(...Object.values(stats.byRoom), 1);
+
+  return (
+    <div className="anim-in space-y-5">
+      <div className="grid md:grid-cols-4 gap-3">
+        <StatCard icon={<ClipboardList size={16} />} value={events.length} label="Total Events" />
+        <StatCard icon={<Users size={16} />} value={stats.totalAttendees} label="Total Attendees" />
+        <StatCard icon={<Upload size={16} />} value={stats.bySource['Imported'] || 0} label="AI Imported" />
+        <StatCard icon={<TrendingUp size={16} />} value={tasks.length} label="Active Tasks" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <PieIcon size={14} className="text-[#A100FF]" /> Events by Classification
+          </h2>
+          {sortedClass.length ? sortedClass.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type
+          </h2>
+          {sortedSession.length ? sortedSession.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations
+          </h2>
+          {sortedRoom.length ? sortedRoom.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <Layout size={14} className="text-[#A100FF]" /> Task Pipeline
+          </h2>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.todo}</div>
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">To Do</div>
+            </div>
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.progress}</div>
+              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">In Progress</div>
+            </div>
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.done}</div>
+              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Done</div>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#4A4A6A] text-center mt-4">
+            {tasks.length ? `${Math.round((stats.taskByStatus.done / tasks.length) * 100)}% complete` : 'No tasks yet'}
+          </p>
         </div>
       </div>
     </div>
