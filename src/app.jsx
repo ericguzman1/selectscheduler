@@ -15,15 +15,13 @@ import {
   Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays,
 } from 'lucide-react';
 
-import * as pdfjsLib from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
 
 // ============================================================
 // 🧠 GEMINI AI CONFIG
 // ============================================================
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
-const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY;
+const GEMINI_API_KEY = import.meta.env.REACT_APP_GEMINI_API_KEY;
 // ============================================================
 
 /* --- PDF.js CDN Loader --- */
