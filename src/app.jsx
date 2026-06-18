@@ -232,29 +232,52 @@ export default function App() {
     return () => { u1(); u2(); u3(); };
   }, [user]);
 
+  const showMsg = (text, isError = false) => {
+    setMessage({ text, isError });
+    setTimeout(() => setMessage({ text: '', isError: false }), 5000);
+  };
 
-  try {
-    // 1. Extract text from PDF
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-
-    let fullText = "";
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const content = await page.getTextContent();
-      fullText += content.items.map((item) => item.str).join(" ") + "\n";
+  const fetchGemini = async (sys, usr = '', json = false) => {
+    if (!aiEnabled) return json ? {} : "AI Unavailable";
+    if (!GEMINI_API_KEY) {
+      return json ? {} : "AI Error: Missing REACT_APP_GEMINI_API_KEY in Vercel env vars.";
     }
+    try {
+      const prompt = usr 
+        ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` 
+        : sys;
 
-    console.log("📄 PDF text length:", fullText.length);
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
-    // 2. Send to Gemini
-    const aiEvents = await extractSelectEventsFromBEO(fullText);
-    console.log("✨ Gemini events:", aiEvents);
+      const body = {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          ...(json ? { responseMimeType: "application/json" } : {})
+        }
+      };
 
-    if (aiEvents.length === 0) {
-      setImportError("No SELECT-required events found in this BEO.");
-      return;
+      const r = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!r.ok) {
+        const errText = await r.text();
+        throw new Error(`Gemini ${r.status}: ${errText.slice(0, 200)}`);
+      }
+
+      const d = await r.json();
+      if (d.error) throw new Error(d.error.message);
+      const t = d.candidates?.[0]?.content?.parts?.[0]?.text;
+      return json ? safeParseJson(t) : t;
+    } catch (e) { 
+      console.error('[Gemini] Error:', e);
+      return json ? {} : `AI Error: ${e.message}`; 
     }
+  };
 
     // 3. Map → your existing events shape
     const mapped = aiEvents.map((e) => ({
