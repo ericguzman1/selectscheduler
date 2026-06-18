@@ -279,27 +279,6 @@ export default function App() {
     }
   };
 
-    const r = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-
-    if (!r.ok) {
-      const errText = await r.text();
-      throw new Error(`Gemini ${r.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const d = await r.json();
-    if (d.error) throw new Error(d.error.message);
-    const t = d.candidates?.[0]?.content?.parts?.[0]?.text;
-    return json ? safeParseJson(t) : t;
-  } catch (e) { 
-    console.error('[Gemini] Error:', e);
-    return json ? {} : `AI Error: ${e.message}`; 
-  }
-};
-
   const generateLeadBriefing = async () => {
     if (!aiEnabled) return;
     setIsBriefingLoading(true);
