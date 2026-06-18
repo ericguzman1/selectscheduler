@@ -279,25 +279,6 @@ export default function App() {
     }
   };
 
-const fetchGemini = async (sys, usr = '', json = false) => {
-  if (!aiEnabled) return json ? {} : "AI Unavailable";
-  if (!GEMINI_API_KEY) return json ? {} : "AI Error: Missing REACT_APP_GEMINI_API_KEY in Vercel env vars.";
-  try {
-    const prompt = usr 
-      ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` 
-      : sys;
-
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const body = {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-        ...(json ? { responseMimeType: "application/json" } : {})
-      }
-    };
-
     const r = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
