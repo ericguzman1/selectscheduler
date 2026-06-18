@@ -653,6 +653,255 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
     } catch { showMsg("Save failed.", true); }
   };
 
+/* ======== ISSUES / TECH FEED PAGE ======== */
+function IssuesPage({ issues, showMsg, fetchGemini }) {
+  const [editingId, setEditingId] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const d = {
+      title: fd.get('title'),
+      device: fd.get('device'),
+      location: fd.get('location'),
+      urgency: fd.get('urgency') || 'Normal',
+      status: fd.get('status') || 'Open',
+      reporter: fd.get('reporter') || '',
+      notes: fd.get('notes') || '',
+      timestamp: new Date().toISOString(),
+    };
+    if (!d.title) { showMsg('Title required.', true); return; }
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues'), d);
+      e.target.reset();
+      showMsg('Issue logged.');
+    } catch { showMsg('Save failed.', true); }
+  };
+
+  const updateStatus = async (id, status) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id), { status });
+    showMsg(`Marked ${status}.`);
+  };
+
+  const del = async (id) => {
+    if (window.confirm('Delete this issue?')) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id));
+      showMsg('Deleted.');
+    }
+  };
+
+  const aiSuggest = async (issue) => {
+    setAiLoading(true);
+    const result = await fetchGemini(
+      'You are a senior IT/AV support engineer at Accenture NYIH. Given the issue below, provide a SHORT (3-5 bullet points) troubleshooting plan. Be specific about which steps to try first based on the device and symptom. Keep it actionable.',
+      `Title: ${issue.title}\nDevice: ${issue.device}\nLocation: ${issue.location}\nNotes: ${issue.notes}`
+    );
+    setAiLoading(false);
+    showMsg('AI suggestion ready.');
+    alert(result);
+  };
+
+  const urgencyColor = (u) => {
+    if (u === 'Urgent') return '#EF4444';
+    if (u === 'High') return '#F59E0B';
+    if (u === 'Low') return '#22C55E';
+    return '#6B6B8A';
+  };
+
+  const statusColor = (s) => {
+    if (s === 'Open') return '#EF4444';
+    if (s === 'In Progress') return '#F59E0B';
+    if (s === 'Resolved') return '#22C55E';
+    return '#6B6B8A';
+  };
+
+  return (
+    <div className="anim-in space-y-5">
+      <form onSubmit={handleAdd} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-3">
+          <BrainCircuit size={16} className="text-[#A100FF]" /> Log Tech Issue
+        </h2>
+        <div className="grid md:grid-cols-2 gap-3">
+          <input name="title" placeholder="Issue title *" required className={DK} />
+          <input name="device" placeholder="Device (e.g., Cyviz, Surface Hub)" className={DK} />
+          <input name="location" placeholder="Location / Room" className={DK} />
+          <select name="urgency" className={DK}>
+            <option value="Normal">Normal</option>
+            <option value="Low">Low</option>
+            <option value="High">High</option>
+            <option value="Urgent">Urgent</option>
+          </select>
+          <select name="status" className={DK}>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+          <input name="reporter" placeholder="Reporter (optional)" className={DK} />
+        </div>
+        <textarea name="notes" placeholder="Notes / symptoms..." rows="2" className={`w-full mt-3 resize-none ${DK}`} />
+        <button type="submit" className="mt-3 bg-[#A100FF] text-white font-bold py-3 px-6 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition">
+          Log Issue
+        </button>
+      </form>
+
+      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+        <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+          <AlertCircle size={16} className="text-[#A100FF]" /> Active Issues ({issues.length})
+        </h2>
+        {!issues.length && (
+          <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
+            No issues logged yet.
+          </div>
+        )}
+        <div className="space-y-3">
+          {issues.map(i => (
+            <div key={i.id} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-4 border-l-4" style={{ borderLeftColor: urgencyColor(i.urgency) }}>
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-white">{i.title}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase" style={{ background: `${urgencyColor(i.urgency)}20`, color: urgencyColor(i.urgency) }}>{i.urgency || 'Normal'}</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase" style={{ background: `${statusColor(i.status)}20`, color: statusColor(i.status) }}>{i.status || 'Open'}</span>
+                    {i.device && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#1A1A2E] text-[#6B6B8A]">{i.device}</span>}
+                    {i.location && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#1A1A2E] text-[#6B6B8A]">{i.location}</span>}
+                  </div>
+                </div>
+                <button onClick={() => del(i.id)} className="text-[#2A2A3E] hover:text-red-400 transition"><Trash2 size={14} /></button>
+              </div>
+              {i.notes && <p className="text-xs text-[#6B6B8A] mt-2">{i.notes}</p>}
+              {i.reporter && <p className="text-[10px] text-[#4A4A6A] mt-1">Reported by: {i.reporter}</p>}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {i.status !== 'In Progress' && (
+                  <button onClick={() => updateStatus(i.id, 'In Progress')} className="text-[10px] bg-[#1A1A2E] text-[#F59E0B] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">
+                    Mark In Progress
+                  </button>
+                )}
+                {i.status !== 'Resolved' && (
+                  <button onClick={() => updateStatus(i.id, 'Resolved')} className="text-[10px] bg-[#1A1A2E] text-[#22C55E] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">
+                    Mark Resolved
+                  </button>
+                )}
+                <button onClick={() => aiSuggest(i)} disabled={aiLoading} className="text-[10px] bg-[#A100FF]/10 text-[#A100FF] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#A100FF]/20 transition flex items-center gap-1 disabled:opacity-50">
+                  <Zap size={10} /> {aiLoading ? 'Thinking...' : 'AI Suggest Fix'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ======== ANALYTICS / INSIGHTS DASHBOARD ======== */
+function AnalyticsDashboard({ events, tasks }) {
+  const stats = useMemo(() => {
+    const totalAttendees = events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0);
+    const byClass = {};
+    const bySession = {};
+    const bySource = {};
+    const byRoom = {};
+    events.forEach(e => {
+      const c = e.classification || 'TBD';
+      const t = e.sessionType || 'Other';
+      const s = e.source || 'Manual';
+      const r = e.eventLocation || 'Unknown';
+      byClass[c] = (byClass[c] || 0) + 1;
+      bySession[t] = (bySession[t] || 0) + 1;
+      bySource[s] = (bySource[s] || 0) + 1;
+      byRoom[r] = (byRoom[r] || 0) + 1;
+    });
+    const taskByStatus = {
+      todo: tasks.filter(t => t.status === 'todo').length,
+      progress: tasks.filter(t => t.status === 'progress').length,
+      done: tasks.filter(t => t.status === 'done').length,
+    };
+    return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
+  }, [events, tasks]);
+
+  const Bar = ({ label, value, max, color }) => (
+    <div className="mb-2">
+      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1">
+        <span>{label}</span>
+        <span style={{ color }}>{value}</span>
+      </div>
+      <div className="h-2 bg-[#0D0D15] rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
+      </div>
+    </div>
+  );
+
+  const sortedClass = Object.entries(stats.byClass).sort((a, b) => b[1] - a[1]);
+  const sortedSession = Object.entries(stats.bySession).sort((a, b) => b[1] - a[1]);
+  const sortedRoom = Object.entries(stats.byRoom).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxClass = Math.max(...Object.values(stats.byClass), 1);
+  const maxSession = Math.max(...Object.values(stats.bySession), 1);
+  const maxRoom = Math.max(...Object.values(stats.byRoom), 1);
+
+  return (
+    <div className="anim-in space-y-5">
+      <div className="grid md:grid-cols-4 gap-3">
+        <StatCard icon={<ClipboardList size={16} />} value={events.length} label="Total Events" />
+        <StatCard icon={<Users size={16} />} value={stats.totalAttendees} label="Total Attendees" />
+        <StatCard icon={<Upload size={16} />} value={stats.bySource['Imported'] || 0} label="AI Imported" />
+        <StatCard icon={<TrendingUp size={16} />} value={tasks.length} label="Active Tasks" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <PieIcon size={14} className="text-[#A100FF]" /> Events by Classification
+          </h2>
+          {sortedClass.length ? sortedClass.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type
+          </h2>
+          {sortedSession.length ? sortedSession.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations
+          </h2>
+          {sortedRoom.length ? sortedRoom.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <Layout size={14} className="text-[#A100FF]" /> Task Pipeline
+          </h2>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.todo}</div>
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">To Do</div>
+            </div>
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.progress}</div>
+              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">In Progress</div>
+            </div>
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.done}</div>
+              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Done</div>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#4A4A6A] text-center mt-4">
+            {tasks.length ? `${Math.round((stats.taskByStatus.done / tasks.length) * 100)}% complete` : 'No tasks yet'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
   /* ============================================================
      BEO-AWARE SMART IMPORT
      Reads real Accenture Daily BEO format, extracts *SELECT Required
@@ -734,7 +983,7 @@ DOCUMENT FORMAT:
   where CLASSIFICATION is one of: INTERNAL, CLIENT VISIT, COMMUNITY, BUSINESS DEV, TRAINING, CLIENT PREP
 
 YOUR TASK:
-Extract ONLY the WRES blocks that contain "*SELECT Required". Ignore all TXA-only and Facilities-only blocks.
+Extract ANY event/block that mentions SELECT support, SELECT team, *SELECT, "SELECT Required", or lists SELECT-supported equipment like Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, microphones, clickers, signage, music, or loaner laptops. Be GENEROUS — when in doubt, include it. Only SKIP blocks that are explicitly marked as TXA-only or Facilities-only with NO SELECT equipment mentioned. If you find even ONE SELECT-related thing, include the event.
 
 For each *SELECT Required block, return a JSON object with these exact keys:
 - "eventName": The closest named event title if you can match one to this WRES block, otherwise "SELECT Support - Floor [number]"
@@ -754,6 +1003,9 @@ For each *SELECT Required block, return a JSON object with these exact keys:
 - "supportTeam": "NYIH SELECT"
 - "weekOf": "" 
 - "notes": ALL context — WRES ID, Host, S&E, all facilities/setup details, signage, furniture, catering, rope & stanchion, etc.
+
+If you cannot find ANY events at all, return an array with a single diagnostic object: 
+[{"eventName":"DEBUG - No SELECT events detected","notes":"Document had X chars. First 200 chars: <paste here>"}]
 
 Return ONLY a valid JSON array. No markdown fences, no explanation.
 Example: [{"eventName":"...","startDate":"2026-06-16T15:30", ...}]`;
