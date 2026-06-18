@@ -493,7 +493,7 @@ function KanbanPage({ tasks, showMsg }) {
   const handleAdd = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const d = { title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'), status: 'todo', timestamp: new Date().toISOString() };
+    const d = { title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'), status: 'backlog', timestamp: new Date().toISOString() };
     if (d.title) { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), d); e.target.reset(); showMsg("Task added."); }
   };
   const move = async (id, s) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), { status: s });
@@ -507,10 +507,10 @@ function KanbanPage({ tasks, showMsg }) {
     setEditingId(null); showMsg("Updated.");
   };
   const statuses = [
-    { key: 'todo', label: 'To Do', color: '#6B6B8A' },
-    { key: 'progress', label: 'In Progress', color: '#F59E0B' },
-    { key: 'done', label: 'Done', color: '#22C55E' },
-  ];
+    { key: 'backlog', label: 'Backlog', color: '#6B6B8A' },
+    { key: 'active', label: 'Active', color: '#F59E0B' },
+    { key: 'delivered', label: 'Delivered', color: '#22C55E' },
+];
 
   const renderCard = (t) => {
     if (editingId === t.id) return (
@@ -545,8 +545,8 @@ function KanbanPage({ tasks, showMsg }) {
         </div>
         <div className="flex justify-between opacity-0 group-hover:opacity-100 transition">
           <div className="flex gap-1">
-            {t.status !== 'todo' && <button onClick={() => move(t.id, t.status === 'done' ? 'progress' : 'todo')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronLeft size={12}/></button>}
-            {t.status !== 'done' && <button onClick={() => move(t.id, t.status === 'todo' ? 'progress' : 'done')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronRight size={12}/></button>}
+            {t.status !== 'backlog' && <button onClick={() => move(t.id, t.status === 'delivered' ? 'active' : 'backlog')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronLeft size={12}/></button>}
+            {t.status !== 'delivered' && <button onClick={() => move(t.id, t.status === 'backlog' ? 'active' : 'delivered')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronRight size={12}/></button>}
           </div>
           <button onClick={() => setEditingId(t.id)} className="text-[9px] text-[#A100FF] font-bold uppercase flex items-center gap-0.5"><Edit3 size={9}/> Edit</button>
         </div>
@@ -814,10 +814,10 @@ function AnalyticsDashboard({ events, tasks }) {
       byRoom[r] = (byRoom[r] || 0) + 1;
     });
     const taskByStatus = {
-      todo: tasks.filter(t => t.status === 'todo').length,
-      progress: tasks.filter(t => t.status === 'progress').length,
-      done: tasks.filter(t => t.status === 'done').length,
-    };
+  backlog: tasks.filter(t => t.status === 'backlog').length,
+  active: tasks.filter(t => t.status === 'active').length,
+  delivered: tasks.filter(t => t.status === 'delivered').length,
+};
     return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
   }, [events, tasks]);
 
@@ -883,20 +883,18 @@ function AnalyticsDashboard({ events, tasks }) {
           </h2>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.todo}</div>
-              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">To Do</div>
-            </div>
-            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.progress}</div>
-              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">In Progress</div>
-            </div>
-            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.done}</div>
-              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Done</div>
+              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.backlog}</div>
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">Backlog</div>
+              ...
+              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.active}</div>
+              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">Active</div>
+              ...
+              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.delivered}</div>
+              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Delivered</div>
             </div>
           </div>
           <p className="text-[10px] text-[#4A4A6A] text-center mt-4">
-            {tasks.length ? `${Math.round((stats.taskByStatus.done / tasks.length) * 100)}% complete` : 'No tasks yet'}
+            {tasks.length ? `${Math.round((stats.taskByStatus.delivered / tasks.length) * 100)}% complete` : 'No tasks yet'}
           </p>
         </div>
       </div>
@@ -1076,49 +1074,56 @@ function AnalyticsDashboard({ events, tasks }) {
       setAiLoading(true);
       setImportBanner(`Sending ${text.length.toLocaleString()} chars to AI for extraction...`);
 
-      const aiPrompt = `You are an expert at reading Accenture NYIH Daily BEO (Banquet Event Order) documents.
+      const aiPrompt = `You are reading an Accenture NYIH Daily BEO (Banquet Event Order).
+Today's date is in the header (e.g. "Thursday, June 18, 2026").
 
-DOCUMENT FORMAT:
-- Header line has the date, e.g. "DAILY BEO  Tuesday, June 16, 2026"
-- Events are grouped by floor: "FLOOR 59   2 EVENTS", "FLOOR 60 ..." etc.
-- Each block starts with a WRES ID like "WRES21413633"
-- Then "Host: name" and "S&E: name"
-- Then a support-type marker:
-    - A lightning bolt emoji followed by "SELECT" then "*SELECT Required" = needs SELECT team support
-    - A lightning bolt emoji followed by "TXA" then "*TXA Required" = needs TXA support (SKIP these)
-    - A building emoji followed by "FACILITIES" = facilities only (SKIP these)
-- After "*SELECT Required" there is usually: Time, POC name, and equipment needs (mics, surface hubs, signage, music, clickers, loaner laptops, etc.)
-- After the FACILITIES section there are setup details (catering tables, signage, rope & stanchion, chairs, etc.)
-- Named events appear as separate lines with format: "EventName  RoomNumber RoomName  StartTime - EndTime  CLASSIFICATION"
-  where CLASSIFICATION is one of: INTERNAL, CLIENT VISIT, COMMUNITY, BUSINESS DEV, TRAINING, CLIENT PREP
+IMPORTANT: PDF extraction may have stripped emoji icons. So instead of looking 
+for specific emoji, look for these TEXTUAL markers in the document:
+- "SELECT" (anywhere it appears)
+- "*SELECT Required" or "SELECT Required"  
+- Equipment keywords: Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, 
+  microphones, mics, clickers, signage, music, loaner laptops, web conference, 
+  teams call, MTR, Cisco
+- "TXA" markers indicate TXA-only blocks (SKIP these)
+- "FACILITIES" alone indicates facilities-only (SKIP unless SELECT is also present)
+
+EVENT BLOCK STRUCTURE:
+Each block looks roughly like:
+- A named event line: "EventName  RoomNumber RoomName  StartTime - EndTime  CLASSIFICATION"
+- "WRES" ID like "WRES21881931"  
+- "Host:" name
+- "S&E:" name
+- Support markers (SELECT, TXA, FACILITIES)
+- Equipment/POC details
 
 YOUR TASK:
-Extract ANY event/block that mentions SELECT support, SELECT team, *SELECT, "SELECT Required", or lists SELECT-supported equipment like Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, microphones, clickers, signage, music, or loaner laptops. Be GENEROUS — when in doubt, include it. Only SKIP blocks that are explicitly marked as TXA-only or Facilities-only with NO SELECT equipment mentioned. If you find even ONE SELECT-related thing, include the event.
+Extract ANY event block that has ANY indication of SELECT support OR mentions 
+ANY SELECT-supported equipment listed above. BE GENEROUS. When in doubt, INCLUDE the event.
 
-For each *SELECT Required block, return a JSON object with these exact keys:
-- "eventName": The closest named event title if you can match one to this WRES block, otherwise "SELECT Support - Floor [number]"
-- "startDate": Combine the BEO header date with the time from the *SELECT Required line. ISO format "YYYY-MM-DDTHH:mm". If no time, use the named event start time.
-- "endDate": If an end time is found (from "Event: 4 PM - 7 PM" or named event line), ISO format. Otherwise "".
-- "eventPoc": The POC name(s) from the *SELECT Required line
-- "selectPoc": "" (leave blank)
+For each qualifying event, return JSON with these keys:
+- "eventName": The named event title (e.g. "Foundation Day3 - additional MTG room")
+- "startDate": ISO format "YYYY-MM-DDTHH:mm" combining header date + event start time. 
+  Example: "2026-06-18T08:30"
+- "endDate": ISO format using event end time. Example: "2026-06-18T18:30"
+- "eventPoc": Host name or POC name
+- "selectPoc": "" (leave blank)  
 - "location": "NYIH"
-- "eventLocation": Room name from the nearby named event, or "Floor [number]"
-- "classification": From the named event line (e.g. "CLIENT VISIT", "INTERNAL") or "TBD"
-- "sessionType": Best guess (Demo, Meeting, Workshop, Town Hall, Other)
-- "attendees": Number of people if mentioned, otherwise ""
-- "demo": Tech/equipment from the *SELECT Required line (mics, surface hubs, music, etc.)
+- "eventLocation": Room name from the event line (e.g. "Dragonboat Suite", "Floor 59")
+- "classification": Match exactly what's in the doc (e.g. "Client", "Internal", "Community")
+  Map: "CLIENT VISIT" -> "Client", "INTERNAL" -> "Internal", "COMMUNITY" -> "Community"
+- "sessionType": Best guess: "Demo", "Meeting", "Workshop", "Town Hall", "Other"
+- "attendees": Number if mentioned, otherwise ""
+- "demo": Equipment/tech mentioned (mics, surface hubs, signage, music, etc.)
 - "selectResources": Same as demo
-- "sessionDays": Multi-day info if present, otherwise ""
-- "sessionSupportDuration": Estimate from times if possible, otherwise ""
+- "sessionSupportDuration": Calculate from start/end times if both present
 - "supportTeam": "NYIH SELECT"
-- "weekOf": "" 
-- "notes": ALL context — WRES ID, Host, S&E, all facilities/setup details, signage, furniture, catering, rope & stanchion, etc.
+- "notes": Include WRES ID, Host name, S&E name, and any other context
 
-If you cannot find ANY events at all, return an array with a single diagnostic object: 
-[{"eventName":"DEBUG - No SELECT events detected","notes":"Document had X chars. First 200 chars: <paste here>"}]
+Return ONLY a JSON array of qualifying events. No markdown fences. No explanation.
+If you find ZERO events with ANY SELECT relevance, return: []
 
-Return ONLY a valid JSON array. No markdown fences, no explanation.
-Example: [{"eventName":"...","startDate":"2026-06-16T15:30", ...}]`;
+Example output:
+[{"eventName":"Foundation Day3","startDate":"2026-06-18T08:30","endDate":"2026-06-18T18:30","eventPoc":"chisato.sug","selectPoc":"","location":"NYIH","eventLocation":"Dragonboat Suite","classification":"Client","sessionType":"Meeting","demo":"","notes":"WRES21881931 | Host: chisato.sug"}]`;
 
       console.log('[BEO Import] Sending to AI, text length:', text.length);
       const result = await fetchGemini(aiPrompt, text, false);
