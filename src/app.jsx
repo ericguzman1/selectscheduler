@@ -279,12 +279,6 @@ export default function App() {
     }
   };
 
-  
-  const showMsg = (text, isError = false) => {
-    setMessage({ text, isError });
-    setTimeout(() => setMessage({ text: '', isError: false }), 5000);
-  };
-
 const fetchGemini = async (sys, usr = '', json = false) => {
   if (!aiEnabled) return json ? {} : "AI Unavailable";
   if (!GEMINI_API_KEY) return json ? {} : "AI Error: Missing REACT_APP_GEMINI_API_KEY in Vercel env vars.";
