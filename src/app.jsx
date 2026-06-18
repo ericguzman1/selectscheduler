@@ -22,10 +22,6 @@ const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 // ============================================================
 
-/* --- PDF.js CDN Loader --- */
-const loadPdfJs = (() => {
-  let promise = null;
-
   const endpoint =
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
@@ -78,9 +74,10 @@ const loadPdfJs = (() => {
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
       s.onload = () => {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-  resolve(window.pdfjsLib);
-};
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        resolve(window.pdfjsLib);
+      };
       s.onerror = () => reject(new Error('Failed to load PDF.js'));
       document.head.appendChild(s);
     });
