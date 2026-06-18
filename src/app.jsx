@@ -279,36 +279,6 @@ export default function App() {
     }
   };
 
-    // 3. Map → your existing events shape
-    const mapped = aiEvents.map((e) => ({
-      id: crypto.randomUUID(),
-      eventName: e.eventName || "",
-      startDate: e.startDate || "",
-      endDate: e.endDate || "",
-      eventPOC: e.eventPOC || "",
-      selectPOC: e.selectPOC || "",
-      location: e.location || "",
-      nyihEventLocation: e.nyihEventLocation || "",
-      classification: e.classification || "",
-      sessionType: e.sessionType || "",
-      attendees: e.attendees || 0,
-      demos: e.demos || [],
-      resources: e.resources || [],
-      supportDuration: e.supportDuration || "",
-      notes: e.notes || "",
-      source: "BEO-AI-Import",
-      importedAt: new Date().toISOString()
-    }));
-
-    setEvents((prev) => [...prev, ...mapped]);
-    setImportSuccess(`✅ Imported ${mapped.length} SELECT event(s) from BEO.`);
-  } catch (err) {
-    console.error("BEO import failed:", err);
-    setImportError(err.message);
-  } finally {
-    setImporting(false);
-  }
-};
   
   const showMsg = (text, isError = false) => {
     setMessage({ text, isError });
@@ -317,7 +287,7 @@ export default function App() {
 
 const fetchGemini = async (sys, usr = '', json = false) => {
   if (!aiEnabled) return json ? {} : "AI Unavailable";
-  if (!GEMINI_API_KEY) return json ? {} : "AI Error: Missing VITE_GEMINI_API_KEY in Vercel env vars.";
+  if (!GEMINI_API_KEY) return json ? {} : "AI Error: Missing REACT_APP_GEMINI_API_KEY in Vercel env vars.";
   try {
     const prompt = usr 
       ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` 
