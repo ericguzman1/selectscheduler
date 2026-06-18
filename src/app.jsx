@@ -15,17 +15,16 @@ import {
   Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays,
 } from 'lucide-react';
 
-
-
 // ============================================================
 // 🧠 GEMINI AI CONFIG
 // ============================================================
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
-const GEMINI_API_KEY = import.meta.env.REACT_APP_GEMINI_API_KEY;
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 // ============================================================
 
 /* --- PDF.js CDN Loader --- */
-const loadPdfJs = (() => { ... })();  // keep as-is
+const loadPdfJs = (() => {
+  let promise = null;
 
   const endpoint =
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
