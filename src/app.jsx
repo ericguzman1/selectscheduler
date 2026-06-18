@@ -17,61 +17,17 @@ import {
 
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 // ============================================================
-// 🧠 GEMINI AI - BEO PARSER (inline, no separate file needed)
+// 🧠 GEMINI AI CONFIG
 // ============================================================
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY;
+// ============================================================
 
-const BEO_PROMPT = `You are an assistant that extracts SELECT-required event 
-details from Accenture BEO (Banquet Event Order) documents for the 1MW NYIH 
-Innovation Hub.
-
-Rules:
-- ONLY extract events that mention SELECT, Innovation Hub, NYIH, Cyviz, Proto, 
-  Hypervsn, Spot, Surface Hub, or other SELECT-supported tech.
-- If the BEO contains multiple events, return ALL qualifying ones.
-- Use ISO date format (YYYY-MM-DD) for dates, 24h (HH:MM) for times.
-- If a field is missing, return null — do NOT guess.
-- Classification: "Internal" | "Client" | "Partner" | "Public"
-- Session Type: "Briefing" | "Workshop" | "Demo" | "Tour" | "Event" | "Meeting" | "Other"
-
-Return ONLY valid JSON:
-{
-  "events": [
-    {
-      "eventName": string,
-      "startDate": string,
-      "endDate": string,
-      "startTime": string | null,
-      "endTime": string | null,
-      "eventPOC": string | null,
-      "selectPOC": string | null,
-      "location": string | null,
-      "nyihEventLocation": string | null,
-      "classification": string | null,
-      "sessionType": string | null,
-      "attendees": number | null,
-      "demos": string[],
-      "resources": string[],
-      "supportDuration": string | null,
-      "notes": string | null
-    }
-  ]
-}`;
-
-async function extractSelectEventsFromBEO(pdfText) {
-  if (!GEMINI_API_KEY) {
-    throw new Error(
-      "Missing GEMINI_API_KEY. Add it in Vercel → Settings → Environment Variables, then redeploy."
-    );
-  }
-  if (!pdfText || pdfText.trim().length < 20) {
-    throw new Error("PDF text is empty or too short to parse.");
-  }
+/* --- PDF.js CDN Loader --- */
+const loadPdfJs = (() => { ... })();  // keep as-is
 
   const endpoint =
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -298,9 +254,7 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState(null);
-  const [importSuccess, setImportSuccess] = useState(null);
+  
 
   useEffect(() => {
     if (!firebaseConfig.apiKey) { setLoading(false); return; }
@@ -322,10 +276,6 @@ export default function App() {
     return () => { u1(); u2(); u3(); };
   }, [user]);
 
-const handleBEOImport = async (file) => {
-  setImporting(true);
-  setImportError(null);
-  setImportSuccess(null);
 
   try {
     // 1. Extract text from PDF
@@ -386,20 +336,45 @@ const handleBEOImport = async (file) => {
     setTimeout(() => setMessage({ text: '', isError: false }), 5000);
   };
 
-  const fetchGemini = async (sys, usr = '', json = false) => {
-    if (!aiEnabled) return json ? {} : "AI Unavailable";
-    try {
-      const prompt = usr ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` : sys;
-      const r = await fetch('/api/ai', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: json ? { responseMimeType: "application/json" } : {} })
-      });
-      const d = await r.json();
-      if (d.error) throw new Error(d.error.message);
-      const t = d.candidates?.[0]?.content?.parts?.[0]?.text;
-      return json ? safeParseJson(t) : t;
-    } catch (e) { return json ? {} : `AI Error: ${e.message}`; }
-  };
+const fetchGemini = async (sys, usr = '', json = false) => {
+  if (!aiEnabled) return json ? {} : "AI Unavailable";
+  if (!GEMINI_API_KEY) return json ? {} : "AI Error: Missing VITE_GEMINI_API_KEY in Vercel env vars.";
+  try {
+    const prompt = usr 
+      ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` 
+      : sys;
+
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const body = {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        ...(json ? { responseMimeType: "application/json" } : {})
+      }
+    };
+
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!r.ok) {
+      const errText = await r.text();
+      throw new Error(`Gemini ${r.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const d = await r.json();
+    if (d.error) throw new Error(d.error.message);
+    const t = d.candidates?.[0]?.content?.parts?.[0]?.text;
+    return json ? safeParseJson(t) : t;
+  } catch (e) { 
+    console.error('[Gemini] Error:', e);
+    return json ? {} : `AI Error: ${e.message}`; 
+  }
+};
 
   const generateLeadBriefing = async () => {
     if (!aiEnabled) return;
@@ -1113,39 +1088,7 @@ Example: [{"eventName":"...","startDate":"2026-06-16T15:30", ...}]`;
               </div>
             </div>
           </div>
-<div style={{ margin: "1rem 0" }}>
-  <label
-    style={{
-      display: "inline-block",
-      padding: "0.6rem 1.2rem",
-      background: "#a100ff",
-      color: "#fff",
-      borderRadius: "6px",
-      cursor: importing ? "wait" : "pointer",
-      fontFamily: "Graphik, sans-serif",
-      opacity: importing ? 0.6 : 1
-    }}
-  >
-    {importing ? "🧠 Parsing with AI..." : "📥 Import BEO (PDF)"}
-    <input
-      type="file"
-      accept="application/pdf"
-      hidden
-      disabled={importing}
-      onChange={(e) => {
-        const f = e.target.files?.[0];
-        if (f) handleBEOImport(f);
-        e.target.value = ""; // allow re-importing same file
-      }}
-    />
-  </label>
-  {importError && (
-    <div style={{ color: "#ff5b5b", marginTop: "0.5rem" }}>⚠️ {importError}</div>
-  )}
-  {importSuccess && (
-    <div style={{ color: "#7CFC9C", marginTop: "0.5rem" }}>{importSuccess}</div>
-  )}
-</div>
+
           {/* ---- Event Cards ---- */}
           <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
             {!filteredEvents.length && (
