@@ -64,13 +64,17 @@ const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 }
 // ============================================================
 
+
 /* --- PDF.js CDN Loader --- */
 const loadPdfJs = (() => {
   let promise = null;
   return () => {
     if (promise) return promise;
     promise = new Promise((resolve, reject) => {
-      if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
+      if (window.pdfjsLib) {
+        resolve(window.pdfjsLib);
+        return;
+      }
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
       s.onload = () => {
