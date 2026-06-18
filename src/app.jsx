@@ -15,24 +15,15 @@ import {
   Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays,
 } from 'lucide-react';
 
-// ============================================================
-// 🧠 GEMINI AI CONFIG
-// ============================================================
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
-// ============================================================
 
-
-/* --- PDF.js CDN Loader --- */
 const loadPdfJs = (() => {
   let promise = null;
   return () => {
     if (promise) return promise;
     promise = new Promise((resolve, reject) => {
-      if (window.pdfjsLib) {
-        resolve(window.pdfjsLib);
-        return;
-      }
+      if (window.pdfjsLib) { resolve(window.pdfjsLib); return; }
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
       s.onload = () => {
@@ -60,7 +51,6 @@ const extractTextFromPdf = async (file) => {
   return pages.join('\n');
 };
 
-/* --- CONSTANTS --- */
 const TEAM_MEMBERS = ["Eric.Guzman","Tommy.Flinch","Donald.Salazar","Mistral.Rojas"];
 const ROOMS = ["Interchange","Vision","Tank","Training Room","Meadow","Common Grounds","Ginsberg","Globe","Office Tour"];
 const DURATION_OPTIONS = ["0.5 Hours","1 Hour","2 Hours","4 Hours","6 Hours","8 Hours","Full Day (10h)","Multi-Day (24h)"];
@@ -77,14 +67,8 @@ const QUICK_FILL_CARDS = [
   { name:'Signage', demo:'Signage only', sessionType:'Leadership', note:'Lobby signage' },
 ];
 
-const SELECT_HINTS = [
-  'select','tech enablement','cyviz','surface hub','proto','vu ai','spot',
-  'signage','web conference','loaner laptop','clicker','txa','support','music','mic','teams call',
-];
-
 const DK = 'bg-[#0D0D15] border border-[#2A2A3E] text-[#E8E8F0] rounded-xl p-3.5 text-sm outline-none focus:border-[#A100FF] transition placeholder-[#4A4A6A]';
 
-/* --- UTILITIES --- */
 const blankEventForm = () => ({
   eventName:'',startDate:'',endDate:'',eventPoc:'',selectPoc:'',location:'NYIH',
   eventLocation:'',classification:'Internal',sessionType:'Demo',attendees:'',demo:'',
@@ -120,43 +104,12 @@ const sanitizeEventData = (obj) => {
   return safe;
 };
 
-const normalizeLine = (s) => String(s||'').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').trim();
-
-const parseDateTime = (v) => {
-  const t = String(v||'').trim();
-  if (!t) return '';
-  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0,16);
-  const m = t.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s*(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (m) {
-    let [,mm,dd,yy,hh,mi,ap] = m;
-    const year = yy.length===2 ? `20${yy}` : yy;
-    let hour = parseInt(hh,10);
-    if (ap.toUpperCase()==='PM' && hour!==12) hour+=12;
-    if (ap.toUpperCase()==='AM' && hour===12) hour=0;
-    return `${year}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}T${String(hour).padStart(2,'0')}:${mi}`;
-  }
-  const d = new Date(t);
-  if (!Number.isNaN(d.getTime())) return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  return '';
-};
-
 const weekOfFromDateTime = (v) => {
   if (!v) return '';
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '';
   const x = new Date(d); x.setDate(x.getDate()-x.getDay());
   return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10);
-};
-
-const scoreSelectRelevance = (e) => {
-  const hay = [e.eventName,e.eventPoc,e.selectPoc,e.location,e.eventLocation,e.classification,e.sessionType,e.attendees,e.demo,e.selectResources,e.sessionSupportDuration,e.notes,e.supportTeam].join(' ').toLowerCase();
-  let score = 0;
-  SELECT_HINTS.forEach((k) => { if (hay.includes(k)) score+=1; });
-  if ((e.selectResources||'').trim()) score+=2;
-  if ((e.demo||'').trim() && !['n/a','tbd'].includes((e.demo||'').trim().toLowerCase())) score+=2;
-  if ((e.eventName||'').toLowerCase().includes('workshop')) score+=1;
-  if ((e.location||'').toLowerCase().includes('nyih')) score+=1;
-  return score;
 };
 
 const classBadgeColor = (cls) => {
@@ -166,7 +119,6 @@ const classBadgeColor = (cls) => {
   return '#6B6B8A';
 };
 
-/* --- FIREBASE --- */
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
 let firebaseConfig = {};
 if (typeof __firebase_config !== 'undefined' && __firebase_config) {
@@ -187,7 +139,6 @@ const app = getApps().length===0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-/* --- STAT CARD --- */
 function StatCard({ icon, value, label }) {
   return (
     <div className="rounded-xl p-4 bg-[#0D0D15] border border-[#2A2A3E] hover:border-[#A100FF] transition">
@@ -198,7 +149,845 @@ function StatCard({ icon, value, label }) {
   );
 }
 
-/* ======== MAIN APP ======== */
+function NavBtn({ a, o, l, i }) {
+  return (
+    <button onClick={o} className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition flex items-center gap-1.5 ${a ? 'bg-[#A100FF] text-white shadow-lg shadow-[#A100FF]/20' : 'bg-[#1A1A2E] text-[#6B6B8A] hover:bg-[#2A2A3E] hover:text-white'}`}>
+      {i} {l}
+    </button>
+  );
+}
+
+function AuthPage({ showMsg }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const submit = async (e) => {
+    e.preventDefault();
+    const { email, password } = Object.fromEntries(new FormData(e.target));
+    try {
+      if (isLogin) await signInWithEmailAndPassword(auth, email, password);
+      else await createUserWithEmailAndPassword(auth, email, password);
+    } catch (err) { showMsg(err.message, true); }
+  };
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0F] p-4">
+      <div className="w-full max-w-sm bg-[#111119] p-8 rounded-2xl border border-[#2A2A3E] text-center">
+        <div className="w-14 h-14 bg-[#A100FF] rounded-xl flex items-center justify-center mx-auto mb-5">
+          <Layout size={24} className="text-white" />
+        </div>
+        <h1 className="text-2xl font-black text-white mb-1"><span className="text-[#A100FF]">SELECT</span> Hub</h1>
+        <p className="text-[10px] text-[#6B6B8A] font-bold uppercase tracking-[.2em] mb-6">Powered by Accenture</p>
+        <form onSubmit={submit} className="space-y-3">
+          <input name="email" type="email" placeholder="Email" required className={`w-full ${DK}`} />
+          <input name="password" type="password" placeholder="Password" required className={`w-full ${DK}`} />
+          <button type="submit" className={`w-full font-bold py-3 rounded-xl text-sm uppercase tracking-wider transition ${isLogin ? 'bg-[#A100FF] text-white hover:bg-[#B733FF]' : 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]'}`}>
+            {isLogin ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
+        <button onClick={() => setIsLogin(!isLogin)} className="mt-5 text-[11px] text-[#6B6B8A] hover:text-[#A100FF] font-bold uppercase tracking-wider transition">
+          {isLogin ? 'Create Account' : 'Back to Sign In'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CalendarView({ events }) {
+  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const year = month.getFullYear();
+  const mo = month.getMonth();
+  const firstDay = new Date(year, mo, 1).getDay();
+  const daysInMonth = new Date(year, mo + 1, 0).getDate();
+  const prevDays = new Date(year, mo, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push({ day: prevDays - firstDay + 1 + i, cur: false });
+  for (let i = 1; i <= daysInMonth; i++) cells.push({ day: i, cur: true });
+  const rem = 42 - cells.length;
+  for (let i = 1; i <= rem; i++) cells.push({ day: i, cur: false });
+
+  const getEventsForDay = (day) => {
+    const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    return events.filter((e) => {
+      const sd = (e.startDate || '').slice(0, 10);
+      const ed = (e.endDate || '').slice(0, 10);
+      return (sd <= ds && (ed >= ds || sd === ds));
+    });
+  };
+  const moNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  return (
+    <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5 anim-in">
+      <div className="flex justify-between items-center mb-5">
+        <button onClick={() => setMonth(new Date(year, mo - 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronLeft size={16}/></button>
+        <h2 className="text-lg font-black text-white">{moNames[mo]} {year}</h2>
+        <button onClick={() => setMonth(new Date(year, mo + 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronRight size={16}/></button>
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-[#2A2A3E] rounded-xl overflow-hidden">
+        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
+          <div key={d} className="bg-[#0D0D15] py-2.5 text-center text-[10px] font-bold text-[#6B6B8A] uppercase tracking-wider">{d}</div>
+        ))}
+        {cells.map((c, idx) => {
+          const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(c.day).padStart(2,'0')}`;
+          const isToday = c.cur && ds === todayStr;
+          const dayEvents = c.cur ? getEventsForDay(c.day) : [];
+          return (
+            <div key={idx} className={`bg-[#0D0D15] min-h-[100px] p-1.5 ${!c.cur ? 'opacity-25' : ''} ${isToday ? 'ring-2 ring-inset ring-[#A100FF]' : ''}`}>
+              <span className={`text-[11px] font-bold block mb-0.5 ${isToday ? 'text-[#A100FF]' : c.cur ? 'text-[#9B9BB0]' : 'text-[#4A4A6A]'}`}>{c.day}</span>
+              <div className="space-y-0.5 overflow-hidden max-h-[65px]">
+                {dayEvents.slice(0, 3).map((ev, i) => (
+                  <div key={i} className="text-[8px] font-bold truncate px-1.5 py-0.5 rounded" style={{ background: `${classBadgeColor(ev.classification)}22`, color: classBadgeColor(ev.classification) }}>
+                    {ev.eventName}
+                  </div>
+                ))}
+                {dayEvents.length > 3 && <div className="text-[8px] text-[#6B6B8A] font-bold pl-1">+{dayEvents.length - 3} more</div>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function KanbanPage({ tasks, showMsg }) {
+  const [editingId, setEditingId] = useState(null);
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const d = { title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'), status: 'todo', timestamp: new Date().toISOString() };
+    if (d.title) { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), d); e.target.reset(); showMsg("Task added."); }
+  };
+  const move = async (id, s) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), { status: s });
+  const del = async (id) => { if (window.confirm("Delete task?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)); showMsg("Deleted."); } };
+  const saveEdit = async (e, id) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), {
+      title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'),
+    });
+    setEditingId(null); showMsg("Updated.");
+  };
+  const statuses = [
+    { key: 'todo', label: 'To Do', color: '#6B6B8A' },
+    { key: 'doing', label: 'Doing', color: '#F59E0B' },
+    { key: 'complete', label: 'Complete', color: '#22C55E' },
+  ];
+
+  const renderCard = (t) => {
+    if (editingId === t.id) return (
+      <form key={t.id} onSubmit={(e) => saveEdit(e, t.id)} className="bg-[#0D0D15] border border-[#A100FF] rounded-xl p-3 space-y-2 anim-in">
+        <input name="t" defaultValue={t.title} required className={`w-full text-xs ${DK}`} />
+        <textarea name="det" defaultValue={t.details} placeholder="Notes..." rows="2" className={`w-full text-xs resize-none ${DK}`} />
+        <div className="grid grid-cols-2 gap-2">
+          <select name="a" defaultValue={t.assignee} className={`text-xs ${DK}`}>
+            <option value="">Assign...</option>
+            {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <input name="du" defaultValue={t.timeSpent} placeholder="Hours" className={`text-xs ${DK}`} />
+        </div>
+        <input name="d" type="date" defaultValue={t.dueDate} className={`w-full text-xs ${DK}`} />
+        <div className="flex gap-2">
+          <button type="submit" className="flex-1 bg-[#A100FF] text-white text-[10px] font-bold py-1.5 rounded-lg uppercase">Save</button>
+          <button type="button" onClick={() => setEditingId(null)} className="flex-1 bg-[#1A1A2E] text-[#6B6B8A] text-[10px] font-bold py-1.5 rounded-lg uppercase">Cancel</button>
+        </div>
+      </form>
+    );
+    return (
+      <div key={t.id} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3.5 group hover:border-[#A100FF]/40 transition">
+        <div className="flex justify-between items-start mb-2">
+          <p className="text-xs font-bold text-white leading-snug">{t.title}</p>
+          <button onClick={() => del(t.id)} className="text-[#2A2A3E] group-hover:text-red-400 transition"><Trash2 size={12}/></button>
+        </div>
+        {t.details && <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{t.details}</p>}
+        <div className="bg-[#111119] rounded-lg p-2 space-y-1 text-[9px] font-bold text-[#6B6B8A] mb-2">
+          <div className="flex items-center gap-1"><User size={9} className="text-[#A100FF]"/> {t.assignee || 'Unassigned'}</div>
+          {t.dueDate && <div className="flex items-center gap-1"><CalendarDays size={9}/> {t.dueDate}</div>}
+          {t.timeSpent && <div className="flex items-center gap-1"><Clock size={9}/> {t.timeSpent}</div>}
+        </div>
+        <div className="flex justify-between opacity-0 group-hover:opacity-100 transition">
+          <div className="flex gap-1">
+            {t.status !== 'todo' && <button onClick={() => move(t.id, t.status === 'complete' ? 'doing' : 'todo')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronLeft size={12}/></button>}
+            {t.status !== 'complete' && <button onClick={() => move(t.id, t.status === 'todo' ? 'doing' : 'complete')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronRight size={12}/></button>}
+          </div>
+          <button onClick={() => setEditingId(t.id)} className="text-[9px] text-[#A100FF] font-bold uppercase flex items-center gap-0.5"><Edit3 size={9}/> Edit</button>
+        </div>
+      </div>
+    );
+  };
+
+  const filterByStatus = (t, key) => {
+    const s = String(t.status || 'todo').toLowerCase().replace(/[\s-_]+/g, '');
+    const map = { todo: 'todo', backlog: 'todo', '': 'todo',
+                  doing: 'doing', active: 'doing', progress: 'doing', inprogress: 'doing',
+                  complete: 'complete', done: 'complete', delivered: 'complete', completed: 'complete' };
+    return (map[s] || s) === key;
+  };
+
+  return (
+    <div className="anim-in space-y-5">
+      <form onSubmit={handleAdd} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
+        <div className="grid md:grid-cols-5 gap-3">
+          <input name="t" placeholder="Task title..." required className={`md:col-span-2 ${DK}`} />
+          <select name="a" className={DK}><option value="">Assign...</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select>
+          <input name="d" type="date" className={DK} />
+          <button type="submit" className="bg-[#A100FF] text-white font-bold py-3 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition">Add</button>
+        </div>
+        <div className="grid md:grid-cols-2 gap-3 mt-3">
+          <input name="du" placeholder="Time spent (hrs)" className={DK} />
+          <input name="det" placeholder="Quick notes..." className={DK} />
+        </div>
+      </form>
+      <div className="grid md:grid-cols-3 gap-4">
+        {statuses.map(({ key, label, color }) => (
+          <div key={key} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4 min-h-[400px]">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color }}>{label}</h3>
+              <span className="text-[10px] font-bold bg-[#0D0D15] border border-[#2A2A3E] px-2 py-0.5 rounded" style={{ color }}>{tasks.filter(t => filterByStatus(t, key)).length}</span>
+            </div>
+            <div className="space-y-3">{tasks.filter(t => filterByStatus(t, key)).map(renderCard)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
+  const [aiLoading, setAiLoading] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [formData, setFormData] = useState(blankEventForm());
+  const [beoText, setBeoText] = useState('');
+  const [importBanner, setImportBanner] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [classificationFilter, setClassificationFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const fileRef = useRef(null);
+
+  const totalStats = useMemo(() => ({
+    events: events.length,
+    imported: events.filter((e) => e.source === 'Imported').length,
+    attendees: events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0),
+    high: events.filter((e) => ['Leadership', 'Client'].includes(e.classification)).length,
+  }), [events]);
+
+  const filteredEvents = useMemo(() => events.filter((e) => {
+    const h = [e.eventName, e.eventPoc, e.selectPoc, e.demo, e.eventLocation, e.selectResources, e.notes, e.supportTeam, e.source, e.classification].join(' ').toLowerCase();
+    return (!searchTerm || h.includes(searchTerm.toLowerCase())) && (!classificationFilter || e.classification === classificationFilter) && (!sourceFilter || (e.source || 'Manual') === sourceFilter);
+  }), [events, searchTerm, classificationFilter, sourceFilter]);
+
+  const updateField = (key, value) => setFormData((p) => ({
+    ...p,
+    [key]: value,
+    ...(key === 'startDate' && !p.weekOf ? { weekOf: weekOfFromDateTime(value) } : {}),
+  }));
+  const resetForm = () => { setEditingId(null); setFormData(blankEventForm()); };
+
+  const openFullIntel = (e) => {
+    const c = `Event: ${e.eventName || ''}\nWRES: ${e.notes?.match?.(/WRES\d+/)?.[0] || ''}\nStart: ${e.startDate || ''}\nEnd: ${e.endDate || ''}\nPOC: ${e.eventPoc || ''}\nSELECT POC: ${e.selectPoc || ''}\nLocation: ${e.location || 'NYIH'}\nRoom: ${e.eventLocation || ''}\nClassification: ${e.classification || ''}\nType: ${e.sessionType || ''}\nAttendees: ${e.attendees || ''}\nDemo/Equipment: ${e.demo || ''}\nResources: ${e.selectResources || ''}\nNotes: ${e.notes || ''}`;
+    setModal({ title: "Event Details", content: c, actionLabel: "Copy", action: () => { navigator.clipboard.writeText(c); showMsg("Copied."); } });
+  };
+
+  const startEdit = (e) => {
+    setEditingId(e.id);
+    setFormData({
+      eventName: e.eventName || '', startDate: e.startDate || '', endDate: e.endDate || '',
+      eventPoc: e.eventPoc || '', selectPoc: e.selectPoc || '', location: e.location || 'NYIH',
+      eventLocation: e.eventLocation || '', classification: e.classification || 'Internal',
+      sessionType: e.sessionType || 'Demo', attendees: e.attendees || '', demo: e.demo || '',
+      selectResources: e.selectResources || '', sessionDays: e.sessionDays || '',
+      sessionSupportDuration: e.sessionSupportDuration || '', supportTeam: e.supportTeam || 'NYIH SELECT',
+      weekOf: e.weekOf || '', notes: e.notes || '', source: e.source || 'Manual',
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCommit = async (e) => {
+    e.preventDefault();
+    const d = sanitizeEventData({
+      ...formData,
+      source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
+      weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
+    });
+    if (!d.eventName || !d.eventPoc) { showMsg("Event name and POC required.", true); return; }
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
+        setEditingId(null);
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...d, timestamp: new Date().toISOString() });
+      }
+      resetForm();
+      showMsg("Event saved.");
+    } catch { showMsg("Save failed.", true); }
+  };
+
+  const handleSmartImport = async () => {
+    try {
+      let text = beoText || '';
+      const file = fileRef.current?.files?.[0];
+
+      if (!text.trim() && file) {
+        try {
+          setPdfLoading(true);
+          setImportBanner('Reading file...');
+          if (file.name.toLowerCase().endsWith('.pdf')) {
+            text = await extractTextFromPdf(file);
+          } else {
+            text = await new Promise((ok, no) => {
+              const reader = new FileReader();
+              reader.onload = () => ok(String(reader.result || ''));
+              reader.onerror = (err) => no(new Error('FileReader failed: ' + err));
+              reader.readAsText(file);
+            });
+          }
+          setPdfLoading(false);
+          setBeoText(text);
+        } catch (err) {
+          setPdfLoading(false);
+          setImportBanner(`File read failed: ${err.message}`);
+          showMsg(`Could not read file: ${err.message}`, true);
+          return;
+        }
+      }
+
+      if (!text.trim()) {
+        showMsg('Upload a PDF or paste BEO text first.', true);
+        setImportBanner('No text to process.');
+        return;
+      }
+
+      if (text.trim().length < 50) {
+        showMsg('Text too short. PDF may be image-based.', true);
+        setImportBanner('Extracted text was too short.');
+        return;
+      }
+
+      setAiLoading(true);
+      setImportBanner(`Sending ${text.length.toLocaleString()} chars to AI...`);
+
+      const aiPrompt = `You are reading an Accenture NYIH Daily BEO (Banquet Event Order). 
+Today's date is in the header (e.g. "Thursday, June 18, 2026").
+
+PDF extraction strips emoji icons. Look for these TEXTUAL markers:
+- "SELECT" (anywhere it appears)
+- "*SELECT Required" or "SELECT Required"
+- Equipment: Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, mics, microphones, 
+  clickers, signage, music, loaner laptops, web conference, teams call, MTR, Cisco
+- "TXA" = TXA-only (SKIP)
+- "FACILITIES" alone = facilities-only (SKIP unless SELECT also present)
+
+Extract ANY event block with SELECT support or SELECT-supported equipment. BE GENEROUS.
+
+For each qualifying event, return JSON with these keys:
+- "eventName": Named event title
+- "startDate": ISO "YYYY-MM-DDTHH:mm" using header date + start time
+- "endDate": ISO format end time
+- "eventPoc": Host or POC name
+- "selectPoc": ""
+- "location": "NYIH"
+- "eventLocation": Room name or "Floor [number]"
+- "classification": Map "CLIENT VISIT"->"Client", "INTERNAL"->"Internal", "COMMUNITY"->"Community"
+- "sessionType": "Demo" | "Meeting" | "Workshop" | "Town Hall" | "Other"
+- "attendees": Number if mentioned, else ""
+- "demo": Equipment mentioned
+- "selectResources": Same as demo
+- "supportTeam": "NYIH SELECT"
+- "notes": Include WRES ID, Host, S&E, all context
+
+Return ONLY a JSON array. No markdown fences. No explanation.
+If zero qualifying events found, return: []`;
+
+      const result = await fetchGemini(aiPrompt, text, false);
+
+      if (!result) {
+        setAiLoading(false);
+        setImportBanner('AI returned empty response.');
+        showMsg('AI returned no response.', true);
+        return;
+      }
+
+      if (typeof result === 'string' && result.startsWith('AI Error:')) {
+        setAiLoading(false);
+        setImportBanner(result);
+        showMsg(result, true);
+        return;
+      }
+
+      let parsed = [];
+      try {
+        const cleaned = String(result).replace(/```json|```/g, '').trim();
+        const obj = JSON.parse(cleaned);
+        parsed = Array.isArray(obj) ? obj : [obj];
+      } catch {
+        try {
+          const m = String(result).match(/\[[\s\S]*\]/);
+          if (m) parsed = JSON.parse(m[0]);
+        } catch {}
+      }
+
+      parsed = parsed.filter(e => e && typeof e === 'object' && (e.eventName || e.eventPoc || e.demo));
+
+      if (!parsed.length) {
+        setAiLoading(false);
+        setImportBanner(`No SELECT events found in this BEO.`);
+        showMsg('No SELECT events detected.', true);
+        return;
+      }
+
+      let saved = 0;
+      let skipped = 0;
+      for (const raw of parsed) {
+        const evt = {
+          ...blankEventForm(),
+          ...Object.fromEntries(
+            ALLOWED_EVENT_KEYS.filter(k => raw[k] !== undefined && raw[k] !== null)
+              .map(k => [k, String(raw[k] || '').slice(0, 500)])
+          ),
+          source: 'Imported',
+          supportTeam: raw.supportTeam || 'NYIH SELECT',
+          location: raw.location || 'NYIH',
+          weekOf: weekOfFromDateTime(raw.startDate),
+        };
+
+        const isDupe = events.some(x =>
+          x.eventName === evt.eventName &&
+          x.startDate === evt.startDate &&
+          x.eventLocation === evt.eventLocation
+        );
+        if (isDupe) { skipped++; continue; }
+
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
+          ...sanitizeEventData(evt),
+          timestamp: new Date().toISOString(),
+        });
+        saved++;
+      }
+
+      setImportBanner(`Found ${parsed.length} event(s) • ${saved} saved${skipped > 0 ? ` • ${skipped} duplicate(s) skipped` : ''}`);
+      setAiLoading(false);
+      if (saved > 0) {
+        setBeoText('');
+        if (fileRef.current) fileRef.current.value = '';
+      }
+      showMsg(saved > 0 ? `Imported ${saved} event(s).` : 'No new events to import.');
+
+    } catch (outerErr) {
+      setPdfLoading(false);
+      setAiLoading(false);
+      setImportBanner(`Error: ${outerErr.message}`);
+      showMsg(`Import failed: ${outerErr.message}`, true);
+    }
+  };
+
+  return (
+    <div className="space-y-5 anim-in">
+      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]"/> Smart BEO Import</h2>
+        <p className="text-[11px] text-[#6B6B8A] mb-4">Upload a Daily BEO PDF or paste the text. AI extracts <span className="text-[#A100FF] font-bold">SELECT</span> events.</p>
+
+        {importBanner && (
+          <div className="bg-[#A100FF]/10 border border-[#A100FF]/30 rounded-xl p-3 text-xs text-[#C0C0D8] font-bold mb-4 flex items-center gap-2">
+            {aiLoading ? <RefreshCcw size={13} className="animate-spin text-[#A100FF]"/> : <CheckCircle2 size={13} className="text-[#A100FF]"/>}
+            {importBanner}
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-[1fr,auto] gap-4 items-end">
+          <div className="space-y-3">
+            <textarea
+              value={beoText}
+              onChange={(e) => setBeoText(e.target.value)}
+              className={`w-full h-32 resize-none text-xs font-mono ${DK}`}
+              placeholder="Paste BEO text here... or upload a PDF below"
+            />
+            <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.json" className={`w-full text-xs ${DK}`} />
+          </div>
+          <button
+            onClick={handleSmartImport}
+            disabled={aiLoading || pdfLoading}
+            className="bg-[#A100FF] text-white px-8 py-4 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-[#B733FF] transition disabled:opacity-50 flex items-center gap-2 h-fit whitespace-nowrap"
+          >
+            {pdfLoading ? (<><RefreshCcw size={14} className="animate-spin"/> Reading...</>) : aiLoading ? (<><BrainCircuit size={14} className="animate-spin"/> Extracting...</>) : (<><Zap size={14}/> Import SELECT</>)}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-[1.2fr,.8fr] gap-5">
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2"><ClipboardList size={16} className="text-[#A100FF]"/> {editingId ? 'Edit Event' : 'New Event'}</h2>
+              <p className="text-[11px] text-[#6B6B8A] mt-0.5">{editingId ? 'Editing event' : 'Add manually or import above'}</p>
+            </div>
+            <div className="flex gap-1.5 flex-wrap">
+              {['Demo','Client','Leadership','Workshop'].map(t => (
+                <button key={t} type="button" onClick={() => updateField('sessionType', t)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${formData.sessionType === t ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {QUICK_FILL_CARDS.map(c => (
+              <button key={c.name} type="button" onClick={() => setFormData(p => ({...p, demo: c.demo, sessionType: c.sessionType}))}
+                className="text-left p-3 rounded-xl bg-[#0D0D15] border border-[#2A2A3E] hover:border-[#A100FF]/50 transition">
+                <div className="text-[11px] font-bold text-white">{c.name}</div>
+                <div className="text-[9px] text-[#6B6B8A]">{c.note}</div>
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleCommit} className="space-y-3">
+            <div className="grid md:grid-cols-2 gap-3">
+              <input value={formData.eventName} onChange={e => updateField('eventName', e.target.value)} placeholder="Event Name *" required className={DK} />
+              <input value={formData.eventPoc} onChange={e => updateField('eventPoc', e.target.value)} placeholder="Event POC *" required className={DK} />
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase">Start<input value={formData.startDate} onChange={e => updateField('startDate', e.target.value)} type="datetime-local" required className={`w-full mt-1 ${DK}`} /></div>
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase">End<input value={formData.endDate} onChange={e => updateField('endDate', e.target.value)} type="datetime-local" required className={`w-full mt-1 ${DK}`} /></div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <select value={formData.selectPoc} onChange={e => updateField('selectPoc', e.target.value)} className={DK}><option value="">SELECT Lead...</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select>
+              <select value={formData.eventLocation} onChange={e => updateField('eventLocation', e.target.value)} className={DK}><option value="">Room...</option>{ROOMS.map(r => <option key={r} value={r}>{r}</option>)}</select>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <select value={formData.classification} onChange={e => updateField('classification', e.target.value)} className={DK}>{CLASSIFICATIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+              <select value={formData.sessionType} onChange={e => updateField('sessionType', e.target.value)} className={DK}>{SESSION_TYPES.map(s => <option key={s} value={s}>{s}</option>)}</select>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <input value={formData.attendees} onChange={e => updateField('attendees', e.target.value)} placeholder="Attendees" className={DK} />
+              <input value={formData.demo} onChange={e => updateField('demo', e.target.value)} placeholder="Demo / Equipment" className={DK} />
+            </div>
+            <input value={formData.selectResources} onChange={e => updateField('selectResources', e.target.value)} placeholder="SELECT Resources" className={`w-full ${DK}`} />
+            <div className="grid md:grid-cols-2 gap-3">
+              <input value={formData.sessionDays} onChange={e => updateField('sessionDays', e.target.value)} placeholder="Session Days" className={DK} />
+              <select value={formData.sessionSupportDuration} onChange={e => updateField('sessionSupportDuration', e.target.value)} className={DK}><option value="">Duration...</option>{DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}</select>
+            </div>
+            <div className="grid md:grid-cols-2 gap-3">
+              <select value={formData.supportTeam} onChange={e => updateField('supportTeam', e.target.value)} className={DK}>{SUPPORT_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}</select>
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase">Week Of<input value={formData.weekOf} onChange={e => updateField('weekOf', e.target.value)} type="date" className={`w-full mt-1 ${DK}`} /></div>
+            </div>
+            <textarea value={formData.notes} onChange={e => updateField('notes', e.target.value)} placeholder="Notes..." rows="3" className={`w-full resize-none ${DK}`} />
+            <div className="flex gap-2">
+              <button type="submit" className={`flex-1 font-bold py-3 rounded-xl text-sm uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>{editingId ? 'Update Event' : 'Save Event'}</button>
+              {editingId && <button type="button" onClick={resetForm} className="px-5 bg-[#1A1A2E] text-[#6B6B8A] font-bold py-3 rounded-xl text-sm uppercase hover:text-white transition flex items-center gap-1"><RefreshCcw size={13}/> Cancel</button>}
+            </div>
+          </form>
+        </div>
+
+        <div className="space-y-5">
+          <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><BarChart3 size={14} className="text-[#A100FF]"/> Stats</h2>
+            <div className="grid grid-cols-2 gap-2.5">
+              <StatCard icon={<ClipboardList size={16}/>} value={totalStats.events} label="Events"/>
+              <StatCard icon={<Upload size={16}/>} value={totalStats.imported} label="Imported"/>
+              <StatCard icon={<Users size={16}/>} value={totalStats.attendees} label="Attendees"/>
+              <StatCard icon={<TrendingUp size={16}/>} value={totalStats.high} label="High Priority"/>
+            </div>
+          </div>
+
+          <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><Search size={14} className="text-[#A100FF]"/> Event Queue</h2>
+            <div className="space-y-2.5 mb-3">
+              <div className="flex items-center gap-2 rounded-xl bg-[#0D0D15] border border-[#2A2A3E] p-2.5 focus-within:border-[#A100FF] transition">
+                <Search size={13} className="text-[#4A4A6A]"/>
+                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="w-full bg-transparent outline-none text-sm text-[#E8E8F0] placeholder-[#4A4A6A]"/>
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                <select value={classificationFilter} onChange={e => setClassificationFilter(e.target.value)} className={`flex-1 min-w-[140px] text-xs ${DK}`}><option value="">All types</option>{CLASSIFICATIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                {['','Imported','Manual'].map(s => (
+                  <button key={s || 'all'} onClick={() => setSourceFilter(s)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${sourceFilter === s ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>{s || 'All'}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
+            {!filteredEvents.length && (
+              <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
+                No events yet.
+              </div>
+            )}
+            {filteredEvents.map(entry => {
+              const bc = classBadgeColor(entry.classification);
+              return (
+                <div key={entry.id} className="bg-[#111119] p-4 rounded-xl border border-[#2A2A3E] hover:border-[#A100FF]/40 transition group border-l-4" style={{ borderLeftColor: editingId === entry.id ? '#A3E635' : bc }}>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 pr-3">
+                      <p className="text-xs font-bold text-white mb-1.5">{entry.eventName}</p>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${bc}20`, color: bc }}>{entry.classification || 'TBD'}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.sessionType || 'Session'}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.source || 'Manual'}</span>
+                      </div>
+                      <div className="space-y-0.5 text-[10px] text-[#6B6B8A]">
+                        <p className="flex items-center gap-1"><CalendarDays size={9}/> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
+                        <p className="flex items-center gap-1"><User size={9}/> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
+                        <p className="flex items-center gap-1"><MapPin size={9}/> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room'}</p>
+                      </div>
+                      {(entry.demo || entry.selectResources) && (
+                        <p className="text-[10px] text-[#A100FF] mt-1.5 line-clamp-1">Equipment: {entry.demo || entry.selectResources || '—'}</p>
+                      )}
+                      {entry.notes && <p className="text-[10px] text-[#4A4A6A] mt-1 line-clamp-2">{entry.notes}</p>}
+                      <div className="flex gap-3 mt-2.5">
+                        <button onClick={() => startEdit(entry)} className="text-[10px] text-[#A100FF] font-bold uppercase flex items-center gap-1 hover:text-[#B733FF] transition"><Edit3 size={10}/> Edit</button>
+                        <button onClick={() => openFullIntel(entry)} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-white transition"><FileText size={10}/> Details</button>
+                        <button onClick={async () => { if (window.confirm("Delete this event?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); showMsg("Event deleted."); } }} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-red-400 transition"><Trash2 size={10}/> Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IssuesPage({ issues, showMsg, fetchGemini }) {
+  const [aiLoading, setAiLoading] = useState(false);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const d = {
+      title: fd.get('title'),
+      device: fd.get('device'),
+      location: fd.get('location'),
+      urgency: fd.get('urgency') || 'Normal',
+      status: fd.get('status') || 'Open',
+      reporter: fd.get('reporter') || '',
+      notes: fd.get('notes') || '',
+      timestamp: new Date().toISOString(),
+    };
+    if (!d.title) { showMsg('Title required.', true); return; }
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues'), d);
+      e.target.reset();
+      showMsg('Issue logged.');
+    } catch { showMsg('Save failed.', true); }
+  };
+
+  const updateStatus = async (id, status) => {
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id), { status });
+    showMsg(`Marked ${status}.`);
+  };
+
+  const del = async (id) => {
+    if (window.confirm('Delete this issue?')) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id));
+      showMsg('Deleted.');
+    }
+  };
+
+  const aiSuggest = async (issue) => {
+    setAiLoading(true);
+    const result = await fetchGemini(
+      'You are a senior IT/AV support engineer at Accenture NYIH. Provide a SHORT (3-5 bullets) troubleshooting plan.',
+      `Title: ${issue.title}\nDevice: ${issue.device}\nLocation: ${issue.location}\nNotes: ${issue.notes}`
+    );
+    setAiLoading(false);
+    showMsg('AI suggestion ready.');
+    alert(result);
+  };
+
+  const urgencyColor = (u) => u === 'Urgent' ? '#EF4444' : u === 'High' ? '#F59E0B' : u === 'Low' ? '#22C55E' : '#6B6B8A';
+  const statusColor = (s) => s === 'Open' ? '#EF4444' : s === 'In Progress' ? '#F59E0B' : s === 'Resolved' ? '#22C55E' : '#6B6B8A';
+
+  return (
+    <div className="anim-in space-y-5">
+      <form onSubmit={handleAdd} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-3">
+          <BrainCircuit size={16} className="text-[#A100FF]" /> Log Tech Issue
+        </h2>
+        <div className="grid md:grid-cols-2 gap-3">
+          <input name="title" placeholder="Issue title *" required className={DK} />
+          <input name="device" placeholder="Device" className={DK} />
+          <input name="location" placeholder="Location / Room" className={DK} />
+          <select name="urgency" className={DK}>
+            <option value="Normal">Normal</option>
+            <option value="Low">Low</option>
+            <option value="High">High</option>
+            <option value="Urgent">Urgent</option>
+          </select>
+          <select name="status" className={DK}>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+          <input name="reporter" placeholder="Reporter (optional)" className={DK} />
+        </div>
+        <textarea name="notes" placeholder="Notes / symptoms..." rows="2" className={`w-full mt-3 resize-none ${DK}`} />
+        <button type="submit" className="mt-3 bg-[#A100FF] text-white font-bold py-3 px-6 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition">
+          Log Issue
+        </button>
+      </form>
+
+      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+        <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+          <AlertCircle size={16} className="text-[#A100FF]" /> Active Issues ({issues.length})
+        </h2>
+        {!issues.length && (
+          <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
+            No issues logged yet.
+          </div>
+        )}
+        <div className="space-y-3">
+          {issues.map(i => (
+            <div key={i.id} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-4 border-l-4" style={{ borderLeftColor: urgencyColor(i.urgency) }}>
+              <div className="flex justify-between items-start mb-2">
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-white">{i.title}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase" style={{ background: `${urgencyColor(i.urgency)}20`, color: urgencyColor(i.urgency) }}>{i.urgency || 'Normal'}</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase" style={{ background: `${statusColor(i.status)}20`, color: statusColor(i.status) }}>{i.status || 'Open'}</span>
+                    {i.device && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#1A1A2E] text-[#6B6B8A]">{i.device}</span>}
+                    {i.location && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#1A1A2E] text-[#6B6B8A]">{i.location}</span>}
+                  </div>
+                </div>
+                <button onClick={() => del(i.id)} className="text-[#2A2A3E] hover:text-red-400 transition"><Trash2 size={14} /></button>
+              </div>
+              {i.notes && <p className="text-xs text-[#6B6B8A] mt-2">{i.notes}</p>}
+              {i.reporter && <p className="text-[10px] text-[#4A4A6A] mt-1">Reported by: {i.reporter}</p>}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {i.status !== 'In Progress' && (
+                  <button onClick={() => updateStatus(i.id, 'In Progress')} className="text-[10px] bg-[#1A1A2E] text-[#F59E0B] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">Mark In Progress</button>
+                )}
+                {i.status !== 'Resolved' && (
+                  <button onClick={() => updateStatus(i.id, 'Resolved')} className="text-[10px] bg-[#1A1A2E] text-[#22C55E] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">Mark Resolved</button>
+                )}
+                <button onClick={() => aiSuggest(i)} disabled={aiLoading} className="text-[10px] bg-[#A100FF]/10 text-[#A100FF] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#A100FF]/20 transition flex items-center gap-1 disabled:opacity-50">
+                  <Zap size={10} /> {aiLoading ? 'Thinking...' : 'AI Suggest Fix'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsDashboard({ events, tasks }) {
+  const stats = useMemo(() => {
+    const totalAttendees = events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0);
+    const byClass = {};
+    const bySession = {};
+    const bySource = {};
+    const byRoom = {};
+    events.forEach(e => {
+      const c = e.classification || 'TBD';
+      const t = e.sessionType || 'Other';
+      const s = e.source || 'Manual';
+      const r = e.eventLocation || 'Unknown';
+      byClass[c] = (byClass[c] || 0) + 1;
+      bySession[t] = (bySession[t] || 0) + 1;
+      bySource[s] = (bySource[s] || 0) + 1;
+      byRoom[r] = (byRoom[r] || 0) + 1;
+    });
+    const norm = (t) => {
+      const s = String(t.status || 'todo').toLowerCase().replace(/[\s-_]+/g, '');
+      const map = { todo: 'todo', backlog: 'todo', '': 'todo',
+                    doing: 'doing', active: 'doing', progress: 'doing', inprogress: 'doing',
+                    complete: 'complete', done: 'complete', delivered: 'complete', completed: 'complete' };
+      return map[s] || s;
+    };
+    const taskByStatus = {
+      todo: tasks.filter(t => norm(t) === 'todo').length,
+      doing: tasks.filter(t => norm(t) === 'doing').length,
+      complete: tasks.filter(t => norm(t) === 'complete').length,
+    };
+    return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
+  }, [events, tasks]);
+
+  const Bar = ({ label, value, max, color }) => (
+    <div className="mb-2">
+      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1">
+        <span>{label}</span>
+        <span style={{ color }}>{value}</span>
+      </div>
+      <div className="h-2 bg-[#0D0D15] rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
+      </div>
+    </div>
+  );
+
+  const sortedClass = Object.entries(stats.byClass).sort((a, b) => b[1] - a[1]);
+  const sortedSession = Object.entries(stats.bySession).sort((a, b) => b[1] - a[1]);
+  const sortedRoom = Object.entries(stats.byRoom).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maxClass = Math.max(...Object.values(stats.byClass), 1);
+  const maxSession = Math.max(...Object.values(stats.bySession), 1);
+  const maxRoom = Math.max(...Object.values(stats.byRoom), 1);
+
+  return (
+    <div className="anim-in space-y-5">
+      <div className="grid md:grid-cols-4 gap-3">
+        <StatCard icon={<ClipboardList size={16} />} value={events.length} label="Total Events" />
+        <StatCard icon={<Users size={16} />} value={stats.totalAttendees} label="Total Attendees" />
+        <StatCard icon={<Upload size={16} />} value={stats.bySource['Imported'] || 0} label="AI Imported" />
+        <StatCard icon={<TrendingUp size={16} />} value={tasks.length} label="Active Tasks" />
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <PieIcon size={14} className="text-[#A100FF]" /> Events by Classification
+          </h2>
+          {sortedClass.length ? sortedClass.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type
+          </h2>
+          {sortedSession.length ? sortedSession.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations
+          </h2>
+          {sortedRoom.length ? sortedRoom.map(([k, v]) => (
+            <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />
+          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
+            <Layout size={14} className="text-[#A100FF]" /> Task Pipeline
+          </h2>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.todo}</div>
+              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">To Do</div>
+            </div>
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.doing}</div>
+              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">Doing</div>
+            </div>
+            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
+              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.complete}</div>
+              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Complete</div>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#4A4A6A] text-center mt-4">
+            {tasks.length ? `${Math.round((stats.taskByStatus.complete / tasks.length) * 100)}% complete` : 'No tasks yet'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -210,7 +999,6 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
-  
 
   useEffect(() => {
     if (!firebaseConfig.apiKey) { setLoading(false); return; }
@@ -239,16 +1027,10 @@ export default function App() {
 
   const fetchGemini = async (sys, usr = '', json = false) => {
     if (!aiEnabled) return json ? {} : "AI Unavailable";
-    if (!GEMINI_API_KEY) {
-      return json ? {} : "AI Error: Missing REACT_APP_GEMINI_API_KEY in Vercel env vars.";
-    }
+    if (!GEMINI_API_KEY) return json ? {} : "AI Error: Missing REACT_APP_GEMINI_API_KEY in Vercel env vars.";
     try {
-      const prompt = usr 
-        ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` 
-        : sys;
-
+      const prompt = usr ? `${sys}\n\n---USER DATA---\n${sanitizeForPrompt(usr)}\n---END---` : sys;
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
       const body = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
@@ -257,25 +1039,22 @@ export default function App() {
           ...(json ? { responseMimeType: "application/json" } : {})
         }
       };
-
       const r = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-
       if (!r.ok) {
         const errText = await r.text();
         throw new Error(`Gemini ${r.status}: ${errText.slice(0, 200)}`);
       }
-
       const d = await r.json();
       if (d.error) throw new Error(d.error.message);
       const t = d.candidates?.[0]?.content?.parts?.[0]?.text;
       return json ? safeParseJson(t) : t;
-    } catch (e) { 
+    } catch (e) {
       console.error('[Gemini] Error:', e);
-      return json ? {} : `AI Error: ${e.message}`; 
+      return json ? {} : `AI Error: ${e.message}`;
     }
   };
 
@@ -285,7 +1064,7 @@ export default function App() {
     const ec = events.slice(0,3).map((e) => e.eventName).join(', ');
     const bc = issues.filter((i) => i.urgency === 'Urgent').map((i) => i.title).join(', ');
     const briefing = await fetchGemini(
-      'Act as an Accenture PM. Provide exactly TWO high-impact bullet points for leadership update reflecting what the team did, what event was supported, what technology was used, and the outcome.',
+      'Act as an Accenture PM. Provide exactly TWO high-impact bullet points for leadership update.',
       `Events: ${ec}. Blockers: ${bc}.`
     );
     setModal({ title: "Leadership Brief", content: briefing, actionLabel: "Copy", action: () => { navigator.clipboard.writeText(briefing); showMsg("Copied."); } });
@@ -383,1017 +1162,5 @@ export default function App() {
         )}
       </div>
     </>
-  );
-}
-
-function NavBtn({ a, o, l, i }) {
-  return (
-    <button onClick={o} className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition flex items-center gap-1.5 ${a ? 'bg-[#A100FF] text-white shadow-lg shadow-[#A100FF]/20' : 'bg-[#1A1A2E] text-[#6B6B8A] hover:bg-[#2A2A3E] hover:text-white'}`}>
-      {i} {l}
-    </button>
-  );
-}
-
-function AuthPage({ showMsg }) {
-  const [isLogin, setIsLogin] = useState(true);
-  const submit = async (e) => {
-    e.preventDefault();
-    const { email, password } = Object.fromEntries(new FormData(e.target));
-    try {
-      if (isLogin) await signInWithEmailAndPassword(auth, email, password);
-      else await createUserWithEmailAndPassword(auth, email, password);
-    } catch (err) { showMsg(err.message, true); }
-  };
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0A0A0F] p-4">
-      <div className="w-full max-w-sm bg-[#111119] p-8 rounded-2xl border border-[#2A2A3E] text-center">
-        <div className="w-14 h-14 bg-[#A100FF] rounded-xl flex items-center justify-center mx-auto mb-5">
-          <Layout size={24} className="text-white" />
-        </div>
-        <h1 className="text-2xl font-black text-white mb-1"><span className="text-[#A100FF]">SELECT</span> Hub</h1>
-        <p className="text-[10px] text-[#6B6B8A] font-bold uppercase tracking-[.2em] mb-6">Powered by Accenture</p>
-        <form onSubmit={submit} className="space-y-3">
-          <input name="email" type="email" placeholder="Email" required className={`w-full ${DK}`} />
-          <input name="password" type="password" placeholder="Password" required className={`w-full ${DK}`} />
-          <button type="submit" className={`w-full font-bold py-3 rounded-xl text-sm uppercase tracking-wider transition ${isLogin ? 'bg-[#A100FF] text-white hover:bg-[#B733FF]' : 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]'}`}>
-            {isLogin ? 'Sign In' : 'Create Account'}
-          </button>
-        </form>
-        <button onClick={() => setIsLogin(!isLogin)} className="mt-5 text-[11px] text-[#6B6B8A] hover:text-[#A100FF] font-bold uppercase tracking-wider transition">
-          {isLogin ? 'Create Account' : 'Back to Sign In'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ======== CALENDAR VIEW ======== */
-function CalendarView({ events }) {
-  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-  const year = month.getFullYear();
-  const mo = month.getMonth();
-  const firstDay = new Date(year, mo, 1).getDay();
-  const daysInMonth = new Date(year, mo + 1, 0).getDate();
-  const prevDays = new Date(year, mo, 0).getDate();
-  const cells = [];
-  for (let i = 0; i < firstDay; i++) cells.push({ day: prevDays - firstDay + 1 + i, cur: false });
-  for (let i = 1; i <= daysInMonth; i++) cells.push({ day: i, cur: true });
-  const rem = 42 - cells.length;
-  for (let i = 1; i <= rem; i++) cells.push({ day: i, cur: false });
-
-  const getEventsForDay = (day) => {
-    const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    return events.filter((e) => {
-      const sd = (e.startDate || '').slice(0, 10);
-      const ed = (e.endDate || '').slice(0, 10);
-      return (sd <= ds && (ed >= ds || sd === ds));
-    });
-  };
-  const moNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
-  return (
-    <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5 anim-in">
-      <div className="flex justify-between items-center mb-5">
-        <button onClick={() => setMonth(new Date(year, mo - 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronLeft size={16}/></button>
-        <h2 className="text-lg font-black text-white">{moNames[mo]} {year}</h2>
-        <button onClick={() => setMonth(new Date(year, mo + 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronRight size={16}/></button>
-      </div>
-      <div className="grid grid-cols-7 gap-px bg-[#2A2A3E] rounded-xl overflow-hidden">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
-          <div key={d} className="bg-[#0D0D15] py-2.5 text-center text-[10px] font-bold text-[#6B6B8A] uppercase tracking-wider">{d}</div>
-        ))}
-        {cells.map((c, idx) => {
-          const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(c.day).padStart(2,'0')}`;
-          const isToday = c.cur && ds === todayStr;
-          const dayEvents = c.cur ? getEventsForDay(c.day) : [];
-          return (
-            <div key={idx} className={`bg-[#0D0D15] min-h-[100px] p-1.5 ${!c.cur ? 'opacity-25' : ''} ${isToday ? 'ring-2 ring-inset ring-[#A100FF]' : ''}`}>
-              <span className={`text-[11px] font-bold block mb-0.5 ${isToday ? 'text-[#A100FF]' : c.cur ? 'text-[#9B9BB0]' : 'text-[#4A4A6A]'}`}>{c.day}</span>
-              <div className="space-y-0.5 overflow-hidden max-h-[65px]">
-                {dayEvents.slice(0, 3).map((ev, i) => (
-                  <div key={i} className="text-[8px] font-bold truncate px-1.5 py-0.5 rounded" style={{ background: `${classBadgeColor(ev.classification)}22`, color: classBadgeColor(ev.classification) }}>
-                    {ev.eventName}
-                  </div>
-                ))}
-                {dayEvents.length > 3 && <div className="text-[8px] text-[#6B6B8A] font-bold pl-1">+{dayEvents.length - 3} more</div>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/* ======== KANBAN / TASK BOARD ======== */
-function KanbanPage({ tasks, showMsg }) {
-  const [editingId, setEditingId] = useState(null);
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const d = { title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'), status: 'todo', timestamp: new Date().toISOString() };
-    if (d.title) { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), d); e.target.reset(); showMsg("Task added."); }
-  };
-  const move = async (id, s) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), { status: s });
-  const del = async (id) => { if (window.confirm("Delete task?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)); showMsg("Deleted."); } };
-  const saveEdit = async (e, id) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), {
-      title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'),
-    });
-    setEditingId(null); showMsg("Updated.");
-  };
-  const statuses = [
-    { key: 'todo', label: 'To Do', color: '#6B6B8A' },
-    { key: 'doing', label: 'Doing', color: '#F59E0B' },
-    { key: 'complete', label: 'Complete', color: '#22C55E' },
-];
-
-  const renderCard = (t) => {
-    if (editingId === t.id) return (
-      <form key={t.id} onSubmit={(e) => saveEdit(e, t.id)} className="bg-[#0D0D15] border border-[#A100FF] rounded-xl p-3 space-y-2 anim-in">
-        <input name="t" defaultValue={t.title} required className={`w-full text-xs ${DK}`} />
-        <textarea name="det" defaultValue={t.details} placeholder="Notes..." rows="2" className={`w-full text-xs resize-none ${DK}`} />
-        <div className="grid grid-cols-2 gap-2">
-          <select name="a" defaultValue={t.assignee} className={`text-xs ${DK}`}>
-            <option value="">Assign...</option>
-            {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <input name="du" defaultValue={t.timeSpent} placeholder="Hours" className={`text-xs ${DK}`} />
-        </div>
-        <input name="d" type="date" defaultValue={t.dueDate} className={`w-full text-xs ${DK}`} />
-        <div className="flex gap-2">
-          <button type="submit" className="flex-1 bg-[#A100FF] text-white text-[10px] font-bold py-1.5 rounded-lg uppercase">Save</button>
-          <button type="button" onClick={() => setEditingId(null)} className="flex-1 bg-[#1A1A2E] text-[#6B6B8A] text-[10px] font-bold py-1.5 rounded-lg uppercase">Cancel</button>
-        </div>
-      </form>
-    );
-    return (
-      <div key={t.id} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3.5 group hover:border-[#A100FF]/40 transition">
-        <div className="flex justify-between items-start mb-2">
-          <p className="text-xs font-bold text-white leading-snug">{t.title}</p>
-          <button onClick={() => del(t.id)} className="text-[#2A2A3E] group-hover:text-red-400 transition"><Trash2 size={12}/></button>
-        </div>
-        {t.details && <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{t.details}</p>}
-        <div className="bg-[#111119] rounded-lg p-2 space-y-1 text-[9px] font-bold text-[#6B6B8A] mb-2">
-          <div className="flex items-center gap-1"><User size={9} className="text-[#A100FF]"/> {t.assignee || 'Unassigned'}</div>
-          {t.dueDate && <div className="flex items-center gap-1"><CalendarDays size={9}/> {t.dueDate}</div>}
-          {t.timeSpent && <div className="flex items-center gap-1"><Clock size={9}/> {t.timeSpent}</div>}
-        </div>
-        <div className="flex justify-between opacity-0 group-hover:opacity-100 transition">
-          <div className="flex gap-1">
-            {t.status !== 'backlog' && <button onClick={() => move(t.id, t.status === 'complete' ? 'doing' : 'todo')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronLeft size={12}/></button>}
-            {t.status !== 'delivered' && <button onClick={() => move(t.id, t.status === 'todo' ? 'doing' : 'complete')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronRight size={12}/></button>}
-          </div>
-          <button onClick={() => setEditingId(t.id)} className="text-[9px] text-[#A100FF] font-bold uppercase flex items-center gap-0.5"><Edit3 size={9}/> Edit</button>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="anim-in space-y-5">
-      <form onSubmit={handleAdd} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
-        <div className="grid md:grid-cols-5 gap-3">
-          <input name="t" placeholder="Task title..." required className={`md:col-span-2 ${DK}`} />
-          <select name="a" className={DK}><option value="">Assign...</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select>
-          <input name="d" type="date" className={DK} />
-          <button type="submit" className="bg-[#A100FF] text-white font-bold py-3 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition">Add</button>
-        </div>
-        <div className="grid md:grid-cols-2 gap-3 mt-3">
-          <input name="du" placeholder="Time spent (hrs)" className={DK} />
-          <input name="det" placeholder="Quick notes..." className={DK} />
-        </div>
-      </form>
-      <div className="grid md:grid-cols-3 gap-4">
-        {statuses.map(({ key, label, color }) => (
-          <div key={key} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4 min-h-[400px]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color }}>{label}</h3>
-              <span className="text-[10px] font-bold bg-[#0D0D15] border border-[#2A2A3E] px-2 py-0.5 rounded" style={{ color }}>{tasks.filter(t => t.status === key).length}</span>
-            </div>
-            <div className="space-y-3">{tasks.filter(t => t.status === key).map(renderCard)}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-/* ======== SCHEDULE PAGE v3 — BEO-Aware AI Import ======== */
-function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
-  const [aiLoading, setAiLoading] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState(blankEventForm());
-  const [beoText, setBeoText] = useState('');
-  const [importBanner, setImportBanner] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [classificationFilter, setClassificationFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState('');
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const fileRef = useRef(null);
-
-  const totalStats = useMemo(() => ({
-    events: events.length,
-    imported: events.filter((e) => e.source === 'Imported').length,
-    attendees: events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0),
-    high: events.filter((e) => ['Leadership', 'Client'].includes(e.classification)).length,
-  }), [events]);
-
-  const filteredEvents = useMemo(() => events.filter((e) => {
-    const h = [e.eventName, e.eventPoc, e.selectPoc, e.demo, e.eventLocation, e.selectResources, e.notes, e.supportTeam, e.source, e.classification].join(' ').toLowerCase();
-    return (!searchTerm || h.includes(searchTerm.toLowerCase())) && (!classificationFilter || e.classification === classificationFilter) && (!sourceFilter || (e.source || 'Manual') === sourceFilter);
-  }), [events, searchTerm, classificationFilter, sourceFilter]);
-
-  const updateField = (key, value) => setFormData((p) => ({
-    ...p,
-    [key]: value,
-    ...(key === 'startDate' && !p.weekOf ? { weekOf: weekOfFromDateTime(value) } : {}),
-  }));
-  const resetForm = () => { setEditingId(null); setFormData(blankEventForm()); };
-
-  const openFullIntel = (e) => {
-    const c = `Event: ${e.eventName || ''}\nWRES: ${e.notes?.match?.(/WRES\d+/)?.[0] || ''}\nStart: ${e.startDate || ''}\nEnd: ${e.endDate || ''}\nPOC: ${e.eventPoc || ''}\nSELECT POC: ${e.selectPoc || ''}\nLocation: ${e.location || 'NYIH'}\nRoom: ${e.eventLocation || ''}\nClassification: ${e.classification || ''}\nType: ${e.sessionType || ''}\nAttendees: ${e.attendees || ''}\nDemo/Equipment: ${e.demo || ''}\nResources: ${e.selectResources || ''}\nDays: ${e.sessionDays || ''}\nDuration: ${e.sessionSupportDuration || ''}\nTeam: ${e.supportTeam || ''}\nWeek Of: ${e.weekOf || ''}\nNotes: ${e.notes || ''}`;
-    setModal({ title: "Event Details", content: c, actionLabel: "Copy", action: () => { navigator.clipboard.writeText(c); showMsg("Copied."); } });
-  };
-
-  const startEdit = (e) => {
-    setEditingId(e.id);
-    setFormData({
-      eventName: e.eventName || '', startDate: e.startDate || '', endDate: e.endDate || '',
-      eventPoc: e.eventPoc || '', selectPoc: e.selectPoc || '', location: e.location || 'NYIH',
-      eventLocation: e.eventLocation || '', classification: e.classification || 'Internal',
-      sessionType: e.sessionType || 'Demo', attendees: e.attendees || '', demo: e.demo || '',
-      selectResources: e.selectResources || '', sessionDays: e.sessionDays || '',
-      sessionSupportDuration: e.sessionSupportDuration || '', supportTeam: e.supportTeam || 'NYIH SELECT',
-      weekOf: e.weekOf || '', notes: e.notes || '', source: e.source || 'Manual',
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleCommit = async (e) => {
-    e.preventDefault();
-    const d = sanitizeEventData({
-      ...formData,
-      source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
-      weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
-    });
-    if (!d.eventName || !d.eventPoc) { showMsg("Event name and POC required.", true); return; }
-    try {
-      if (editingId) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
-        setEditingId(null);
-      } else {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...d, timestamp: new Date().toISOString() });
-      }
-      resetForm();
-      showMsg("Event saved.");
-    } catch { showMsg("Save failed.", true); }
-  };
-
-
-
-/* ======== ISSUES / TECH FEED PAGE ======== */
-function IssuesPage({ issues, showMsg, fetchGemini }) {
-  const [aiLoading, setAiLoading] = useState(false);
-
-  const handleAdd = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const d = {
-      title: fd.get('title'),
-      device: fd.get('device'),
-      location: fd.get('location'),
-      urgency: fd.get('urgency') || 'Normal',
-      status: fd.get('status') || 'Open',
-      reporter: fd.get('reporter') || '',
-      notes: fd.get('notes') || '',
-      timestamp: new Date().toISOString(),
-    };
-    if (!d.title) { showMsg('Title required.', true); return; }
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_issues'), d);
-      e.target.reset();
-      showMsg('Issue logged.');
-    } catch { showMsg('Save failed.', true); }
-  };
-
-  const updateStatus = async (id, status) => {
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id), { status });
-    showMsg(`Marked ${status}.`);
-  };
-
-  const del = async (id) => {
-    if (window.confirm('Delete this issue?')) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_issues', id));
-      showMsg('Deleted.');
-    }
-  };
-
-  const aiSuggest = async (issue) => {
-    setAiLoading(true);
-    const result = await fetchGemini(
-      'You are a senior IT/AV support engineer at Accenture NYIH. Given the issue below, provide a SHORT (3-5 bullets) troubleshooting plan.',
-      `Title: ${issue.title}\nDevice: ${issue.device}\nLocation: ${issue.location}\nNotes: ${issue.notes}`
-    );
-    setAiLoading(false);
-    showMsg('AI suggestion ready.');
-    alert(result);
-  };
-
-  const urgencyColor = (u) => u === 'Urgent' ? '#EF4444' : u === 'High' ? '#F59E0B' : u === 'Low' ? '#22C55E' : '#6B6B8A';
-  const statusColor = (s) => s === 'Open' ? '#EF4444' : s === 'In Progress' ? '#F59E0B' : s === 'Resolved' ? '#22C55E' : '#6B6B8A';
-
-  return (
-    <div className="anim-in space-y-5">
-      <form onSubmit={handleAdd} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-3">
-          <BrainCircuit size={16} className="text-[#A100FF]" /> Log Tech Issue
-        </h2>
-        <div className="grid md:grid-cols-2 gap-3">
-          <input name="title" placeholder="Issue title *" required className={DK} />
-          <input name="device" placeholder="Device (e.g., Cyviz, Surface Hub)" className={DK} />
-          <input name="location" placeholder="Location / Room" className={DK} />
-          <select name="urgency" className={DK}>
-            <option value="Normal">Normal</option>
-            <option value="Low">Low</option>
-            <option value="High">High</option>
-            <option value="Urgent">Urgent</option>
-          </select>
-          <select name="status" className={DK}>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-          </select>
-          <input name="reporter" placeholder="Reporter (optional)" className={DK} />
-        </div>
-        <textarea name="notes" placeholder="Notes / symptoms..." rows="2" className={`w-full mt-3 resize-none ${DK}`} />
-        <button type="submit" className="mt-3 bg-[#A100FF] text-white font-bold py-3 px-6 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition">
-          Log Issue
-        </button>
-      </form>
-
-      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <h2 className="text-base font-bold text-white mb-4 flex items-center gap-2">
-          <AlertCircle size={16} className="text-[#A100FF]" /> Active Issues ({issues.length})
-        </h2>
-        {!issues.length && (
-          <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
-            No issues logged yet.
-          </div>
-        )}
-        <div className="space-y-3">
-          {issues.map(i => (
-            <div key={i.id} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-4 border-l-4" style={{ borderLeftColor: urgencyColor(i.urgency) }}>
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-white">{i.title}</p>
-                  <div className="flex flex-wrap gap-1 mt-1.5">
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase" style={{ background: `${urgencyColor(i.urgency)}20`, color: urgencyColor(i.urgency) }}>{i.urgency || 'Normal'}</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase" style={{ background: `${statusColor(i.status)}20`, color: statusColor(i.status) }}>{i.status || 'Open'}</span>
-                    {i.device && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#1A1A2E] text-[#6B6B8A]">{i.device}</span>}
-                    {i.location && <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-[#1A1A2E] text-[#6B6B8A]">{i.location}</span>}
-                  </div>
-                </div>
-                <button onClick={() => del(i.id)} className="text-[#2A2A3E] hover:text-red-400 transition"><Trash2 size={14} /></button>
-              </div>
-              {i.notes && <p className="text-xs text-[#6B6B8A] mt-2">{i.notes}</p>}
-              {i.reporter && <p className="text-[10px] text-[#4A4A6A] mt-1">Reported by: {i.reporter}</p>}
-              <div className="flex flex-wrap gap-2 mt-3">
-                {i.status !== 'In Progress' && (
-                  <button onClick={() => updateStatus(i.id, 'In Progress')} className="text-[10px] bg-[#1A1A2E] text-[#F59E0B] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">
-                    Mark In Progress
-                  </button>
-                )}
-                {i.status !== 'Resolved' && (
-                  <button onClick={() => updateStatus(i.id, 'Resolved')} className="text-[10px] bg-[#1A1A2E] text-[#22C55E] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">
-                    Mark Resolved
-                  </button>
-                )}
-                <button onClick={() => aiSuggest(i)} disabled={aiLoading} className="text-[10px] bg-[#A100FF]/10 text-[#A100FF] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#A100FF]/20 transition flex items-center gap-1 disabled:opacity-50">
-                  <Zap size={10} /> {aiLoading ? 'Thinking...' : 'AI Suggest Fix'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ======== ANALYTICS / INSIGHTS DASHBOARD ======== */
-function AnalyticsDashboard({ events, tasks }) {
-  const stats = useMemo(() => {
-    const totalAttendees = events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0);
-    const byClass = {};
-    const bySession = {};
-    const bySource = {};
-    const byRoom = {};
-    events.forEach(e => {
-      const c = e.classification || 'TBD';
-      const t = e.sessionType || 'Other';
-      const s = e.source || 'Manual';
-      const r = e.eventLocation || 'Unknown';
-      byClass[c] = (byClass[c] || 0) + 1;
-      bySession[t] = (bySession[t] || 0) + 1;
-      bySource[s] = (bySource[s] || 0) + 1;
-      byRoom[r] = (byRoom[r] || 0) + 1;
-    });
-    const taskByStatus = {
-      backlog: tasks.filter(t => t.status === 'todo').length,
-      active: tasks.filter(t => t.status === 'doing').length,
-      delivered: tasks.filter(t => t.status === 'complete').length,
-    };
-    return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
-  }, [events, tasks]);
-
-  const Bar = ({ label, value, max, color }) => (
-    <div className="mb-2">
-      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1">
-        <span>{label}</span>
-        <span style={{ color }}>{value}</span>
-      </div>
-      <div className="h-2 bg-[#0D0D15] rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
-      </div>
-    </div>
-  );
-
-  const sortedClass = Object.entries(stats.byClass).sort((a, b) => b[1] - a[1]);
-  const sortedSession = Object.entries(stats.bySession).sort((a, b) => b[1] - a[1]);
-  const sortedRoom = Object.entries(stats.byRoom).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const maxClass = Math.max(...Object.values(stats.byClass), 1);
-  const maxSession = Math.max(...Object.values(stats.bySession), 1);
-  const maxRoom = Math.max(...Object.values(stats.byRoom), 1);
-
-  return (
-    <div className="anim-in space-y-5">
-      <div className="grid md:grid-cols-4 gap-3">
-        <StatCard icon={<ClipboardList size={16} />} value={events.length} label="Total Events" />
-        <StatCard icon={<Users size={16} />} value={stats.totalAttendees} label="Total Attendees" />
-        <StatCard icon={<Upload size={16} />} value={stats.bySource['Imported'] || 0} label="AI Imported" />
-        <StatCard icon={<TrendingUp size={16} />} value={tasks.length} label="Active Tasks" />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-5">
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <PieIcon size={14} className="text-[#A100FF]" /> Events by Classification
-          </h2>
-          {sortedClass.length ? sortedClass.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
-        </div>
-
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type
-          </h2>
-          {sortedSession.length ? sortedSession.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
-        </div>
-
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations
-          </h2>
-          {sortedRoom.length ? sortedRoom.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
-        </div>
-
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <Layout size={14} className="text-[#A100FF]" /> Task Pipeline
-          </h2>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.todo}</div>
-              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">Backlog</div>
-            </div>
-            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.doing}</div>
-              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">Active</div>
-            </div>
-            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.complete}</div>
-              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Delivered</div>
-            </div>
-          </div>
-          <p className="text-[10px] text-[#4A4A6A] text-center mt-4">
-            {tasks.length ? `${Math.round((stats.taskByStatus.complete / tasks.length) * 100)}% complete` : 'No tasks yet'}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ======== ANALYTICS / INSIGHTS DASHBOARD ======== */
-function AnalyticsDashboard({ events, tasks }) {
-  const stats = useMemo(() => {
-    const totalAttendees = events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0);
-    const byClass = {};
-    const bySession = {};
-    const bySource = {};
-    const byRoom = {};
-    events.forEach(e => {
-      const c = e.classification || 'TBD';
-      const t = e.sessionType || 'Other';
-      const s = e.source || 'Manual';
-      const r = e.eventLocation || 'Unknown';
-      byClass[c] = (byClass[c] || 0) + 1;
-      bySession[t] = (bySession[t] || 0) + 1;
-      bySource[s] = (bySource[s] || 0) + 1;
-      byRoom[r] = (byRoom[r] || 0) + 1;
-    });
-    const taskByStatus = {
-  backlog: tasks.filter(t => t.status === 'backlog').length,
-  active: tasks.filter(t => t.status === 'active').length,
-  delivered: tasks.filter(t => t.status === 'delivered').length,
-};
-    return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
-  }, [events, tasks]);
-
-  const Bar = ({ label, value, max, color }) => (
-    <div className="mb-2">
-      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1">
-        <span>{label}</span>
-        <span style={{ color }}>{value}</span>
-      </div>
-      <div className="h-2 bg-[#0D0D15] rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
-      </div>
-    </div>
-  );
-
-  const sortedClass = Object.entries(stats.byClass).sort((a, b) => b[1] - a[1]);
-  const sortedSession = Object.entries(stats.bySession).sort((a, b) => b[1] - a[1]);
-  const sortedRoom = Object.entries(stats.byRoom).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const maxClass = Math.max(...Object.values(stats.byClass), 1);
-  const maxSession = Math.max(...Object.values(stats.bySession), 1);
-  const maxRoom = Math.max(...Object.values(stats.byRoom), 1);
-
-  return (
-    <div className="anim-in space-y-5">
-      <div className="grid md:grid-cols-4 gap-3">
-        <StatCard icon={<ClipboardList size={16} />} value={events.length} label="Total Events" />
-        <StatCard icon={<Users size={16} />} value={stats.totalAttendees} label="Total Attendees" />
-        <StatCard icon={<Upload size={16} />} value={stats.bySource['Imported'] || 0} label="AI Imported" />
-        <StatCard icon={<TrendingUp size={16} />} value={tasks.length} label="Active Tasks" />
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-5">
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <PieIcon size={14} className="text-[#A100FF]" /> Events by Classification
-          </h2>
-          {sortedClass.length ? sortedClass.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
-        </div>
-
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type
-          </h2>
-          {sortedSession.length ? sortedSession.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
-        </div>
-
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations
-          </h2>
-          {sortedRoom.length ? sortedRoom.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
-        </div>
-
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <Layout size={14} className="text-[#A100FF]" /> Task Pipeline
-          </h2>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
-              <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.backlog}</div>
-              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase tracking-wider mt-1">Backlog</div>
-              ...
-              <div className="text-2xl font-black text-[#F59E0B]">{stats.taskByStatus.active}</div>
-              <div className="text-[9px] font-bold text-[#F59E0B] uppercase tracking-wider mt-1">Active</div>
-              ...
-              <div className="text-2xl font-black text-[#22C55E]">{stats.taskByStatus.delivered}</div>
-              <div className="text-[9px] font-bold text-[#22C55E] uppercase tracking-wider mt-1">Delivered</div>
-            </div>
-          </div>
-          <p className="text-[10px] text-[#4A4A6A] text-center mt-4">
-            {tasks.length ? `${Math.round((stats.taskByStatus.delivered / tasks.length) * 100)}% complete` : 'No tasks yet'}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-  /* ============================================================
-     BEO-AWARE SMART IMPORT
-     Reads real Accenture Daily BEO format, extracts *SELECT Required
-     blocks, and auto-populates them into the event queue.
-     ============================================================ */
-  const handleSmartImport = async () => {
-    try {
-      let text = beoText || '';
-      const file = fileRef.current?.files?.[0];
-
-      console.log('[BEO Import] Starting...', { hasText: !!text.trim(), hasFile: !!file, fileName: file?.name });
-
-      /* Step 1: Get text from file if textarea is empty */
-      if (!text.trim() && file) {
-        try {
-          setPdfLoading(true);
-          setImportBanner('Reading file...');
-
-          if (file.name.toLowerCase().endsWith('.pdf')) {
-            console.log('[BEO Import] Reading PDF:', file.name, file.size, 'bytes');
-            text = await extractTextFromPdf(file);
-          } else {
-            console.log('[BEO Import] Reading text file:', file.name);
-            text = await new Promise((ok, no) => {
-              const reader = new FileReader();
-              reader.onload = () => ok(String(reader.result || ''));
-              reader.onerror = (err) => no(new Error('FileReader failed: ' + err));
-              reader.readAsText(file);
-            });
-          }
-
-          setPdfLoading(false);
-          console.log('[BEO Import] Text extracted:', text.length, 'chars');
-          console.log('[BEO Import] First 200 chars:', text.slice(0, 200));
-
-          /* Keep extracted text visible in textarea so user can see it worked */
-          setBeoText(text);
-
-        } catch (err) {
-          setPdfLoading(false);
-          console.error('[BEO Import] File read error:', err);
-          setImportBanner(`File read failed: ${err.message}. Try pasting the BEO text directly.`);
-          showMsg(`Could not read file: ${err.message}`, true);
-          return;
-        }
-      }
-
-      /* Bail if still no text */
-      if (!text.trim()) {
-        showMsg('Upload a PDF or paste BEO text first.', true);
-        setImportBanner('No text to process. Paste BEO text or pick a file and try again.');
-        return;
-      }
-
-      if (text.trim().length < 50) {
-        showMsg('Text is too short to be a BEO. Try a different file.', true);
-        setImportBanner('Extracted text was too short. The PDF may be image-based (scanned). Try pasting the text manually.');
-        return;
-      }
-
-      /* Step 2: Send to AI */
-      setAiLoading(true);
-      setImportBanner(`Sending ${text.length.toLocaleString()} chars to AI for extraction...`);
-
-      const aiPrompt = `You are reading an Accenture NYIH Daily BEO (Banquet Event Order).
-Today's date is in the header (e.g. "Thursday, June 18, 2026").
-
-IMPORTANT: PDF extraction may have stripped emoji icons. So instead of looking 
-for specific emoji, look for these TEXTUAL markers in the document:
-- "SELECT" (anywhere it appears)
-- "*SELECT Required" or "SELECT Required"  
-- Equipment keywords: Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, 
-  microphones, mics, clickers, signage, music, loaner laptops, web conference, 
-  teams call, MTR, Cisco
-- "TXA" markers indicate TXA-only blocks (SKIP these)
-- "FACILITIES" alone indicates facilities-only (SKIP unless SELECT is also present)
-
-EVENT BLOCK STRUCTURE:
-Each block looks roughly like:
-- A named event line: "EventName  RoomNumber RoomName  StartTime - EndTime  CLASSIFICATION"
-- "WRES" ID like "WRES21881931"  
-- "Host:" name
-- "S&E:" name
-- Support markers (SELECT, TXA, FACILITIES)
-- Equipment/POC details
-
-YOUR TASK:
-Extract ANY event block that has ANY indication of SELECT support OR mentions 
-ANY SELECT-supported equipment listed above. BE GENEROUS. When in doubt, INCLUDE the event.
-
-For each qualifying event, return JSON with these keys:
-- "eventName": The named event title (e.g. "Foundation Day3 - additional MTG room")
-- "startDate": ISO format "YYYY-MM-DDTHH:mm" combining header date + event start time. 
-  Example: "2026-06-18T08:30"
-- "endDate": ISO format using event end time. Example: "2026-06-18T18:30"
-- "eventPoc": Host name or POC name
-- "selectPoc": "" (leave blank)  
-- "location": "NYIH"
-- "eventLocation": Room name from the event line (e.g. "Dragonboat Suite", "Floor 59")
-- "classification": Match exactly what's in the doc (e.g. "Client", "Internal", "Community")
-  Map: "CLIENT VISIT" -> "Client", "INTERNAL" -> "Internal", "COMMUNITY" -> "Community"
-- "sessionType": Best guess: "Demo", "Meeting", "Workshop", "Town Hall", "Other"
-- "attendees": Number if mentioned, otherwise ""
-- "demo": Equipment/tech mentioned (mics, surface hubs, signage, music, etc.)
-- "selectResources": Same as demo
-- "sessionSupportDuration": Calculate from start/end times if both present
-- "supportTeam": "NYIH SELECT"
-- "notes": Include WRES ID, Host name, S&E name, and any other context
-
-Return ONLY a JSON array of qualifying events. No markdown fences. No explanation.
-If you find ZERO events with ANY SELECT relevance, return: []
-
-Example output:
-[{"eventName":"Foundation Day3","startDate":"2026-06-18T08:30","endDate":"2026-06-18T18:30","eventPoc":"chisato.sug","selectPoc":"","location":"NYIH","eventLocation":"Dragonboat Suite","classification":"Client","sessionType":"Meeting","demo":"","notes":"WRES21881931 | Host: chisato.sug"}]`;
-
-      console.log('[BEO Import] Sending to AI, text length:', text.length);
-      const result = await fetchGemini(aiPrompt, text, false);
-      console.log('[BEO Import] AI response type:', typeof result);
-      console.log('[BEO Import] AI response preview:', String(result).slice(0, 500));
-
-      /* Check for AI errors */
-      if (!result) {
-        setAiLoading(false);
-        setImportBanner('AI returned empty response. The /api/ai endpoint may not be configured.');
-        showMsg('AI returned no response. Check your Gemini API setup.', true);
-        return;
-      }
-
-      if (typeof result === 'string' && result.startsWith('AI Error:')) {
-        setAiLoading(false);
-        setImportBanner(result);
-        showMsg(result, true);
-        return;
-      }
-
-      /* Step 3: Parse JSON from response */
-      let parsed = [];
-      try {
-        const cleaned = String(result).replace(/```json|```/g, '').trim();
-        const obj = JSON.parse(cleaned);
-        parsed = Array.isArray(obj) ? obj : [obj];
-      } catch (jsonErr) {
-        console.warn('[BEO Import] Direct JSON parse failed, trying regex...');
-        try {
-          const m = String(result).match(/\[[\s\S]*\]/);
-          if (m) parsed = JSON.parse(m[0]);
-        } catch (regexErr) {
-          console.error('[BEO Import] All JSON parsing failed');
-        }
-      }
-
-      parsed = parsed.filter(e => e && typeof e === 'object' && (e.eventName || e.eventPoc || e.demo));
-      console.log('[BEO Import] Parsed events:', parsed.length, parsed);
-
-      if (!parsed.length) {
-        setAiLoading(false);
-        const preview = String(result).slice(0, 300);
-        setImportBanner(`No events parsed from AI response. Raw response preview: "${preview}..."`);
-        showMsg('Could not parse events from AI response. Check console for details.', true);
-        return;
-      }
-
-      /* Step 4: Deduplicate and save */
-      let saved = 0;
-      let skipped = 0;
-      for (const raw of parsed) {
-        const evt = {
-          ...blankEventForm(),
-          ...Object.fromEntries(
-            ALLOWED_EVENT_KEYS.filter(k => raw[k] !== undefined && raw[k] !== null)
-              .map(k => [k, String(raw[k] || '').slice(0, 500)])
-          ),
-          source: 'Imported',
-          supportTeam: raw.supportTeam || 'NYIH SELECT',
-          location: raw.location || 'NYIH',
-          weekOf: weekOfFromDateTime(raw.startDate),
-        };
-
-        const isDupe = events.some(x =>
-          x.eventName === evt.eventName &&
-          x.startDate === evt.startDate &&
-          x.eventLocation === evt.eventLocation
-        );
-        if (isDupe) { skipped++; continue; }
-
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
-          ...sanitizeEventData(evt),
-          timestamp: new Date().toISOString(),
-        });
-        saved++;
-      }
-
-      /* Step 5: Report */
-      const banner = `Found ${parsed.length} SELECT event(s) \u2022 ${saved} saved${skipped > 0 ? ` \u2022 ${skipped} duplicate(s) skipped` : ''}`;
-      setImportBanner(banner);
-      setAiLoading(false);
-      /* Only clear text on success */
-      if (saved > 0) {
-        setBeoText('');
-        if (fileRef.current) fileRef.current.value = '';
-      }
-      showMsg(saved > 0 ? `Imported ${saved} SELECT event(s). Edit or delete below.` : 'No new events to import.');
-
-    } catch (outerErr) {
-      /* Catch-all so the button never silently fails */
-      console.error('[BEO Import] Unexpected error:', outerErr);
-      setPdfLoading(false);
-      setAiLoading(false);
-      setImportBanner(`Unexpected error: ${outerErr.message}`);
-     showMsg(`Import failed: ${outerErr.message}`, true);
-    }
-  };
-
-  return (
-    <div className="space-y-5 anim-in">
-      
-      {/* ---- BEO SMART IMPORT ---- */}
-      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]"/> Smart BEO Import</h2>
-        <p className="text-[11px] text-[#6B6B8A] mb-4">Upload a Daily BEO PDF or paste the text. AI extracts only <span className="text-[#A100FF] font-bold">*SELECT Required</span> events and adds them to your queue.</p>
-
-        {importBanner && (
-          <div className="bg-[#A100FF]/10 border border-[#A100FF]/30 rounded-xl p-3 text-xs text-[#C0C0D8] font-bold mb-4 flex items-center gap-2">
-            {aiLoading ? <RefreshCcw size={13} className="animate-spin text-[#A100FF]"/> : <CheckCircle2 size={13} className="text-[#A100FF]"/>}
-            {importBanner}
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-[1fr,auto] gap-4 items-end">
-          <div className="space-y-3">
-            <textarea
-              value={beoText}
-              onChange={(e) => setBeoText(e.target.value)}
-              className={`w-full h-32 resize-none text-xs font-mono ${DK}`}
-              placeholder="Paste BEO text here... or upload a PDF below"
-            />
-            <input ref={fileRef} type="file" accept=".pdf,.txt,.csv,.json" className={`w-full text-xs ${DK}`} />
-          </div>
-          <button
-            onClick={handleSmartImport}
-            disabled={aiLoading || pdfLoading}
-            className="bg-[#A100FF] text-white px-8 py-4 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-[#B733FF] transition disabled:opacity-50 flex items-center gap-2 h-fit whitespace-nowrap"
-          >
-            {pdfLoading ? (
-              <><RefreshCcw size={14} className="animate-spin"/> Reading PDF...</>
-            ) : aiLoading ? (
-              <><BrainCircuit size={14} className="animate-spin"/> Extracting...</>
-            ) : (
-              <><Zap size={14}/> Import SELECT</>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* ---- MAIN LAYOUT ---- */}
-      <div className="grid lg:grid-cols-[1.2fr,.8fr] gap-5">
-        {/* LEFT: Event Form */}
-        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
-            <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2"><ClipboardList size={16} className="text-[#A100FF]"/> {editingId ? 'Edit Event' : 'New Event'}</h2>
-              <p className="text-[11px] text-[#6B6B8A] mt-0.5">{editingId ? 'Editing imported or manual event' : 'Add event manually or use import above'}</p>
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              {['Demo','Client','Leadership','Workshop'].map(t => (
-                <button key={t} type="button" onClick={() => updateField('sessionType', t)}
-                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${formData.sessionType === t ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {QUICK_FILL_CARDS.map(c => (
-              <button key={c.name} type="button" onClick={() => setFormData(p => ({...p, demo: c.demo, sessionType: c.sessionType}))}
-                className="text-left p-3 rounded-xl bg-[#0D0D15] border border-[#2A2A3E] hover:border-[#A100FF]/50 transition">
-                <div className="text-[11px] font-bold text-white">{c.name}</div>
-                <div className="text-[9px] text-[#6B6B8A]">{c.note}</div>
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleCommit} className="space-y-3">
-            <div className="grid md:grid-cols-2 gap-3">
-              <input value={formData.eventName} onChange={e => updateField('eventName', e.target.value)} placeholder="Event Name *" required className={DK} />
-              <input value={formData.eventPoc} onChange={e => updateField('eventPoc', e.target.value)} placeholder="Event POC *" required className={DK} />
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase">Start<input value={formData.startDate} onChange={e => updateField('startDate', e.target.value)} type="datetime-local" required className={`w-full mt-1 ${DK}`} /></div>
-              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase">End<input value={formData.endDate} onChange={e => updateField('endDate', e.target.value)} type="datetime-local" required className={`w-full mt-1 ${DK}`} /></div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              <select value={formData.selectPoc} onChange={e => updateField('selectPoc', e.target.value)} className={DK}><option value="">SELECT Lead...</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select>
-              <select value={formData.eventLocation} onChange={e => updateField('eventLocation', e.target.value)} className={DK}><option value="">Room...</option>{ROOMS.map(r => <option key={r} value={r}>{r}</option>)}</select>
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              <select value={formData.classification} onChange={e => updateField('classification', e.target.value)} className={DK}>{CLASSIFICATIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-              <select value={formData.sessionType} onChange={e => updateField('sessionType', e.target.value)} className={DK}>{SESSION_TYPES.map(s => <option key={s} value={s}>{s}</option>)}</select>
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              <input value={formData.attendees} onChange={e => updateField('attendees', e.target.value)} placeholder="Attendees" className={DK} />
-              <input value={formData.demo} onChange={e => updateField('demo', e.target.value)} placeholder="Demo / Equipment" className={DK} />
-            </div>
-            <input value={formData.selectResources} onChange={e => updateField('selectResources', e.target.value)} placeholder="SELECT Resources" className={`w-full ${DK}`} />
-            <div className="grid md:grid-cols-2 gap-3">
-              <input value={formData.sessionDays} onChange={e => updateField('sessionDays', e.target.value)} placeholder="Session Days" className={DK} />
-              <select value={formData.sessionSupportDuration} onChange={e => updateField('sessionSupportDuration', e.target.value)} className={DK}><option value="">Duration...</option>{DURATION_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}</select>
-            </div>
-            <div className="grid md:grid-cols-2 gap-3">
-              <select value={formData.supportTeam} onChange={e => updateField('supportTeam', e.target.value)} className={DK}>{SUPPORT_TEAMS.map(t => <option key={t} value={t}>{t}</option>)}</select>
-              <div className="text-[9px] font-bold text-[#6B6B8A] uppercase">Week Of<input value={formData.weekOf} onChange={e => updateField('weekOf', e.target.value)} type="date" className={`w-full mt-1 ${DK}`} /></div>
-            </div>
-            <textarea value={formData.notes} onChange={e => updateField('notes', e.target.value)} placeholder="Notes / setup details..." rows="3" className={`w-full resize-none ${DK}`} />
-            <div className="flex gap-2">
-              <button type="submit" className={`flex-1 font-bold py-3 rounded-xl text-sm uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>{editingId ? 'Update Event' : 'Save Event'}</button>
-              {editingId && <button type="button" onClick={resetForm} className="px-5 bg-[#1A1A2E] text-[#6B6B8A] font-bold py-3 rounded-xl text-sm uppercase hover:text-white transition flex items-center gap-1"><RefreshCcw size={13}/> Cancel</button>}
-            </div>
-          </form>
-        </div>
-
-        {/* RIGHT: Stats + Event Queue */}
-        <div className="space-y-5">
-          <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><BarChart3 size={14} className="text-[#A100FF]"/> Stats</h2>
-            <div className="grid grid-cols-2 gap-2.5">
-              <StatCard icon={<ClipboardList size={16}/>} value={totalStats.events} label="Events"/>
-              <StatCard icon={<Upload size={16}/>} value={totalStats.imported} label="Imported"/>
-              <StatCard icon={<Users size={16}/>} value={totalStats.attendees} label="Attendees"/>
-              <StatCard icon={<TrendingUp size={16}/>} value={totalStats.high} label="High Priority"/>
-            </div>
-          </div>
-
-          <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><Search size={14} className="text-[#A100FF]"/> Event Queue</h2>
-            <div className="space-y-2.5 mb-3">
-              <div className="flex items-center gap-2 rounded-xl bg-[#0D0D15] border border-[#2A2A3E] p-2.5 focus-within:border-[#A100FF] transition">
-                <Search size={13} className="text-[#4A4A6A]"/>
-                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="w-full bg-transparent outline-none text-sm text-[#E8E8F0] placeholder-[#4A4A6A]"/>
-              </div>
-              <div className="flex gap-1.5 flex-wrap">
-                <select value={classificationFilter} onChange={e => setClassificationFilter(e.target.value)} className={`flex-1 min-w-[140px] text-xs ${DK}`}><option value="">All types</option>{CLASSIFICATIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                {['','Imported','Manual'].map(s => (
-                  <button key={s || 'all'} onClick={() => setSourceFilter(s)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${sourceFilter === s ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>{s || 'All'}</button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ---- Event Cards ---- */}
-          <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-            {!filteredEvents.length && (
-              <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
-                No events yet. Import a BEO or add one manually.
-              </div>
-            )}
-            {filteredEvents.map(entry => {
-              const bc = classBadgeColor(entry.classification);
-              return (
-                <div key={entry.id} className="bg-[#111119] p-4 rounded-xl border border-[#2A2A3E] hover:border-[#A100FF]/40 transition group border-l-4" style={{ borderLeftColor: editingId === entry.id ? '#A3E635' : bc }}>
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1 pr-3">
-                      <p className="text-xs font-bold text-white mb-1.5">{entry.eventName}</p>
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${bc}20`, color: bc }}>{entry.classification || 'TBD'}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.sessionType || 'Session'}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.source || 'Manual'}</span>
-                      </div>
-                      <div className="space-y-0.5 text-[10px] text-[#6B6B8A]">
-                        <p className="flex items-center gap-1"><CalendarDays size={9}/> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
-                        <p className="flex items-center gap-1"><User size={9}/> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
-                        <p className="flex items-center gap-1"><MapPin size={9}/> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room'}</p>
-                      </div>
-                      {(entry.demo || entry.selectResources) && (
-                        <p className="text-[10px] text-[#A100FF] mt-1.5 line-clamp-1">
-                          Equipment: {entry.demo || entry.selectResources || '—'}
-                        </p>
-                      )}
-                      {entry.notes && (
-                        <p className="text-[10px] text-[#4A4A6A] mt-1 line-clamp-2">{entry.notes}</p>
-                      )}
-                      <div className="flex gap-3 mt-2.5">
-                        <button onClick={() => startEdit(entry)} className="text-[10px] text-[#A100FF] font-bold uppercase flex items-center gap-1 hover:text-[#B733FF] transition"><Edit3 size={10}/> Edit</button>
-                        <button onClick={() => openFullIntel(entry)} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-white transition"><FileText size={10}/> Details</button>
-                        <button onClick={async () => { if (window.confirm("Delete this event?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); showMsg("Event deleted."); } }} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-red-400 transition"><Trash2 size={10}/> Delete</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
