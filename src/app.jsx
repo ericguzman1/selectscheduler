@@ -22,48 +22,6 @@ const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 // ============================================================
 
-  const endpoint =
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
-  const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `${BEO_PROMPT}\n\n--- BEO DOCUMENT TEXT ---\n${pdfText}` }]
-      }
-    ],
-    generationConfig: {
-      temperature: 0.1,
-      responseMimeType: "application/json",
-      maxOutputTokens: 8192
-    }
-  };
-
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errText}`);
-  }
-
-  const data = await res.json();
-  const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!rawText) throw new Error("Gemini returned no content. Try a different BEO file.");
-
-  let parsed;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch {
-    throw new Error(`Failed to parse Gemini JSON: ${rawText.slice(0, 200)}`);
-  }
-  return parsed.events || [];
-}
-// ============================================================
-
 
 /* --- PDF.js CDN Loader --- */
 const loadPdfJs = (() => {
