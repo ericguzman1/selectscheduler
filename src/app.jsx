@@ -78,7 +78,7 @@ const blankEventForm = () => ({
 
 const sanitizeForPrompt = (text) => {
   if (typeof text !== 'string') return '';
-  return text.slice(0,4000).replace(/[<>]/g,'').replace(/ignore (all )?instructions?/gi,'[redacted]').trim();
+  return text.slice(0,16000).replace(/[<>]/g,'').replace(/ignore (all )?instructions?/gi,'[redacted]').trim();
 };
 
 const safeParseJson = (text) => {
@@ -750,7 +750,20 @@ PDF extraction strips emoji icons. Look for these TEXTUAL markers:
 - "TXA" = TXA-only (SKIP)
 - "FACILITIES" alone = facilities-only (SKIP unless SELECT also present)
 
-Extract ANY event block with SELECT support or SELECT-supported equipment. BE GENEROUS.
+Extract ALL events that ANY of the following apply:
+
+1. Contains "SELECT" or "*SELECT Required"
+2. Uses rooms like Vision Room, Interchange, Tank, Training Room
+3. Mentions technology or AV support (Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, microphones, mics, clickers, monitors, screens, VC, Teams, Cisco)
+4. Includes demonstrations, presentations, workshops, or client demos
+5. Has attendees and appears to require setup or coordination
+
+IMPORTANT:
+- DO NOT skip events just because the word "SELECT" is missing.
+- If the event requires technology, AV, presentation, or room setup, INCLUDE it.
+- When uncertain, INCLUDE the event.
+
+Return ALL possible SELECT-relevant events. Over-inclusion is preferred over missing events.
 
 For each qualifying event, return JSON with these keys:
 - "eventName": Named event title
