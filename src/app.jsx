@@ -93,13 +93,17 @@ const safeParseJson = (text) => {
 const ALLOWED_EVENT_KEYS = [
   'eventName','startDate','endDate','eventPoc','selectPoc','location',
   'eventLocation','classification','sessionType','attendees','demo',
-  'selectResources','sessionDays','sessionSupportDuration','supportTeam','weekOf','notes','source'
+  'selectResources','sessionDays','sessionSupportDuration','supportTeam','weekOf','notes','source',
+  'riskLevel','readinessScore','automationSummary','equipmentDetected','riskReasons'
 ];
 
 const sanitizeEventData = (obj) => {
   const safe = {};
   for (const key of ALLOWED_EVENT_KEYS) {
-    if (obj[key] !== undefined) safe[key] = String(obj[key]).slice(0,500);
+    if (obj[key] !== undefined) {
+      if (Array.isArray(obj[key])) safe[key] = obj[key].slice(0, 20);
+      else safe[key] = String(obj[key]).slice(0, 700);
+    }
   }
   return safe;
 };
@@ -117,6 +121,230 @@ const classBadgeColor = (cls) => {
   if (cls==='Client') return '#22C55E';
   if (cls==='Confidential') return '#EF4444';
   return '#6B6B8A';
+};
+
+const normalizeText = (v) => String(v || '').toLowerCase();
+
+const getAttendeeCount = (v) => {
+  const n = parseInt(String(v || '').replace(/[^\d]/g, ''), 10);
+  return Number.isNaN(n) ? 0 : n;
+};
+
+const detectEquipment = (event) => {
+  const haystack = [
+    event.demo,
+    event.selectResources,
+    event.notes,
+    event.eventName,
+    event.eventLocation,
+    event.sessionType,
+  ].join(' ').toLowerCase();
+
+  const found = [];
+
+  if (haystack.includes('proto') || haystack.includes('hologram')) found.push('Proto');
+  if (haystack.includes('cyviz')) found.push('Cyviz');
+  if (haystack.includes('surface hub') || haystack.includes('surfacehub')) found.push('Surface Hub');
+  if (haystack.includes('vu ai') || haystack.includes('video wall') || haystack.includes('vu')) found.push('Vu AI');
+  if (haystack.includes('spot') || haystack.includes('boston dynamics')) found.push('Spot');
+  if (haystack.includes('hypervsn')) found.push('Hypervsn');
+  if (haystack.includes('signage')) found.push('Signage');
+  if (haystack.includes('mtr') || haystack.includes('teams') || haystack.includes('web conference') || haystack.includes('cisco')) found.push('MTR / VC');
+  if (haystack.includes('mic') || haystack.includes('microphone') || haystack.includes('clicker')) found.push('Audio');
+  if (haystack.includes('loaner') || haystack.includes('laptop')) found.push('Loaner Laptop');
+
+  return [...new Set(found)];
+};
+
+const inferSelectOwner = (event) => {
+  const room = normalizeText(event.eventLocation);
+  const equipment = normalizeText(`${event.demo} ${event.selectResources} ${event.notes}`);
+
+  if (equipment.includes('cyviz') || room.includes('vision') || room.includes('interchange')) return 'Donald.Salazar';
+  if (equipment.includes('proto') || equipment.includes('hologram') || equipment.includes('spot')) return 'Tommy.Flinch';
+  if (equipment.includes('signage') || equipment.includes('tour') || equipment.includes('experience')) return 'Mistral.Rojas';
+
+  return event.selectPoc || 'Eric.Guzman';
+};
+
+const calculateRisk = (event) => {
+  const attendees = getAttendeeCount(event.attendees);
+  const equipment = detectEquipment(event);
+  const room = normalizeText(event.eventLocation);
+  const classification = event.classification || '';
+  const issues = [];
+
+  if (!event.selectPoc) issues.push('No SELECT lead assigned');
+  if (!event.eventLocation) issues.push('No room/location listed');
+  if (!event.startDate || !event.endDate) issues.push('Missing start/end time');
+  if (attendees >= 50 && !equipment.includes('Audio')) issues.push('Large event may need audio/mic validation');
+  if (['Leadership', 'Client', 'Confidential'].includes(classification)) issues.push(`${classification} event requires tighter readiness`);
+  if ((room.includes('vision') || room.includes('interchange')) && !equipment.includes('Cyviz')) issues.push('Room may require Cyviz validation');
+  if (equipment.length >= 3) issues.push('Multiple technology dependencies');
+
+  let riskLevel = 'Low';
+  if (issues.length >= 3 || attendees >= 100 || classification === 'Confidential') riskLevel = 'High';
+  else if (issues.length >= 1 || attendees >= 50 || ['Leadership', 'Client'].includes(classification)) riskLevel = 'Medium';
+
+  return {
+    riskLevel,
+    riskReasons: issues,
+  };
+};
+
+const getRiskColor = (risk) => {
+  if (risk === 'High') return '#EF4444';
+  if (risk === 'Medium') return '#F59E0B';
+  return '#22C55E';
+};
+
+const buildTaskTemplatesForEvent = (event) => {
+  const equipment = detectEquipment(event);
+  const attendees = getAttendeeCount(event.attendees);
+  const room = normalizeText(event.eventLocation);
+  const owner = inferSelectOwner(event);
+
+  const baseTasks = [
+    {
+      title: `Review BEO details for ${event.eventName}`,
+      details: `Confirm time, room, POC, attendee count, classification, and SELECT requirements.`,
+      assignee: owner,
+    },
+    {
+      title: `Confirm SELECT owner for ${event.eventName}`,
+      details: `Validate primary support lead and backup coverage.`,
+      assignee: event.selectPoc || owner,
+    },
+    {
+      title: `Pre-check room for ${event.eventName}`,
+      details: `Validate display, audio, camera, network, cables, and room readiness.`,
+      assignee: owner,
+    },
+  ];
+
+  const techTasks = [];
+
+  if (equipment.includes('Cyviz') || room.includes('vision') || room.includes('interchange')) {
+    techTasks.push({
+      title: `Cyviz validation for ${event.eventName}`,
+      details: `Test routing, screen layout, Teams/Cisco connection, and content sharing.`,
+      assignee: 'Donald.Salazar',
+    });
+  }
+
+  if (equipment.includes('Proto')) {
+    techTasks.push({
+      title: `Proto readiness check for ${event.eventName}`,
+      details: `Validate content, network, audio, physical placement, and run-of-show alignment.`,
+      assignee: 'Tommy.Flinch',
+    });
+  }
+
+  if (equipment.includes('Surface Hub')) {
+    techTasks.push({
+      title: `Surface Hub setup for ${event.eventName}`,
+      details: `Confirm whiteboard, Teams join, camera, mic, and sharing experience.`,
+      assignee: owner,
+    });
+  }
+
+  if (equipment.includes('Vu AI')) {
+    techTasks.push({
+      title: `Vu AI / video wall prep for ${event.eventName}`,
+      details: `Confirm content source, display behavior, and fallback plan.`,
+      assignee: 'Donald.Salazar',
+    });
+  }
+
+  if (equipment.includes('Spot')) {
+    techTasks.push({
+      title: `Spot demo prep for ${event.eventName}`,
+      details: `Validate battery, route, safety, demo script, and operator readiness.`,
+      assignee: 'Tommy.Flinch',
+    });
+  }
+
+  if (equipment.includes('Signage')) {
+    techTasks.push({
+      title: `Signage update for ${event.eventName}`,
+      details: `Confirm welcome message, timing, naming, and display placement.`,
+      assignee: 'Mistral.Rojas',
+    });
+  }
+
+  if (equipment.includes('MTR / VC')) {
+    techTasks.push({
+      title: `MTR / VC test for ${event.eventName}`,
+      details: `Confirm meeting join, camera, microphone, speakers, dialing, and content sharing.`,
+      assignee: owner,
+    });
+  }
+
+  if (equipment.includes('Audio') || attendees >= 50) {
+    techTasks.push({
+      title: `Audio and microphone check for ${event.eventName}`,
+      details: `Validate mics, speakers, clickers, volume levels, and presenter movement.`,
+      assignee: owner,
+    });
+  }
+
+  if (equipment.includes('Loaner Laptop')) {
+    techTasks.push({
+      title: `Loaner laptop prep for ${event.eventName}`,
+      details: `Confirm laptop availability, charger, adapters, login, content, and fallback device.`,
+      assignee: owner,
+    });
+  }
+
+  const closeoutTasks = [
+    {
+      title: `Day-of support check-in for ${event.eventName}`,
+      details: `Confirm event start, presenter support, room readiness, and escalation path.`,
+      assignee: owner,
+    },
+    {
+      title: `Post-event closeout for ${event.eventName}`,
+      details: `Capture issues, lessons learned, follow-ups, and support impact.`,
+      assignee: event.selectPoc || owner,
+    },
+  ];
+
+  return [...baseTasks, ...techTasks, ...closeoutTasks];
+};
+
+const buildAutomationSummary = (event) => {
+  const equipment = detectEquipment(event);
+  const risk = calculateRisk(event);
+
+  return {
+    equipmentDetected: equipment,
+    riskLevel: risk.riskLevel,
+    riskReasons: risk.riskReasons,
+    readinessScore: 0,
+    automationSummary: `${equipment.length || 0} tech dependencies detected. Risk: ${risk.riskLevel}.`,
+  };
+};
+
+const createTasksForEvent = async (eventId, event, showMsg) => {
+  const tasks = buildTaskTemplatesForEvent(event);
+  let created = 0;
+
+  for (const task of tasks) {
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), {
+      ...task,
+      dueDate: event.startDate ? String(event.startDate).slice(0, 10) : '',
+      timeSpent: '',
+      status: 'backlog',
+      eventId,
+      linkedEvent: event.eventName || '',
+      source: 'Auto-generated',
+      timestamp: new Date().toISOString(),
+    });
+    created++;
+  }
+
+  if (showMsg) showMsg(`Created ${created} auto-task(s) for ${event.eventName}.`);
+  return created;
 };
 
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'accenture-hub-v1';
@@ -300,9 +528,33 @@ function KanbanPage({ tasks, showMsg }) {
         </div>
         {t.details && <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{t.details}</p>}
         <div className="bg-[#111119] rounded-lg p-2 space-y-1 text-[9px] font-bold text-[#6B6B8A] mb-2">
-          <div className="flex items-center gap-1"><User size={9} className="text-[#A100FF]"/> {t.assignee || 'Unassigned'}</div>
-          {t.dueDate && <div className="flex items-center gap-1"><CalendarDays size={9}/> {t.dueDate}</div>}
-          {t.timeSpent && <div className="flex items-center gap-1"><Clock size={9}/> {t.timeSpent}</div>}
+          <div className="flex items-center gap-1">
+            <User size={9} className="text-[#A100FF]"/> {t.assignee || 'Unassigned'}
+          </div>
+        
+          {t.linkedEvent && (
+            <div className="flex items-center gap-1 text-[#A100FF]">
+              <ClipboardList size={9}/> {t.linkedEvent}
+            </div>
+          )}
+        
+          {t.source && (
+            <div className="flex items-center gap-1">
+              <Zap size={9}/> {t.source}
+            </div>
+          )}
+        
+          {t.dueDate && (
+            <div className="flex items-center gap-1">
+              <CalendarDays size={9}/> {t.dueDate}
+            </div>
+          )}
+        
+          {t.timeSpent && (
+            <div className="flex items-center gap-1">
+              <Clock size={9}/> {t.timeSpent}
+            </div>
+          )}
         </div>
         <div className="flex justify-between opacity-0 group-hover:opacity-100 transition">
           <div className="flex gap-1">
@@ -403,24 +655,45 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   };
 
   const handleCommit = async (e) => {
-    e.preventDefault();
-    const d = sanitizeEventData({
-      ...formData,
-      source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
-      weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
-    });
-    if (!d.eventName || !d.eventPoc) { showMsg("Event name and POC required.", true); return; }
-    try {
-      if (editingId) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
-        setEditingId(null);
-      } else {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), { ...d, timestamp: new Date().toISOString() });
-      }
-      resetForm();
-      showMsg("Event saved.");
-    } catch { showMsg("Save failed.", true); }
-  };
+  e.preventDefault();
+
+  const automation = buildAutomationSummary(formData);
+
+  const d = sanitizeEventData({
+    ...formData,
+    ...automation,
+    selectPoc: formData.selectPoc || inferSelectOwner(formData),
+    source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
+    weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
+  });
+
+  if (!d.eventName || !d.eventPoc) {
+    showMsg("Event name and POC required.", true);
+    return;
+  }
+
+  try {
+    if (editingId) {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
+      setEditingId(null);
+      showMsg("Event updated.");
+    } else {
+      const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
+        ...d,
+        timestamp: new Date().toISOString(),
+      });
+
+      await createTasksForEvent(ref.id, d, showMsg);
+      showMsg("Event saved and SELECT task checklist created.");
+    }
+
+    resetForm();
+  } catch (err) {
+    console.error(err);
+    showMsg("Save failed.", true);
+  }
+};
+
 
   const handleSmartImport = async () => {
     try {
@@ -557,14 +830,25 @@ If zero qualifying events found, return: []`;
         );
         if (isDupe) { skipped++; continue; }
 
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
-          ...sanitizeEventData(evt),
+        const automation = buildAutomationSummary(evt);
+
+        const finalEvt = sanitizeEventData({
+          ...evt,
+          ...automation,
+          selectPoc: evt.selectPoc || inferSelectOwner(evt),
+        });
+        
+        const eventRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
+          ...finalEvt,
           timestamp: new Date().toISOString(),
         });
+        
+        await createTasksForEvent(eventRef.id, finalEvt);
+        
         saved++;
       }
 
-      setImportBanner(`Found ${parsed.length} event(s) • ${saved} saved${skipped > 0 ? ` • ${skipped} duplicate(s) skipped` : ''}`);
+      setImportBanner(`Found ${parsed.length} event(s) • ${saved} saved with auto-task checklists${skipped > 0 ? ` • ${skipped} duplicate(s) skipped` : ''}`);
       setAiLoading(false);
       if (saved > 0) {
         setBeoText('');
@@ -719,9 +1003,35 @@ If zero qualifying events found, return: []`;
                     <div className="flex-1 pr-3">
                       <p className="text-xs font-bold text-white mb-1.5">{entry.eventName}</p>
                       <div className="flex flex-wrap gap-1 mb-2">
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${bc}20`, color: bc }}>{entry.classification || 'TBD'}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.sessionType || 'Session'}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.source || 'Manual'}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${bc}20`, color: bc }}>
+                          {entry.classification || 'TBD'}
+                        </span>
+                        
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">
+                          {entry.sessionType || 'Session'}
+                        </span>
+                        
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">
+                          {entry.source || 'Manual'}
+                        </span>
+                        
+                        {entry.riskLevel && (
+                          <span
+                            className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase"
+                            style={{
+                              background: `${getRiskColor(entry.riskLevel)}20`,
+                              color: getRiskColor(entry.riskLevel),
+                            }}
+                          >
+                            {entry.riskLevel} Risk
+                          </span>
+                        )}
+                        
+                        {entry.automationSummary && (
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#A100FF]/10 text-[#A100FF]">
+                            Auto-Planned
+                          </span>
+                        )}
                       </div>
                       <div className="space-y-0.5 text-[10px] text-[#6B6B8A]">
                         <p className="flex items-center gap-1"><CalendarDays size={9}/> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
@@ -732,6 +1042,25 @@ If zero qualifying events found, return: []`;
                         <p className="text-[10px] text-[#A100FF] mt-1.5 line-clamp-1">Equipment: {entry.demo || entry.selectResources || '—'}</p>
                       )}
                       {entry.notes && <p className="text-[10px] text-[#4A4A6A] mt-1 line-clamp-2">{entry.notes}</p>}
+                      {entry.automationSummary && (
+                        <div className="mt-2 bg-[#0D0D15] border border-[#2A2A3E] rounded-lg p-2">
+                          <p className="text-[9px] text-[#A100FF] font-bold uppercase tracking-wider mb-1">
+                            Automation Readiness
+                          </p>
+                          <p className="text-[10px] text-[#9B9BB0]">
+                            {entry.automationSummary}
+                          </p>
+                          {Array.isArray(entry.riskReasons) && entry.riskReasons.length > 0 && (
+                            <ul className="mt-1 space-y-0.5">
+                              {entry.riskReasons.slice(0, 3).map((r, idx) => (
+                                <li key={idx} className="text-[9px] text-[#F59E0B]">
+                                  ⚠ {r}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                       <div className="flex gap-3 mt-2.5">
                         <button onClick={() => startEdit(entry)} className="text-[10px] text-[#A100FF] font-bold uppercase flex items-center gap-1 hover:text-[#B733FF] transition"><Edit3 size={10}/> Edit</button>
                         <button onClick={() => openFullIntel(entry)} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-white transition"><FileText size={10}/> Details</button>
@@ -902,8 +1231,23 @@ function AnalyticsDashboard({ events, tasks }) {
       doing: tasks.filter(t => norm(t) === 'doing').length,
       complete: tasks.filter(t => norm(t) === 'complete').length,
     };
-    return { totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus };
-  }, [events, tasks]);
+    const highRiskEvents = events.filter(e => e.riskLevel === 'High').length;
+    const mediumRiskEvents = events.filter(e => e.riskLevel === 'Medium').length;
+    const autoPlannedEvents = events.filter(e => e.automationSummary).length;
+    const autoGeneratedTasks = tasks.filter(t => t.source === 'Auto-generated').length;
+    
+    return {
+      totalAttendees,
+      byClass,
+      bySession,
+      bySource,
+      byRoom,
+      taskByStatus,
+      highRiskEvents,
+      mediumRiskEvents,
+      autoPlannedEvents,
+      autoGeneratedTasks,
+    }; [events, tasks]);
 
   const Bar = ({ label, value, max, color }) => (
     <div className="mb-2">
@@ -928,9 +1272,9 @@ function AnalyticsDashboard({ events, tasks }) {
     <div className="anim-in space-y-5">
       <div className="grid md:grid-cols-4 gap-3">
         <StatCard icon={<ClipboardList size={16} />} value={events.length} label="Total Events" />
-        <StatCard icon={<Users size={16} />} value={stats.totalAttendees} label="Total Attendees" />
-        <StatCard icon={<Upload size={16} />} value={stats.bySource['Imported'] || 0} label="AI Imported" />
-        <StatCard icon={<TrendingUp size={16} />} value={tasks.length} label="Active Tasks" />
+        <StatCard icon={<Zap size={16} />} value={stats.autoPlannedEvents} label="Auto-Planned Events" />
+        <StatCard icon={<AlertCircle size={16} />} value={stats.highRiskEvents} label="High Risk" />
+        <StatCard icon={<TrendingUp size={16} />} value={stats.autoGeneratedTasks} label="Auto Tasks" />
       </div>
 
       <div className="grid md:grid-cols-2 gap-5">
