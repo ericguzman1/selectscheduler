@@ -228,24 +228,68 @@ const buildTaskTemplatesForEvent = (event) => {
   const attendees = getAttendeeCount(event.attendees);
   const room = normalizeText(event.eventLocation);
   const owner = inferSelectOwner(event);
+  const risk = calculateRisk(event);
 
-  const baseTasks = [
-    {
-      title: `Review BEO details for ${event.eventName}`,
-      details: `Confirm time, room, POC, attendee count, classification, and SELECT requirements.`,
-      assignee: owner,
-    },
-    {
-      title: `Confirm SELECT owner for ${event.eventName}`,
-      details: `Validate primary support lead and backup coverage.`,
-      assignee: event.selectPoc || owner,
-    },
-    {
-      title: `Pre-check room for ${event.eventName}`,
-      details: `Validate display, audio, camera, network, cables, and room readiness.`,
-      assignee: owner,
-    },
-  ];
+  // Build the checklist as a single details block
+  const checklist = [];
+
+  // BASE CHECKS (always)
+  checklist.push('☐ Review BEO details (time, room, POC, attendees, classification)');
+  checklist.push('☐ Confirm SELECT owner and backup coverage');
+  checklist.push('☐ Pre-check room (display, audio, camera, network, cables)');
+
+  // TECH-SPECIFIC CHECKS
+  if (equipment.includes('Cyviz') || room.includes('vision') || room.includes('interchange')) {
+    checklist.push('☐ Cyviz: test routing, screen layout, Teams/Cisco, content sharing');
+  }
+  if (equipment.includes('Proto')) {
+    checklist.push('☐ Proto: validate content, network, audio, placement, run-of-show');
+  }
+  if (equipment.includes('Surface Hub')) {
+    checklist.push('☐ Surface Hub: whiteboard, Teams join, camera, mic, sharing');
+  }
+  if (equipment.includes('Vu AI')) {
+    checklist.push('☐ Vu AI / video wall: content source, display behavior, fallback');
+  }
+  if (equipment.includes('Spot')) {
+    checklist.push('☐ Spot: battery, route, safety, demo script, operator readiness');
+  }
+  if (equipment.includes('Signage')) {
+    checklist.push('☐ Signage: welcome message, timing, naming, placement');
+  }
+  if (equipment.includes('MTR / VC')) {
+    checklist.push('☐ MTR/VC: meeting join, camera, mic, speakers, dialing, sharing');
+  }
+  if (equipment.includes('Audio') || attendees >= 50) {
+    checklist.push('☐ Audio: mics, speakers, clickers, volume, presenter movement');
+  }
+  if (equipment.includes('Loaner Laptop')) {
+    checklist.push('☐ Loaner laptop: availability, charger, adapters, login, content');
+  }
+
+  // DAY-OF + CLOSEOUT
+  checklist.push('☐ Day-of: confirm event start, presenter support, escalation path');
+  checklist.push('☐ Post-event: capture issues, lessons learned, follow-ups');
+
+  // Build the full task
+  const detailsBlock = [
+    `Event: ${event.eventName}`,
+    `When: ${event.startDate || 'TBD'} → ${event.endDate || 'TBD'}`,
+    `Room: ${event.eventLocation || 'TBD'}`,
+    `POC: ${event.eventPoc || 'TBD'}`,
+    `Equipment: ${equipment.join(', ') || 'None detected'}`,
+    `Risk: ${risk.riskLevel}${risk.riskReasons.length ? ' — ' + risk.riskReasons.join('; ') : ''}`,
+    '',
+    'CHECKLIST:',
+    ...checklist,
+  ].join('\n');
+
+  return [{
+    title: `SELECT support: ${event.eventName}`,
+    details: detailsBlock,
+    assignee: owner,
+  }];
+};
 
   const techTasks = [];
 
@@ -368,7 +412,7 @@ const createTasksForEvent = async (eventId, event, showMsg) => {
     created++;
   }
 
-  if (showMsg) showMsg(`Created ${created} auto-task(s) for ${event.eventName}.`);
+  if (showMsg) showMsg(`Created task with full checklist for ${event.eventName}.`);
   return created;
 };
 
@@ -525,7 +569,108 @@ function KanbanPage({ tasks, showMsg }) {
     { key: 'doing', label: 'Doing', color: '#F59E0B' },
     { key: 'complete', label: 'Complete', color: '#22C55E' },
   ];
+// Toggle a single checklist item in the task's details
+const toggleChecklistItem = async (task, lineIndex) => {
+  const lines = (task.details || '').split('\n');
+  const line = lines[lineIndex];
+  if (!line) return;
 
+  let newLine;
+  if (line.startsWith('☐')) newLine = '☑' + line.slice(1);
+  else if (line.startsWith('☑')) newLine = '☐' + line.slice(1);
+  else return;
+
+  lines[lineIndex] = newLine;
+  await updateDoc(
+    doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', task.id),
+    { details: lines.join('\n') }
+  );
+};
+
+// Render details — if checklist detected, show clickable items
+const renderDetails = (task) => {
+  const details = task.details || '';
+  const hasChecklist = details.includes('☐') || details.includes('☑');
+
+  if (!hasChecklist) {
+    return <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{details}</p>;
+  }
+
+  const lines = details.split('\n');
+  const checkboxLines = lines.filter(l => l.startsWith('☐') || l.startsWith('☑'));
+  const done = checkboxLines.filter(l => l.startsWith('☑')).length;
+  const total = checkboxLines.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="mb-2 space-y-0.5">
+      {/* Progress bar */}
+      {total > 0 && (
+        <div className="mb-2">
+          <div className="flex justify-between text-[9px] font-bold mb-1">
+            <span className="text-[#A100FF] uppercase tracking-wider">Checklist</span>
+            <span className={done === total ? 'text-[#22C55E]' : 'text-[#6B6B8A]'}>
+              {done} / {total}
+            </span>
+          </div>
+          <div className="h-1 bg-[#0D0D15] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${pct}%`,
+                background: done === total ? '#22C55E' : '#A100FF',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Lines */}
+      {lines.map((line, i) => {
+        const isUnchecked = line.startsWith('☐');
+        const isChecked = line.startsWith('☑');
+
+        if (isUnchecked || isChecked) {
+          const text = line.slice(1).trim();
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleChecklistItem(task, i);
+              }}
+              className="flex items-start gap-1.5 text-[10px] w-full text-left hover:bg-[#1A1A2E] rounded px-1 py-0.5 transition group/check"
+            >
+              <span className={`flex-shrink-0 text-[11px] leading-none mt-px ${isChecked ? 'text-[#22C55E]' : 'text-[#6B6B8A] group-hover/check:text-[#A100FF]'}`}>
+                {isChecked ? '☑' : '☐'}
+              </span>
+              <span className={`leading-snug ${isChecked ? 'text-[#4A4A6A] line-through' : 'text-[#9B9BB0]'}`}>
+                {text}
+              </span>
+            </button>
+          );
+        }
+
+        if (line.trim() === 'CHECKLIST:') {
+          return (
+            <p key={i} className="text-[9px] font-bold uppercase tracking-wider text-[#A100FF] mt-2 mb-1">
+              {line}
+            </p>
+          );
+        }
+
+        if (line.trim() === '') return <div key={i} className="h-1" />;
+
+        return (
+          <p key={i} className="text-[10px] text-[#6B6B8A] leading-snug">
+            {line}
+          </p>
+        );
+      })}
+    </div>
+  );
+};
   const renderCard = (t) => {
     if (editingId === t.id) return (
       <form key={t.id} onSubmit={(e) => saveEdit(e, t.id)} className="bg-[#0D0D15] border border-[#A100FF] rounded-xl p-3 space-y-2 anim-in">
@@ -551,7 +696,7 @@ function KanbanPage({ tasks, showMsg }) {
           <p className="text-xs font-bold text-white leading-snug">{t.title}</p>
           <button onClick={() => del(t.id)} className="text-[#2A2A3E] group-hover:text-red-400 transition"><Trash2 size={12}/></button>
         </div>
-        {t.details && <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{t.details}</p>}
+        {t.details && renderDetails(t)}
         <div className="bg-[#111119] rounded-lg p-2 space-y-1 text-[9px] font-bold text-[#6B6B8A] mb-2">
           <div className="flex items-center gap-1">
             <User size={9} className="text-[#A100FF]"/> {t.assignee || 'Unassigned'}
