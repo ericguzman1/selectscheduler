@@ -230,15 +230,13 @@ const buildTaskTemplatesForEvent = (event) => {
   const owner = inferSelectOwner(event);
   const risk = calculateRisk(event);
 
-  // Build the checklist as a single details block
+  // Build checklist
   const checklist = [];
 
-  // BASE CHECKS (always)
   checklist.push('☐ Review BEO details (time, room, POC, attendees, classification)');
   checklist.push('☐ Confirm SELECT owner and backup coverage');
   checklist.push('☐ Pre-check room (display, audio, camera, network, cables)');
 
-  // TECH-SPECIFIC CHECKS
   if (equipment.includes('Cyviz') || room.includes('vision') || room.includes('interchange')) {
     checklist.push('☐ Cyviz: test routing, screen layout, Teams/Cisco, content sharing');
   }
@@ -267,11 +265,9 @@ const buildTaskTemplatesForEvent = (event) => {
     checklist.push('☐ Loaner laptop: availability, charger, adapters, login, content');
   }
 
-  // DAY-OF + CLOSEOUT
   checklist.push('☐ Day-of: confirm event start, presenter support, escalation path');
   checklist.push('☐ Post-event: capture issues, lessons learned, follow-ups');
 
-  // Build the full task
   const detailsBlock = [
     `Event: ${event.eventName}`,
     `When: ${event.startDate || 'TBD'} → ${event.endDate || 'TBD'}`,
@@ -289,96 +285,6 @@ const buildTaskTemplatesForEvent = (event) => {
     details: detailsBlock,
     assignee: owner,
   }];
-};
-
-  const techTasks = [];
-
-  if (equipment.includes('Cyviz') || room.includes('vision') || room.includes('interchange')) {
-    techTasks.push({
-      title: `Cyviz validation for ${event.eventName}`,
-      details: `Test routing, screen layout, Teams/Cisco connection, and content sharing.`,
-      assignee: 'Donald.Salazar',
-    });
-  }
-
-  if (equipment.includes('Proto')) {
-    techTasks.push({
-      title: `Proto readiness check for ${event.eventName}`,
-      details: `Validate content, network, audio, physical placement, and run-of-show alignment.`,
-      assignee: 'Tommy.Flinch',
-    });
-  }
-
-  if (equipment.includes('Surface Hub')) {
-    techTasks.push({
-      title: `Surface Hub setup for ${event.eventName}`,
-      details: `Confirm whiteboard, Teams join, camera, mic, and sharing experience.`,
-      assignee: owner,
-    });
-  }
-
-  if (equipment.includes('Vu AI')) {
-    techTasks.push({
-      title: `Vu AI / video wall prep for ${event.eventName}`,
-      details: `Confirm content source, display behavior, and fallback plan.`,
-      assignee: 'Donald.Salazar',
-    });
-  }
-
-  if (equipment.includes('Spot')) {
-    techTasks.push({
-      title: `Spot demo prep for ${event.eventName}`,
-      details: `Validate battery, route, safety, demo script, and operator readiness.`,
-      assignee: 'Tommy.Flinch',
-    });
-  }
-
-  if (equipment.includes('Signage')) {
-    techTasks.push({
-      title: `Signage update for ${event.eventName}`,
-      details: `Confirm welcome message, timing, naming, and display placement.`,
-      assignee: 'Mistral.Rojas',
-    });
-  }
-
-  if (equipment.includes('MTR / VC')) {
-    techTasks.push({
-      title: `MTR / VC test for ${event.eventName}`,
-      details: `Confirm meeting join, camera, microphone, speakers, dialing, and content sharing.`,
-      assignee: owner,
-    });
-  }
-
-  if (equipment.includes('Audio') || attendees >= 50) {
-    techTasks.push({
-      title: `Audio and microphone check for ${event.eventName}`,
-      details: `Validate mics, speakers, clickers, volume levels, and presenter movement.`,
-      assignee: owner,
-    });
-  }
-
-  if (equipment.includes('Loaner Laptop')) {
-    techTasks.push({
-      title: `Loaner laptop prep for ${event.eventName}`,
-      details: `Confirm laptop availability, charger, adapters, login, content, and fallback device.`,
-      assignee: owner,
-    });
-  }
-
-  const closeoutTasks = [
-    {
-      title: `Day-of support check-in for ${event.eventName}`,
-      details: `Confirm event start, presenter support, room readiness, and escalation path.`,
-      assignee: owner,
-    },
-    {
-      title: `Post-event closeout for ${event.eventName}`,
-      details: `Capture issues, lessons learned, follow-ups, and support impact.`,
-      assignee: event.selectPoc || owner,
-    },
-  ];
-
-  return [...baseTasks, ...techTasks, ...closeoutTasks];
 };
 
 const buildAutomationSummary = (event) => {
