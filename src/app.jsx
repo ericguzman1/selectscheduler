@@ -78,7 +78,7 @@ const blankEventForm = () => ({
 
 const sanitizeForPrompt = (text) => {
   if (typeof text !== 'string') return '';
-  return text.slice(0,16000).replace(/[<>]/g,'').replace(/ignore (all )?instructions?/gi,'[redacted]').trim();
+  return text.slice(0,60000).replace(/[<>]/g,'').replace(/ignore (all )?instructions?/gi,'[redacted]').trim();
 };
 
 const safeParseJson = (text) => {
@@ -159,11 +159,36 @@ const detectEquipment = (event) => {
 const inferSelectOwner = (event) => {
   const room = normalizeText(event.eventLocation);
   const equipment = normalizeText(`${event.demo} ${event.selectResources} ${event.notes}`);
+  const eventName = normalizeText(event.eventName);
 
-  if (equipment.includes('cyviz') || room.includes('vision') || room.includes('interchange')) return 'Donald.Salazar';
-  if (equipment.includes('proto') || equipment.includes('hologram') || equipment.includes('spot')) return 'Tommy.Flinch';
-  if (equipment.includes('signage') || equipment.includes('tour') || equipment.includes('experience')) return 'Mistral.Rojas';
-
+  // Cyviz / Vision Room / Interchange → Donald
+  if (equipment.includes('cyviz') || room.includes('vision') || room.includes('interchange')) 
+    return 'Donald.Salazar';
+  
+  // Proto / Spot / Hologram → Tommy
+  if (equipment.includes('proto') || equipment.includes('hologram') || 
+      equipment.includes('spot') || equipment.includes('boston dynamics')) 
+    return 'Tommy.Flinch';
+  
+  // Signage / Tours / Makers Lab → Mistral
+  if (equipment.includes('signage') || equipment.includes('tour') || 
+      equipment.includes('makers lab') || equipment.includes('liquid studios')) 
+    return 'Mistral.Rojas';
+  
+  // Broadcast / Vu AI / CecoCeco / Alleo → Donald (AV specialist)
+  if (equipment.includes('broadcast') || equipment.includes('vu ai') || 
+      equipment.includes('cecoceco') || equipment.includes('alleo') ||
+      equipment.includes('hypervsn')) 
+    return 'Donald.Salazar';
+  
+  // Tank / FKA Theater / ExCo → Tommy (experience spaces)
+  if (room.includes('tank') || room.includes('fka theater') || room.includes('exco')) 
+    return 'Tommy.Flinch';
+  
+  // Common Grounds with audio → Mistral (cafe events)
+  if (room.includes('common grounds') && (equipment.includes('mic') || equipment.includes('music'))) 
+    return 'Mistral.Rojas';
+  
   return event.selectPoc || 'Eric.Guzman';
 };
 
@@ -739,50 +764,162 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
       setAiLoading(true);
       setImportBanner(`Sending ${text.length.toLocaleString()} chars to AI...`);
 
-      const aiPrompt = `You are reading an Accenture NYIH Daily BEO (Banquet Event Order). 
-Today's date is in the header (e.g. "Thursday, June 18, 2026").
+      const aiPrompt = `You are an event data extraction specialist for the Accenture NYIH SELECT team.
 
-PDF extraction strips emoji icons. Look for these TEXTUAL markers:
-- "SELECT" (anywhere it appears)
-- "*SELECT Required" or "SELECT Required"
-- Equipment: Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, mics, microphones, 
-  clickers, signage, music, loaner laptops, web conference, teams call, MTR, Cisco
-- "TXA" = TXA-only (SKIP)
-- "FACILITIES" alone = facilities-only (SKIP unless SELECT also present)
+const aiPrompt = `You are an event data extraction specialist for the Accenture NYIH SELECT team.
 
-Extract ALL events that ANY of the following apply:
+You will read a Daily BEO and extract SELECT-relevant events using a structured reasoning process.
 
-1. Contains "SELECT" or "*SELECT Required"
-2. Uses rooms like Vision Room, Interchange, Tank, Training Room
-3. Mentions technology or AV support (Cyviz, Surface Hub, Proto, Hypervsn, Vu AI, Spot, microphones, mics, clickers, monitors, screens, VC, Teams, Cisco)
-4. Includes demonstrations, presentations, workshops, or client demos
-5. Has attendees and appears to require setup or coordination
+═══ BEO STRUCTURE ═══
+      ═══ SELECT TEAM CONTEXT ═══
+The NYIH SELECT team owns these spaces, technologies, and people:
 
-IMPORTANT:
-- DO NOT skip events just because the word "SELECT" is missing.
-- If the event requires technology, AV, presentation, or room setup, INCLUDE it.
-- When uncertain, INCLUDE the event.
+TEAM MEMBERS (any of these as POC/Host/S&E = SELECT event):
+eric.guzman, donald.salazar, tommy.flinch, m.j.cedanio.rojas / mistral.rojas, 
+jonathan.hayes, rutba.shivani, joel.p.trahan, tanvi.santhosh, 
+jessica.b.delgado, daniela.john, kaitlyn.stewart
 
-Return ALL possible SELECT-relevant events. Over-inclusion is preferred over missing events.
+OWNED TECHNOLOGY:
+Proto (hologram), Spot (Boston Dynamics), Vu AI / Vu video wall, 
+Cyviz, CecoCeco, Alleo, Hypervsn, Surface Hub, broadcast systems,
+Liquid Studios, Makers Lab
 
-For each qualifying event, return JSON with these keys:
-- "eventName": Named event title
-- "startDate": ISO "YYYY-MM-DDTHH:mm" using header date + start time
-- "endDate": ISO format end time
-- "eventPoc": Host or POC name
-- "selectPoc": ""
-- "location": "NYIH"
-- "eventLocation": Room name or "Floor [number]"
-- "classification": Map "CLIENT VISIT"->"Client", "INTERNAL"->"Internal", "COMMUNITY"->"Community"
-- "sessionType": "Demo" | "Meeting" | "Workshop" | "Town Hall" | "Other"
-- "attendees": Number if mentioned, else ""
-- "demo": Equipment mentioned
-- "selectResources": Same as demo
-- "supportTeam": "NYIH SELECT"
-- "notes": Include WRES ID, Host, S&E, all context
+OWNED ROOMS (always SELECT):
+The Tank / FKA Tank, FKA Theater, Vision Room, Interchange / Cafe, ExCo
 
-Return ONLY a JSON array. No markdown fences. No explanation.
-If zero qualifying events found, return: []`;
+SHARED ROOMS (SELECT only if audio mentioned):
+Common Grounds Cafe → SELECT only if mics, microphones, music, broadcast
+
+EQUIPMENT THAT CROSSES TXA→SELECT (treat as SELECT if mentioned):
+loaner laptops, clickers, screen connection, screen sharing, 
+presentation support, broadcasting, MTR setup, Cisco video conferencing
+• Header has date, e.g. "DAILY BEO  Thursday, June 18, 2026"
+• Each WRES block has: WRES ID, Host, S&E, support marker (SELECT/TXA/FACILITIES), then details
+• Named events appear separately: "EventName  RoomNumber RoomName  StartTime - EndTime  CLASSIFICATION"
+
+═══ EXTRACTION PROCESS — Follow these steps INTERNALLY for every WRES block ═══
+
+STEP 1 — IDENTIFY THE DATE
+Extract the date from the BEO header. Convert to YYYY-MM-DD format.
+Example: "Thursday, June 18, 2026" → "2026-06-18"
+
+STEP 2 — DOES THIS BLOCK BELONG TO SELECT?
+A WRES block belongs to SELECT if ANY of these are true. Check each one:
+
+A) EXPLICIT SELECT MARKERS
+  - Contains "*SELECT Required" or "SELECT Required" → INCLUDE
+  - Contains "*SELECT" anywhere → INCLUDE
+
+B) SELECT TEAM MEMBERS NAMED AS POC OR HOST OR S&E
+  Any of: eric.guzman, donald.salazar, tommy.flinch, m.j.cedanio.rojas, 
+  mistral.rojas, jonathan.hayes, rutba.shivani, joel.p.trahan, 
+  tanvi.santhosh, jessica.b.delgado, daniela.john, kaitlyn.stewart
+  → INCLUDE
+
+C) SELECT-OWNED TECHNOLOGY / SPACES
+  Any of: Proto, hologram, Spot, Boston Dynamics, Vu AI, Vu video wall, 
+  Cyviz, CecoCeco, Ceco Ceco, Alleo, Hypervsn, Surface Hub, Liquid Studios, 
+  Makers Lab, broadcast, broadcasting, MTR, Cisco
+  → INCLUDE
+
+D) SELECT-OWNED ROOMS (always SELECT support)
+  Any of: The Tank, FKA Tank, FKA Theater, Vision Room, Vision, 
+  Interchange, Interchange Cafe, ExCo, Executive Cafe
+  → INCLUDE
+
+E) COMMON GROUNDS — CONDITIONAL
+  Common Grounds Cafe → INCLUDE **only if** mics, microphone, audio, 
+  music, broadcast, or speakers are mentioned. Otherwise SKIP.
+
+F) TXA-LIKE BLOCKS THAT ARE ACTUALLY SELECT
+  Some blocks say "*TXA Required" but mention loaner laptops, clickers, 
+  screen connection, screen sharing, presentation help → INCLUDE as SELECT
+  (These have become joint TXA/SELECT events)
+
+G) PURE TXA OR FACILITIES (no overlap with A-F)
+  → SKIP
+
+When uncertain between TXA and SELECT → INCLUDE as SELECT.
+
+STEP 3 — MATCH WRES TO NAMED EVENT
+The named events appear in a separate section. Match each qualifying WRES block to its nearest named event based on:
+  - Same floor section
+  - Time proximity to the SELECT line time
+  - Host name overlap
+If no clear match → use "SELECT Support - Floor [N]" or "<Host> Support Event"
+
+STEP 4 — BUILD DATES
+Combine header date + time mentioned in the SELECT line OR named event line.
+  - "Time: 3:30 PM" + date 2026-06-18 → "2026-06-18T15:30"
+  - "Event: 4 PM - 7 PM" → start "16:00", end "19:00"
+  - Named event "08:00 AM - 05:00 PM" → start "08:00", end "17:00"
+
+STEP 5 — EXTRACT EQUIPMENT
+Pull every piece of equipment mentioned. Be specific.
+
+Equipment categories to look for:
+  - Audio: mics, microphones, speakers, music, background music
+  - Display: Surface Hub, Cyviz, Vu AI, video wall, monitors, screens
+  - Specialty: Proto, hologram, Spot, robot, Hypervsn, CecoCeco, Alleo
+  - Presentation: clickers, loaner laptops, screen connection, MTR, Cisco
+  - Production: broadcast, broadcasting, Liquid Studios, Makers Lab
+  - Signage: digital signage, lobby signage
+  
+Examples:
+  - "2 mics + 2 surface hubs" → "2 mics, 2 Surface Hubs"
+  - "Music: classic jazz" → "Background music: classic jazz"
+  - "Screen Connection Help" → "Screen connection support"
+  - "loaner laptop (WBS: CXFNR003)" → "Loaner laptop (WBS: CXFNR003)"
+  - "Microphones (max amount), clicker" → "Multiple mics, clicker"
+
+STEP 6 — MAP CLASSIFICATION
+"CLIENT VISIT" / "BUSINESS DEV" / "CLIENT PREP" → "Client"
+"INTERNAL" / "TRAINING" → "Internal"
+"COMMUNITY" → "Community"
+"LEADERSHIP" / VIP indicators → "Leadership"
+Unknown → "TBD"
+
+STEP 7 — CONSTRUCT NOTES FIELD
+Use this exact format with pipe separators:
+"WRES: <id> | Host: <name> | S&E: <name> | Equipment: <full list> | Setup: <catering/signage/furniture/rope details> | Special: <multi-day info, VIP names, timing notes, specific instructions>"
+
+═══ WORKED EXAMPLE ═══
+
+INPUT BLOCK:
+"WRES19421611  Host: john.beyan  S&E: jia.b.gao  TXA  *TXA Required  Support at 8am each day with presentations and Teams call. Microphones (max amount), clicker, loaner laptop (WBS: CXFNR003) POC: carmen.guevara, john.beyan  FACILITIES  Catering Table: 4 OUTSIDE BC hallway  Clusters/Pods: Day 1 of 8 (6/16-6/25) Homeroom ABC combined 10 Pods of 8 for 80 ppl..."
+
+My reasoning:
+- Step 1: Date = 2026-06-18 (from header)
+- Step 2: Says "*TXA Required" BUT mentions microphones + clicker + loaner laptop + Teams call → CROSSOVER. INCLUDE as SELECT (rule F)
+- Step 3: Nearby named event "Regeneron End to End Summit - Week 1  421 W61 Homeroom C  08:00 AM - 06:00 PM  CLIENT VISIT" matches
+- Step 4: Start = 08:00, End = 18:00, multi-day 6/16-6/25
+- Step 5: Equipment = "Multiple mics, clicker, loaner laptop (WBS: CXFNR003), Teams call support"
+- Step 6: CLIENT VISIT → "Client"
+- Step 7: Build notes
+
+OUTPUT:
+{
+  "eventName": "Regeneron End to End Summit - Week 1",
+  "startDate": "2026-06-18T08:00",
+  "endDate": "2026-06-18T18:00",
+  "eventPoc": "carmen.guevara, john.beyan",
+  "selectPoc": "",
+  "location": "NYIH",
+  "eventLocation": "421 W61 Homeroom C",
+  "classification": "Client",
+  "sessionType": "Workshop",
+  "attendees": "80",
+  "demo": "Multiple mics, clicker, loaner laptop, Teams call support",
+  "selectResources": "Multiple mics, clicker, loaner laptop, Teams call support",
+  "supportTeam": "NYIH SELECT",
+  "sessionDays": "Day 1 of 8 (6/16-6/25)",
+  "notes": "WRES: WRES19421611 | Host: john.beyan | S&E: jia.b.gao | Equipment: max microphones, clicker, loaner laptop (WBS: CXFNR003) | Setup: 4 catering tables OUTSIDE BC hallway, 10 Pods of 8 for 80 ppl, Registration table by reception on 6/16 only +2 chairs, Jia provides ACN tablecloth | Special: Day 1 of 8 (6/16-6/25), Regeneron VIP leadership attending: Mark Volpe SVP Tax, Jai Gulati Global Head G&A IT, Mack MacKenzie SVP Commercial, Hakan Franson, 8am support each day, breakfast 8:30am meeting 9am, 47 external + 32 internal registered ~60/day expected"
+}
+
+═══ OUTPUT INSTRUCTIONS ═══
+Apply steps 1-7 to every WRES block silently. Then return ONLY a JSON array of all qualifying events.
+No markdown fences. No reasoning shown. No prose.
+If zero qualifying events: return []`;
 
       const result = await fetchGemini(aiPrompt, text, false);
 
@@ -1412,6 +1549,8 @@ export default function App() {
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 8192,
+          topP: 0.95,          // ← add this
+          topK: 40,            // ← add this
           ...(json ? { responseMimeType: "application/json" } : {})
         }
       };
