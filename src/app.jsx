@@ -1562,6 +1562,7 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [rooms, setRooms] = useState([]);
 
   useEffect(() => {
     if (!firebaseConfig.apiKey) { setLoading(false); return; }
@@ -1580,7 +1581,8 @@ export default function App() {
     const u1 = onSnapshot(query(p('shared_events'), orderBy('timestamp','desc')), (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const u2 = onSnapshot(query(p('shared_tasks'), orderBy('timestamp','desc')), (s) => setTasks(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const u3 = onSnapshot(query(p('shared_issues'), orderBy('timestamp','desc')), (s) => setIssues(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    return () => { u1(); u2(); u3(); };
+    const u4 = makeListener('shared_rooms', setRooms);
+    return () => { u1(); u2(); u3(); u4(); };
   }, [user]);
 
   const showMsg = (text, isError = false) => {
@@ -1694,6 +1696,12 @@ export default function App() {
             <NavBtn a={currentPage==='calendar'} o={() => setCurrentPage('calendar')} l="Calendar" i={<CalendarDays size={13}/>} />
             <NavBtn a={currentPage==='kanban'} o={() => setCurrentPage('kanban')} l="Tasks" i={<Layout size={13}/>} />
             <NavBtn a={currentPage==='issues'} o={() => setCurrentPage('issues')} l="Tech Feed" i={<BrainCircuit size={13}/>} />
+            <NavBtn
+    a={currentPage === 'rooms'}
+    o={() => setCurrentPage('rooms')}
+    l="Rooms"
+    i={<MapPin size={13} />}
+/>
             <NavBtn a={currentPage==='analytics'} o={() => setCurrentPage('analytics')} l="Insights" i={<BarChart3 size={13}/>} />
           </div>
         </div>
