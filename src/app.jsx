@@ -1422,8 +1422,587 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
   );
 }
 
-function RoomStatusPage(...) {
-   ...
+function RoomStatusPage({ rooms, showMsg }) {
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({
+    title: '',
+    owner: '',
+    backupOwner: '',
+    status: 'Operational',
+    devices: '',
+    notes: '',
+  });
+
+  const statusColor = (status) => {
+    if (status === 'Operational') return '#22C55E';
+    if (status === 'Monitor') return '#F59E0B';
+    if (status === 'Escalate') return '#EF4444';
+    return '#6B6B8A';
+  };
+
+  const getInitials = (name = '') =>
+    String(name)
+      .split('.')
+      .map((p) => p[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+
+  const resetForm = () => {
+    setEditingId(null);
+    setForm({
+      title: '',
+      owner: '',
+      backupOwner: '',
+      status: 'Operational',
+      devices: '',
+      notes: '',
+    });
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+
+    if (!form.title) {
+      showMsg('Room / device name required.', true);
+      return;
+    }
+
+    const payload = {
+      ...form,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: auth.currentUser?.email || 'unknown',
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      if (editingId) {
+        await updateDoc(
+          doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', editingId),
+          payload
+        );
+        showMsg('Room updated.');
+      } else {
+        await addDoc(
+          collection(db, 'artifacts', appId, 'public', 'data', 'shared_rooms'),
+          payload
+        );
+        showMsg('Room added.');
+      }
+
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      showMsg('Room save failed.', true);
+    }
+  };
+
+  const updateRoomStatus = async (room, status) => {
+    try {
+      await updateDoc(
+        doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', room.id),
+        {
+          status,
+          lastUpdated: new Date().toISOString(),
+          updatedBy: auth.currentUser?.email || 'unknown',
+        }
+      );
+
+      showMsg(`${room.title} marked ${status}.`);
+    } catch (err) {
+      console.error(err);
+      showMsg('Status update failed.', true);
+    }
+  };
+
+  const editRoom = (room) => {
+    setEditingId(room.id);
+    setForm({
+      title: room.title || '',
+      owner: room.owner || '',
+      backupOwner: room.backupOwner || '',
+      status: room.status || 'Operational',
+      devices: room.devices || '',
+      notes: room.notes || '',
+    });
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const deleteRoom = async (id) => {
+    if (!window.confirm('Delete this room/device?')) return;
+
+    try {
+      await deleteDoc(
+        doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', id)
+      );
+      showMsg('Room deleted.');
+    } catch (err) {
+      console.error(err);
+      showMsg('Delete failed.', true);
+    }
+  };
+
+  const seedDefaultRooms = async () => {
+    const defaults = [
+      {
+        title: 'Vision Room',
+        owner: 'Donald.Salazar',
+        backupOwner: 'Eric.Guzman',
+        status: 'Operational',
+        devices: 'Cyviz, Vu',
+        notes: 'Primary experience room / client support',
+      },
+      {
+        title: 'Broadcast Cyviz',
+        owner: 'Donald.Salazar',
+        backupOwner: 'Eric.Guzman',
+        status: 'Operational',
+        devices: 'Cyviz, Vu, Broadcast',
+        notes: 'Broadcast-enabled Cyviz space',
+      },
+      {
+        title: '65th Floor',
+        owner: 'Mistral.Rojas',
+        backupOwner: 'Eric.Guzman',
+        status: 'Operational',
+        devices: 'Cyviz, Audio, Video, Britelite, Target Screen',
+        notes: '65th floor readiness and maintenance',
+      },
+      {
+        title: 'CIC Space',
+        owner: 'Eric.Guzman',
+        backupOwner: 'Donald.Salazar',
+        status: 'Operational',
+        devices: 'Cyviz, Kiosk, Projection / experience tech',
+        notes: 'CIC readiness and vendor coordination',
+      },
+      {
+        title: 'Proto',
+        owner: 'Eric.Guzman',
+        backupOwner: 'Donald.Salazar',
+        status: 'Operational',
+        devices: 'Proto hologram',
+        notes: 'Proto sessions and content readiness',
+      },
+      {
+        title: 'Hypervsn',
+        owner: 'Eric.Guzman',
+        backupOwner: 'Donald.Salazar',
+        status: 'Monitor',
+        devices: 'Hypervsn display',
+        notes: 'Monitor content and hardware status',
+      },
+      {
+        title: 'Surface Hubs',
+        owner: 'Travis.Alexander',
+        backupOwner: 'Eric.Guzman',
+        status: 'Monitor',
+        devices: 'Surface Hub fleet',
+        notes: 'Offline hubs / remediation tracking',
+      },
+      {
+        title: 'Vestaboard',
+        owner: 'Wilson.Ferreira',
+        backupOwner: 'Eric.Guzman',
+        status: 'Operational',
+        devices: 'Vestaboard coding project',
+        notes: 'Wilson development ownership',
+      },
+      {
+        title: 'Alleo',
+        owner: 'Mistral.Rojas',
+        backupOwner: 'Donald.Salazar',
+        status: 'Operational',
+        devices: 'Alleo',
+        notes: 'Documentation and support readiness',
+      },
+      {
+        title: 'Ceco Ceco',
+        owner: 'Mistral.Rojas',
+        backupOwner: 'Donald.Salazar',
+        status: 'Operational',
+        devices: 'Ceco Ceco',
+        notes: 'Documentation and support readiness',
+      },
+    ];
+
+    try {
+      for (const room of defaults) {
+        await addDoc(
+          collection(db, 'artifacts', appId, 'public', 'data', 'shared_rooms'),
+          {
+            ...room,
+            lastUpdated: new Date().toISOString(),
+            updatedBy: auth.currentUser?.email || 'seed',
+            timestamp: new Date().toISOString(),
+          }
+        );
+      }
+
+      showMsg('Default room ownership loaded.');
+    } catch (err) {
+      console.error(err);
+      showMsg('Seed failed.', true);
+    }
+  };
+
+  const stats = useMemo(
+    () => ({
+      total: rooms.length,
+      operational: rooms.filter((r) => r.status === 'Operational').length,
+      monitor: rooms.filter((r) => r.status === 'Monitor').length,
+      escalate: rooms.filter((r) => r.status === 'Escalate').length,
+    }),
+    [rooms]
+  );
+
+  const ownershipRows = useMemo(() => {
+    const people = {};
+
+    rooms.forEach((room) => {
+      const owner = room.owner || 'Unassigned';
+
+      if (!people[owner]) {
+        people[owner] = {
+          owner,
+          primary: [],
+          backup: [],
+          monitor: 0,
+          escalate: 0,
+        };
+      }
+
+      people[owner].primary.push(room.title);
+
+      if (room.status === 'Monitor') people[owner].monitor += 1;
+      if (room.status === 'Escalate') people[owner].escalate += 1;
+
+      if (room.backupOwner) {
+        if (!people[room.backupOwner]) {
+          people[room.backupOwner] = {
+            owner: room.backupOwner,
+            primary: [],
+            backup: [],
+            monitor: 0,
+            escalate: 0,
+          };
+        }
+
+        people[room.backupOwner].backup.push(room.title);
+      }
+    });
+
+    return Object.values(people);
+  }, [rooms]);
+
+  return (
+    <div className="anim-in space-y-5">
+      <div className="grid md:grid-cols-4 gap-3">
+        <StatCard icon={<Layout size={16} />} value={stats.total} label="Rooms / Devices" />
+        <StatCard icon={<CheckCircle2 size={16} />} value={stats.operational} label="Operational" />
+        <StatCard icon={<Clock size={16} />} value={stats.monitor} label="Monitor" />
+        <StatCard icon={<AlertCircle size={16} />} value={stats.escalate} label="Escalate" />
+      </div>
+
+      <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+        <div className="flex justify-between items-start flex-wrap gap-3 mb-4">
+          <div>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <Layout size={16} className="text-[#A100FF]" />
+              {editingId ? 'Edit Room / Device' : 'Add Room / Device'}
+            </h2>
+            <p className="text-[11px] text-[#6B6B8A] mt-0.5">
+              Track ownership, room health, backup coverage, and device notes.
+            </p>
+          </div>
+
+          {!rooms.length && (
+            <button
+              type="button"
+              onClick={seedDefaultRooms}
+              className="bg-[#A100FF] text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase hover:bg-[#B733FF] transition"
+            >
+              Load Default Matrix
+            </button>
+          )}
+        </div>
+
+        <form onSubmit={handleSave} className="space-y-3">
+          <div className="grid md:grid-cols-4 gap-3">
+            <input
+              value={form.title}
+              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+              placeholder="Room / Device name *"
+              className={`md:col-span-2 ${DK}`}
+              required
+            />
+
+            <select
+              value={form.owner}
+              onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))}
+              className={DK}
+            >
+              <option value="">Primary owner...</option>
+              {TEAM_MEMBERS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={form.backupOwner}
+              onChange={(e) => setForm((p) => ({ ...p, backupOwner: e.target.value }))}
+              className={DK}
+            >
+              <option value="">Backup owner...</option>
+              {TEAM_MEMBERS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-3">
+            <select
+              value={form.status}
+              onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
+              className={DK}
+            >
+              <option value="Operational">Operational</option>
+              <option value="Monitor">Monitor</option>
+              <option value="Escalate">Escalate</option>
+            </select>
+
+            <input
+              value={form.devices}
+              onChange={(e) => setForm((p) => ({ ...p, devices: e.target.value }))}
+              placeholder="Devices / systems"
+              className={`md:col-span-2 ${DK}`}
+            />
+
+            <button
+              type="submit"
+              className={`font-bold py-3 rounded-xl text-xs uppercase transition ${
+                editingId
+                  ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]'
+                  : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'
+              }`}
+            >
+              {editingId ? 'Update' : 'Add'}
+            </button>
+          </div>
+
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+            placeholder="Notes / support details..."
+            rows="2"
+            className={`w-full resize-none ${DK}`}
+          />
+
+          {editingId && (
+            <button
+              type="button"
+              onClick={resetForm}
+              className="bg-[#1A1A2E] text-[#6B6B8A] px-4 py-2 rounded-lg text-[10px] font-bold uppercase hover:text-white transition"
+            >
+              Cancel Edit
+            </button>
+          )}
+        </form>
+      </div>
+
+      <div className="grid lg:grid-cols-[1.5fr,.9fr] gap-5">
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+            <MapPin size={16} className="text-[#A100FF]" />
+            Live Room Status
+          </h2>
+
+          {!rooms.length && (
+            <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
+              No rooms loaded yet. Use “Load Default Matrix” or add a room above.
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-2 gap-4">
+            {rooms.map((room) => {
+              const color = statusColor(room.status);
+
+              return (
+                <div
+                  key={room.id}
+                  className="bg-[#0D0D15] rounded-2xl border border-[#2A2A3E] p-4 border-l-4 hover:border-[#A100FF]/50 transition group"
+                  style={{ borderLeftColor: color }}
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <h3 className="text-sm font-black text-white">{room.title}</h3>
+                      <p className="text-[10px] text-[#6B6B8A] mt-1">
+                        Owner:{' '}
+                        <span className="text-[#C0C0D8] font-bold">
+                          {room.owner || 'Unassigned'}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-[#6B6B8A]">
+                        Backup:{' '}
+                        <span className="text-[#C0C0D8] font-bold">
+                          {room.backupOwner || 'None'}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                      <button
+                        onClick={() => editRoom(room)}
+                        className="p-1.5 rounded-lg bg-[#1A1A2E] text-[#A100FF] hover:bg-[#2A2A3E]"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+
+                      <button
+                        onClick={() => deleteRoom(room.id)}
+                        className="p-1.5 rounded-lg bg-[#1A1A2E] text-red-400 hover:bg-[#2A2A3E]"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {room.devices && (
+                    <p className="text-[10px] text-[#A100FF] mb-2 line-clamp-1">
+                      Devices: {room.devices}
+                    </p>
+                  )}
+
+                  {room.notes && (
+                    <p className="text-[10px] text-[#6B6B8A] mb-3 line-clamp-2">
+                      {room.notes}
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {['Operational', 'Monitor', 'Escalate'].map((s) => {
+                      const active = room.status === s;
+
+                      return (
+                        <button
+                          key={s}
+                          onClick={() => updateRoomStatus(room, s)}
+                          className="py-2 rounded-lg text-[10px] font-bold uppercase transition border"
+                          style={{
+                            background: active ? statusColor(s) : '#111119',
+                            borderColor: active ? statusColor(s) : '#2A2A3E',
+                            color: active ? '#FFFFFF' : '#8A8AA3',
+                          }}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {room.lastUpdated && (
+                    <p className="text-[9px] text-[#4A4A6A] mt-3">
+                      Updated: {new Date(room.lastUpdated).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
+          <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+            <Users size={16} className="text-[#A100FF]" />
+            Device Ownership Matrix
+          </h2>
+
+          {!ownershipRows.length && (
+            <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
+              Ownership matrix will appear after rooms are added.
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {ownershipRows.map((row) => (
+              <div
+                key={row.owner}
+                className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#A100FF]/20 text-[#A100FF] flex items-center justify-center text-[10px] font-black">
+                    {getInitials(row.owner)}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">{row.owner}</p>
+                    <p className="text-[9px] text-[#6B6B8A]">
+                      Primary: {row.primary.length} • Backup: {row.backup.length}
+                    </p>
+                  </div>
+                </div>
+
+                {!!row.primary.length && (
+                  <div className="mb-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#A100FF] mb-1">
+                      Primary
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {row.primary.map((item) => (
+                        <span
+                          key={item}
+                          className="px-2 py-1 rounded bg-[#1A1A2E] text-[#C0C0D8] text-[9px] font-bold"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {!!row.backup.length && (
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#6B6B8A] mb-1">
+                      Backup
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {row.backup.map((item) => (
+                        <span
+                          key={item}
+                          className="px-2 py-1 rounded bg-[#111119] border border-[#2A2A3E] text-[#6B6B8A] text-[9px] font-bold"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(row.monitor > 0 || row.escalate > 0) && (
+                  <div className="mt-3 flex gap-2">
+                    {row.monitor > 0 && (
+                      <span className="text-[9px] font-bold px-2 py-1 rounded bg-[#F59E0B]/10 text-[#F59E0B]">
+                        {row.monitor} Monitor
+                      </span>
+                    )}
+                    {row.escalate > 0 && (
+                      <span className="text-[9px] font-bold px-2 py-1 rounded bg-[#EF4444]/10 text-[#EF4444]">
+                        {row.escalate} Escalate
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function AnalyticsDashboard({ events, tasks }) {
