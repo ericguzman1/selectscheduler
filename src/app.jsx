@@ -12,7 +12,7 @@ import {
   Layout, AlertCircle, Trash2, CheckCircle2, ChevronLeft, ChevronRight,
   Zap, LogOut, User, Edit3, FileText, BarChart3, PieChart as PieIcon,
   Calendar, Clock, TrendingUp, Share2, BrainCircuit, MapPin, Upload,
-  Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays,
+  Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays, MapPin, Users,
 } from 'lucide-react';
 
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
@@ -52,6 +52,11 @@ const extractTextFromPdf = async (file) => {
 };
 
 const TEAM_MEMBERS = ["Eric.Guzman","Tommy.Flinch","Donald.Salazar","Mistral.Rojas"];
+const ROOM_STATUS_OPTIONS = [
+    'Operational',
+    'Monitor',
+    'Escalate'
+];
 const ROOMS = ["Interchange","Vision","Tank","Training Room","Meadow","Common Grounds","Ginsberg","Globe","Office Tour"];
 const DURATION_OPTIONS = ["0.5 Hours","1 Hour","2 Hours","4 Hours","6 Hours","8 Hours","Full Day (10h)","Multi-Day (24h)"];
 const SUPPORT_TEAMS = ["NYIH SELECT","CIC","TXA Assist","Other"];
@@ -222,6 +227,21 @@ const getRiskColor = (risk) => {
   if (risk === 'Medium') return '#F59E0B';
   return '#22C55E';
 };
+
+const roomStatusColor = (status) => {
+    if (status === 'Operational') return '#22C55E';
+    if (status === 'Monitor') return '#F59E0B';
+    if (status === 'Escalate') return '#EF4444';
+    return '#6B6B8A';
+};
+
+const initials = (name = '') =>
+    String(name)
+        .split('.')
+        .map((p) => p[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
 
 const buildTaskTemplatesForEvent = (event) => {
   const equipment = detectEquipment(event);
@@ -1402,6 +1422,10 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
   );
 }
 
+function RoomStatusPage(...) {
+   ...
+}
+
 function AnalyticsDashboard({ events, tasks }) {
   const stats = useMemo(() => {
   const totalAttendees = events.reduce((s, e) => {
@@ -1718,6 +1742,12 @@ export default function App() {
           {currentPage === 'calendar' && <CalendarView events={events} />}
           {currentPage === 'kanban' && <KanbanPage tasks={tasks} showMsg={showMsg} />}
           {currentPage === 'issues' && <IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} />}
+          {currentPage === 'rooms' && (
+    <RoomStatusPage
+        rooms={rooms}
+        showMsg={showMsg}
+    />
+)}
           {currentPage === 'analytics' && <AnalyticsDashboard events={events} tasks={tasks} />}
         </div>
 
