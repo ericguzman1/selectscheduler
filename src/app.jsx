@@ -1605,7 +1605,19 @@ export default function App() {
     const u1 = onSnapshot(query(p('shared_events'), orderBy('timestamp','desc')), (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const u2 = onSnapshot(query(p('shared_tasks'), orderBy('timestamp','desc')), (s) => setTasks(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const u3 = onSnapshot(query(p('shared_issues'), orderBy('timestamp','desc')), (s) => setIssues(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const u4 = makeListener('shared_rooms', setRooms);
+   const u4 = onSnapshot(
+  query(
+    p('shared_rooms'),
+    orderBy('timestamp', 'desc')
+  ),
+  (s) =>
+    setRooms(
+      s.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }))
+    )
+);
     return () => { u1(); u2(); u3(); u4(); };
   }, [user]);
 
