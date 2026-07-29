@@ -12,7 +12,7 @@ import {
   Layout, AlertCircle, Trash2, CheckCircle2, ChevronLeft, ChevronRight,
   Zap, LogOut, User, Edit3, FileText, BarChart3, PieChart as PieIcon,
   Calendar, Clock, TrendingUp, Share2, BrainCircuit, MapPin, Upload,
-  Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays, Users,
+  Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays, 
 } from 'lucide-react';
 
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
