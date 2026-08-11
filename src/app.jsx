@@ -1,20 +1,25 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+
 import { initializeApp, getApps } from 'firebase/app';
+
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signOut, signInWithCustomToken,
 } from 'firebase/auth';
+
 import {
   getFirestore, collection, addDoc, onSnapshot, query,
   deleteDoc, doc, updateDoc, orderBy,
 } from 'firebase/firestore';
+
 import {
   Layout, AlertCircle, Trash2, CheckCircle2, ChevronLeft, ChevronRight,
   Zap, LogOut, User, Edit3, FileText, BarChart3, PieChart as PieIcon,
   Calendar, Clock, TrendingUp, Share2, BrainCircuit, MapPin, Upload,
-  Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays, 
+  Search, Filter, RefreshCcw, ClipboardList, Users, CalendarDays,
 } from 'lucide-react';
 
+// ─── Gemini model intentionally left as-is until API proxy is set up ───
 const GEMINI_MODEL = "gemini-3.1-flash-lite";
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
@@ -51,44 +56,40 @@ const extractTextFromPdf = async (file) => {
   return pages.join('\n');
 };
 
-const TEAM_MEMBERS = ["Eric.Guzman","Tommy.Flinch","Donald.Salazar","Mistral.Rojas"];
-const ROOM_STATUS_OPTIONS = [
-    'Operational',
-    'Monitor',
-    'Escalate'
-];
-const ROOMS = ["Interchange","Vision","Tank","Training Room","Meadow","Common Grounds","Ginsberg","Globe","Office Tour"];
-const DURATION_OPTIONS = ["0.5 Hours","1 Hour","2 Hours","4 Hours","6 Hours","8 Hours","Full Day (10h)","Multi-Day (24h)"];
-const SUPPORT_TEAMS = ["NYIH SELECT","CIC","TXA Assist","Other"];
-const CLASSIFICATIONS = ["Internal","Client","Leadership","Community","Confidential","Public / External","TBD"];
-const SESSION_TYPES = ["Demo","Client","Leadership","Workshop","Meeting","Conference / Boardroom","Town Hall","Other","TBD"];
+const TEAM_MEMBERS = ["Eric.Guzman", "Tommy.Flinch", "Donald.Salazar", "Mistral.Rojas"];
+const ROOM_STATUS_OPTIONS = ['Operational', 'Monitor', 'Escalate'];
+const ROOMS = ["Interchange", "Vision", "Tank", "Training Room", "Meadow", "Common Grounds", "Ginsberg", "Globe", "Office Tour"];
+const DURATION_OPTIONS = ["0.5 Hours", "1 Hour", "2 Hours", "4 Hours", "6 Hours", "8 Hours", "Full Day (10h)", "Multi-Day (24h)"];
+const SUPPORT_TEAMS = ["NYIH SELECT", "CIC", "TXA Assist", "Other"];
+const CLASSIFICATIONS = ["Internal", "Client", "Leadership", "Community", "Confidential", "Public / External", "TBD"];
+const SESSION_TYPES = ["Demo", "Client", "Leadership", "Workshop", "Meeting", "Conference / Boardroom", "Town Hall", "Other", "TBD"];
 
 const QUICK_FILL_CARDS = [
-  { name:'Proto', demo:'Proto hologram', sessionType:'Demo', note:'Hologram demo' },
-  { name:'Vu AI', demo:'Vu AI', sessionType:'Demo', note:'AI video wall' },
-  { name:'Spot', demo:'Spot', sessionType:'Demo', note:'Boston Dynamics' },
-  { name:'Cyviz', demo:'Cyviz', sessionType:'Meeting', note:'Room / VC' },
-  { name:'Surface Hub', demo:'Surface Hub', sessionType:'Meeting', note:'Whiteboard / VC' },
-  { name:'Signage', demo:'Signage only', sessionType:'Leadership', note:'Lobby signage' },
+  { name: 'Proto', demo: 'Proto hologram', sessionType: 'Demo', note: 'Hologram demo' },
+  { name: 'Vu AI', demo: 'Vu AI', sessionType: 'Demo', note: 'AI video wall' },
+  { name: 'Spot', demo: 'Spot', sessionType: 'Demo', note: 'Boston Dynamics' },
+  { name: 'Cyviz', demo: 'Cyviz', sessionType: 'Meeting', note: 'Room / VC' },
+  { name: 'Surface Hub', demo: 'Surface Hub', sessionType: 'Meeting', note: 'Whiteboard / VC' },
+  { name: 'Signage', demo: 'Signage only', sessionType: 'Leadership', note: 'Lobby signage' },
 ];
 
 const DK = 'bg-[#0D0D15] border border-[#2A2A3E] text-[#E8E8F0] rounded-xl p-3.5 text-sm outline-none focus:border-[#A100FF] transition placeholder-[#4A4A6A]';
 
 const blankEventForm = () => ({
-  eventName:'',startDate:'',endDate:'',eventPoc:'',selectPoc:'',location:'NYIH',
-  eventLocation:'',classification:'Internal',sessionType:'Demo',attendees:'',demo:'',
-  selectResources:'',sessionDays:'',sessionSupportDuration:'',supportTeam:'NYIH SELECT',
-  weekOf:'',notes:'',source:'Manual',
+  eventName: '', startDate: '', endDate: '', eventPoc: '', selectPoc: '', location: 'NYIH',
+  eventLocation: '', classification: 'Internal', sessionType: 'Demo', attendees: '', demo: '',
+  selectResources: '', sessionDays: '', sessionSupportDuration: '', supportTeam: 'NYIH SELECT',
+  weekOf: '', notes: '', source: 'Manual',
 });
 
 const sanitizeForPrompt = (text) => {
   if (typeof text !== 'string') return '';
-  return text.slice(0,60000).replace(/[<>]/g,'').replace(/ignore (all )?instructions?/gi,'[redacted]').trim();
+  return text.slice(0, 60000).replace(/[<>]/g, '').replace(/ignore (all )?instructions?/gi, '[redacted]').trim();
 };
 
 const safeParseJson = (text) => {
   try {
-    const cleaned = text?.replace(/```json|```/g,'').trim();
+    const cleaned = text?.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(cleaned);
     if (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null) return {};
     return parsed;
@@ -96,10 +97,10 @@ const safeParseJson = (text) => {
 };
 
 const ALLOWED_EVENT_KEYS = [
-  'eventName','startDate','endDate','eventPoc','selectPoc','location',
-  'eventLocation','classification','sessionType','attendees','demo',
-  'selectResources','sessionDays','sessionSupportDuration','supportTeam','weekOf','notes','source',
-  'riskLevel','readinessScore','automationSummary','equipmentDetected','riskReasons'
+  'eventName', 'startDate', 'endDate', 'eventPoc', 'selectPoc', 'location',
+  'eventLocation', 'classification', 'sessionType', 'attendees', 'demo',
+  'selectResources', 'sessionDays', 'sessionSupportDuration', 'supportTeam', 'weekOf', 'notes', 'source',
+  'riskLevel', 'readinessScore', 'automationSummary', 'equipmentDetected', 'riskReasons',
 ];
 
 const sanitizeEventData = (obj) => {
@@ -117,14 +118,14 @@ const weekOfFromDateTime = (v) => {
   if (!v) return '';
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return '';
-  const x = new Date(d); x.setDate(x.getDate()-x.getDay());
-  return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  const x = new Date(d); x.setDate(x.getDate() - x.getDay());
+  return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
 
 const classBadgeColor = (cls) => {
-  if (cls==='Leadership') return '#F59E0B';
-  if (cls==='Client') return '#22C55E';
-  if (cls==='Confidential') return '#EF4444';
+  if (cls === 'Leadership') return '#F59E0B';
+  if (cls === 'Client') return '#22C55E';
+  if (cls === 'Confidential') return '#EF4444';
   return '#6B6B8A';
 };
 
@@ -137,16 +138,11 @@ const getAttendeeCount = (v) => {
 
 const detectEquipment = (event) => {
   const haystack = [
-    event.demo,
-    event.selectResources,
-    event.notes,
-    event.eventName,
-    event.eventLocation,
-    event.sessionType,
+    event.demo, event.selectResources, event.notes,
+    event.eventName, event.eventLocation, event.sessionType,
   ].join(' ').toLowerCase();
 
   const found = [];
-
   if (haystack.includes('proto') || haystack.includes('hologram')) found.push('Proto');
   if (haystack.includes('cyviz')) found.push('Cyviz');
   if (haystack.includes('surface hub') || haystack.includes('surfacehub')) found.push('Surface Hub');
@@ -157,43 +153,30 @@ const detectEquipment = (event) => {
   if (haystack.includes('mtr') || haystack.includes('teams') || haystack.includes('web conference') || haystack.includes('cisco')) found.push('MTR / VC');
   if (haystack.includes('mic') || haystack.includes('microphone') || haystack.includes('clicker')) found.push('Audio');
   if (haystack.includes('loaner') || haystack.includes('laptop')) found.push('Loaner Laptop');
-
   return [...new Set(found)];
 };
 
 const inferSelectOwner = (event) => {
   const room = normalizeText(event.eventLocation);
   const equipment = normalizeText(`${event.demo} ${event.selectResources} ${event.notes}`);
-  const eventName = normalizeText(event.eventName);
 
-  // Cyviz / Vision Room / Interchange → Donald
-  if (equipment.includes('cyviz') || room.includes('vision') || room.includes('interchange')) 
+  if (equipment.includes('cyviz') || room.includes('vision') || room.includes('interchange'))
     return 'Donald.Salazar';
-  
-  // Proto / Spot / Hologram → Tommy
-  if (equipment.includes('proto') || equipment.includes('hologram') || 
-      equipment.includes('spot') || equipment.includes('boston dynamics')) 
+  if (equipment.includes('proto') || equipment.includes('hologram') ||
+    equipment.includes('spot') || equipment.includes('boston dynamics'))
     return 'Tommy.Flinch';
-  
-  // Signage / Tours / Makers Lab → Mistral
-  if (equipment.includes('signage') || equipment.includes('tour') || 
-      equipment.includes('makers lab') || equipment.includes('liquid studios')) 
+  if (equipment.includes('signage') || equipment.includes('tour') ||
+    equipment.includes('makers lab') || equipment.includes('liquid studios'))
     return 'Mistral.Rojas';
-  
-  // Broadcast / Vu AI / CecoCeco / Alleo → Donald (AV specialist)
-  if (equipment.includes('broadcast') || equipment.includes('vu ai') || 
-      equipment.includes('cecoceco') || equipment.includes('alleo') ||
-      equipment.includes('hypervsn')) 
+  if (equipment.includes('broadcast') || equipment.includes('vu ai') ||
+    equipment.includes('cecoceco') || equipment.includes('alleo') ||
+    equipment.includes('hypervsn'))
     return 'Donald.Salazar';
-  
-  // Tank / FKA Theater / ExCo → Tommy (experience spaces)
-  if (room.includes('tank') || room.includes('fka theater') || room.includes('exco')) 
+  if (room.includes('tank') || room.includes('fka theater') || room.includes('exco'))
     return 'Tommy.Flinch';
-  
-  // Common Grounds with audio → Mistral (cafe events)
-  if (room.includes('common grounds') && (equipment.includes('mic') || equipment.includes('music'))) 
+  if (room.includes('common grounds') && (equipment.includes('mic') || equipment.includes('music')))
     return 'Mistral.Rojas';
-  
+
   return event.selectPoc || 'Eric.Guzman';
 };
 
@@ -216,10 +199,7 @@ const calculateRisk = (event) => {
   if (issues.length >= 3 || attendees >= 100 || classification === 'Confidential') riskLevel = 'High';
   else if (issues.length >= 1 || attendees >= 50 || ['Leadership', 'Client'].includes(classification)) riskLevel = 'Medium';
 
-  return {
-    riskLevel,
-    riskReasons: issues,
-  };
+  return { riskLevel, riskReasons: issues };
 };
 
 const getRiskColor = (risk) => {
@@ -229,19 +209,14 @@ const getRiskColor = (risk) => {
 };
 
 const roomStatusColor = (status) => {
-    if (status === 'Operational') return '#22C55E';
-    if (status === 'Monitor') return '#F59E0B';
-    if (status === 'Escalate') return '#EF4444';
-    return '#6B6B8A';
+  if (status === 'Operational') return '#22C55E';
+  if (status === 'Monitor') return '#F59E0B';
+  if (status === 'Escalate') return '#EF4444';
+  return '#6B6B8A';
 };
 
 const initials = (name = '') =>
-    String(name)
-        .split('.')
-        .map((p) => p[0])
-        .join('')
-        .slice(0, 2)
-        .toUpperCase();
+  String(name).split('.').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 
 const buildTaskTemplatesForEvent = (event) => {
   const equipment = detectEquipment(event);
@@ -250,40 +225,29 @@ const buildTaskTemplatesForEvent = (event) => {
   const owner = inferSelectOwner(event);
   const risk = calculateRisk(event);
 
-  // Build checklist
   const checklist = [];
-
   checklist.push('☐ Review BEO details (time, room, POC, attendees, classification)');
   checklist.push('☐ Confirm SELECT owner and backup coverage');
   checklist.push('☐ Pre-check room (display, audio, camera, network, cables)');
 
-  if (equipment.includes('Cyviz') || room.includes('vision') || room.includes('interchange')) {
+  if (equipment.includes('Cyviz') || room.includes('vision') || room.includes('interchange'))
     checklist.push('☐ Cyviz: test routing, screen layout, Teams/Cisco, content sharing');
-  }
-  if (equipment.includes('Proto')) {
+  if (equipment.includes('Proto'))
     checklist.push('☐ Proto: validate content, network, audio, placement, run-of-show');
-  }
-  if (equipment.includes('Surface Hub')) {
+  if (equipment.includes('Surface Hub'))
     checklist.push('☐ Surface Hub: whiteboard, Teams join, camera, mic, sharing');
-  }
-  if (equipment.includes('Vu AI')) {
+  if (equipment.includes('Vu AI'))
     checklist.push('☐ Vu AI / video wall: content source, display behavior, fallback');
-  }
-  if (equipment.includes('Spot')) {
+  if (equipment.includes('Spot'))
     checklist.push('☐ Spot: battery, route, safety, demo script, operator readiness');
-  }
-  if (equipment.includes('Signage')) {
+  if (equipment.includes('Signage'))
     checklist.push('☐ Signage: welcome message, timing, naming, placement');
-  }
-  if (equipment.includes('MTR / VC')) {
+  if (equipment.includes('MTR / VC'))
     checklist.push('☐ MTR/VC: meeting join, camera, mic, speakers, dialing, sharing');
-  }
-  if (equipment.includes('Audio') || attendees >= 50) {
+  if (equipment.includes('Audio') || attendees >= 50)
     checklist.push('☐ Audio: mics, speakers, clickers, volume, presenter movement');
-  }
-  if (equipment.includes('Loaner Laptop')) {
+  if (equipment.includes('Loaner Laptop'))
     checklist.push('☐ Loaner laptop: availability, charger, adapters, login, content');
-  }
 
   checklist.push('☐ Day-of: confirm event start, presenter support, escalation path');
   checklist.push('☐ Post-event: capture issues, lessons learned, follow-ups');
@@ -310,7 +274,6 @@ const buildTaskTemplatesForEvent = (event) => {
 const buildAutomationSummary = (event) => {
   const equipment = detectEquipment(event);
   const risk = calculateRisk(event);
-
   return {
     equipmentDetected: equipment,
     riskLevel: risk.riskLevel,
@@ -323,7 +286,6 @@ const buildAutomationSummary = (event) => {
 const createTasksForEvent = async (eventId, event, showMsg) => {
   const tasks = buildTaskTemplatesForEvent(event);
   let created = 0;
-
   for (const task of tasks) {
     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), {
       ...task,
@@ -337,7 +299,6 @@ const createTasksForEvent = async (eventId, event, showMsg) => {
     });
     created++;
   }
-
   if (showMsg) showMsg(`Created task with full checklist for ${event.eventName}.`);
   return created;
 };
@@ -354,13 +315,17 @@ if (typeof __firebase_config !== 'undefined' && __firebase_config) {
       projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
       storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || `${process.env.REACT_APP_FIREBASE_PROJECT_ID}.appspot.com`,
       messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-      appId: process.env.REACT_APP_FIREBASE_APP_ID
+      appId: process.env.REACT_APP_FIREBASE_APP_ID,
     };
   } catch (e) {}
 }
-const app = getApps().length===0 ? initializeApp(firebaseConfig) : getApps()[0];
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED COMPONENTS
+// ─────────────────────────────────────────────────────────────────────────────
 
 function StatCard({ icon, value, label }) {
   return (
@@ -374,11 +339,18 @@ function StatCard({ icon, value, label }) {
 
 function NavBtn({ a, o, l, i }) {
   return (
-    <button onClick={o} className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition flex items-center gap-1.5 ${a ? 'bg-[#A100FF] text-white shadow-lg shadow-[#A100FF]/20' : 'bg-[#1A1A2E] text-[#6B6B8A] hover:bg-[#2A2A3E] hover:text-white'}`}>
+    <button
+      onClick={o}
+      className={`px-4 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition flex items-center gap-1.5 ${a ? 'bg-[#A100FF] text-white shadow-lg shadow-[#A100FF]/20' : 'bg-[#1A1A2E] text-[#6B6B8A] hover:bg-[#2A2A3E] hover:text-white'}`}
+    >
       {i} {l}
     </button>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH PAGE
+// ─────────────────────────────────────────────────────────────────────────────
 
 function AuthPage({ showMsg }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -401,11 +373,17 @@ function AuthPage({ showMsg }) {
         <form onSubmit={submit} className="space-y-3">
           <input name="email" type="email" placeholder="Email" required className={`w-full ${DK}`} />
           <input name="password" type="password" placeholder="Password" required className={`w-full ${DK}`} />
-          <button type="submit" className={`w-full font-bold py-3 rounded-xl text-sm uppercase tracking-wider transition ${isLogin ? 'bg-[#A100FF] text-white hover:bg-[#B733FF]' : 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]'}`}>
+          <button
+            type="submit"
+            className={`w-full font-bold py-3 rounded-xl text-sm uppercase tracking-wider transition ${isLogin ? 'bg-[#A100FF] text-white hover:bg-[#B733FF]' : 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]'}`}
+          >
             {isLogin ? 'Sign In' : 'Create Account'}
           </button>
         </form>
-        <button onClick={() => setIsLogin(!isLogin)} className="mt-5 text-[11px] text-[#6B6B8A] hover:text-[#A100FF] font-bold uppercase tracking-wider transition">
+        <button
+          onClick={() => setIsLogin(!isLogin)}
+          className="mt-5 text-[11px] text-[#6B6B8A] hover:text-[#A100FF] font-bold uppercase tracking-wider transition"
+        >
           {isLogin ? 'Create Account' : 'Back to Sign In'}
         </button>
       </div>
@@ -413,10 +391,14 @@ function AuthPage({ showMsg }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CALENDAR VIEW
+// ─────────────────────────────────────────────────────────────────────────────
+
 function CalendarView({ events }) {
   const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const year = month.getFullYear();
   const mo = month.getMonth();
   const firstDay = new Date(year, mo, 1).getDay();
@@ -429,28 +411,28 @@ function CalendarView({ events }) {
   for (let i = 1; i <= rem; i++) cells.push({ day: i, cur: false });
 
   const getEventsForDay = (day) => {
-    const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const ds = `${year}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     return events.filter((e) => {
       const sd = (e.startDate || '').slice(0, 10);
       const ed = (e.endDate || '').slice(0, 10);
       return (sd <= ds && (ed >= ds || sd === ds));
     });
   };
-  const moNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const moNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
     <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5 anim-in">
       <div className="flex justify-between items-center mb-5">
-        <button onClick={() => setMonth(new Date(year, mo - 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronLeft size={16}/></button>
+        <button onClick={() => setMonth(new Date(year, mo - 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronLeft size={16} /></button>
         <h2 className="text-lg font-black text-white">{moNames[mo]} {year}</h2>
-        <button onClick={() => setMonth(new Date(year, mo + 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronRight size={16}/></button>
+        <button onClick={() => setMonth(new Date(year, mo + 1, 1))} className="p-2 rounded-lg bg-[#1A1A2E] text-[#6B6B8A] hover:text-white hover:bg-[#2A2A3E] transition"><ChevronRight size={16} /></button>
       </div>
       <div className="grid grid-cols-7 gap-px bg-[#2A2A3E] rounded-xl overflow-hidden">
-        {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
           <div key={d} className="bg-[#0D0D15] py-2.5 text-center text-[10px] font-bold text-[#6B6B8A] uppercase tracking-wider">{d}</div>
         ))}
         {cells.map((c, idx) => {
-          const ds = `${year}-${String(mo+1).padStart(2,'0')}-${String(c.day).padStart(2,'0')}`;
+          const ds = `${year}-${String(mo + 1).padStart(2, '0')}-${String(c.day).padStart(2, '0')}`;
           const isToday = c.cur && ds === todayStr;
           const dayEvents = c.cur ? getEventsForDay(c.day) : [];
           return (
@@ -472,131 +454,130 @@ function CalendarView({ events }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// KANBAN PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
 function KanbanPage({ tasks, showMsg }) {
   const [editingId, setEditingId] = useState(null);
+
   const handleAdd = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const d = { title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'), status: 'todo', timestamp: new Date().toISOString() };
-    if (d.title) { await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), d); e.target.reset(); showMsg("Task added."); }
+    const d = {
+      title: fd.get('t'),
+      assignee: fd.get('a'),
+      dueDate: fd.get('d'),
+      timeSpent: fd.get('du'),
+      details: fd.get('det'),
+      status: 'todo',
+      timestamp: new Date().toISOString(),
+    };
+    if (d.title) {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_tasks'), d);
+      e.target.reset();
+      showMsg("Task added.");
+    }
   };
-  const move = async (id, s) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), { status: s });
-  const del = async (id) => { if (window.confirm("Delete task?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id)); showMsg("Deleted."); } };
+
+  const move = async (id, s) =>
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), { status: s });
+
+  const del = async (id) => {
+    if (window.confirm("Delete task?")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id));
+      showMsg("Deleted.");
+    }
+  };
+
   const saveEdit = async (e, id) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', id), {
-      title: fd.get('t'), assignee: fd.get('a'), dueDate: fd.get('d'), timeSpent: fd.get('du'), details: fd.get('det'),
+      title: fd.get('t'),
+      assignee: fd.get('a'),
+      dueDate: fd.get('d'),
+      timeSpent: fd.get('du'),
+      details: fd.get('det'),
     });
-    setEditingId(null); showMsg("Updated.");
+    setEditingId(null);
+    showMsg("Updated.");
   };
-  const statuses = [
-    { key: 'todo', label: 'To Do', color: '#6B6B8A' },
-    { key: 'doing', label: 'Doing', color: '#F59E0B' },
-    { key: 'complete', label: 'Complete', color: '#22C55E' },
-  ];
-// Toggle a single checklist item in the task's details
-const toggleChecklistItem = async (task, lineIndex) => {
-  const lines = (task.details || '').split('\n');
-  const line = lines[lineIndex];
-  if (!line) return;
 
-  let newLine;
-  if (line.startsWith('☐')) newLine = '☑' + line.slice(1);
-  else if (line.startsWith('☑')) newLine = '☐' + line.slice(1);
-  else return;
+  const toggleChecklistItem = async (task, lineIndex) => {
+    const lines = (task.details || '').split('\n');
+    const line = lines[lineIndex];
+    if (!line) return;
+    let newLine;
+    if (line.startsWith('☐')) newLine = '☑' + line.slice(1);
+    else if (line.startsWith('☑')) newLine = '☐' + line.slice(1);
+    else return;
+    lines[lineIndex] = newLine;
+    await updateDoc(
+      doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', task.id),
+      { details: lines.join('\n') }
+    );
+  };
 
-  lines[lineIndex] = newLine;
-  await updateDoc(
-    doc(db, 'artifacts', appId, 'public', 'data', 'shared_tasks', task.id),
-    { details: lines.join('\n') }
-  );
-};
+  const renderDetails = (task) => {
+    const details = task.details || '';
+    const hasChecklist = details.includes('☐') || details.includes('☑');
 
-// Render details — if checklist detected, show clickable items
-const renderDetails = (task) => {
-  const details = task.details || '';
-  const hasChecklist = details.includes('☐') || details.includes('☑');
+    if (!hasChecklist) {
+      return <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{details}</p>;
+    }
 
-  if (!hasChecklist) {
-    return <p className="text-[10px] text-[#6B6B8A] mb-2 line-clamp-2">{details}</p>;
-  }
+    const lines = details.split('\n');
+    const checkboxLines = lines.filter(l => l.startsWith('☐') || l.startsWith('☑'));
+    const done = checkboxLines.filter(l => l.startsWith('☑')).length;
+    const total = checkboxLines.length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
 
-  const lines = details.split('\n');
-  const checkboxLines = lines.filter(l => l.startsWith('☐') || l.startsWith('☑'));
-  const done = checkboxLines.filter(l => l.startsWith('☑')).length;
-  const total = checkboxLines.length;
-  const pct = total ? Math.round((done / total) * 100) : 0;
-
-  return (
-    <div className="mb-2 space-y-0.5">
-      {/* Progress bar */}
-      {total > 0 && (
-        <div className="mb-2">
-          <div className="flex justify-between text-[9px] font-bold mb-1">
-            <span className="text-[#A100FF] uppercase tracking-wider">Checklist</span>
-            <span className={done === total ? 'text-[#22C55E]' : 'text-[#6B6B8A]'}>
-              {done} / {total}
-            </span>
+    return (
+      <div className="mb-2 space-y-0.5">
+        {total > 0 && (
+          <div className="mb-2">
+            <div className="flex justify-between text-[9px] font-bold mb-1">
+              <span className="text-[#A100FF] uppercase tracking-wider">Checklist</span>
+              <span className={done === total ? 'text-[#22C55E]' : 'text-[#6B6B8A]'}>{done} / {total}</span>
+            </div>
+            <div className="h-1 bg-[#0D0D15] rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${pct}%`, background: done === total ? '#22C55E' : '#A100FF' }}
+              />
+            </div>
           </div>
-          <div className="h-1 bg-[#0D0D15] rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{
-                width: `${pct}%`,
-                background: done === total ? '#22C55E' : '#A100FF',
-              }}
-            />
-          </div>
-        </div>
-      )}
+        )}
+        {lines.map((line, i) => {
+          const isUnchecked = line.startsWith('☐');
+          const isChecked = line.startsWith('☑');
+          if (isUnchecked || isChecked) {
+            const text = line.slice(1).trim();
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); toggleChecklistItem(task, i); }}
+                className="flex items-start gap-1.5 text-[10px] w-full text-left hover:bg-[#1A1A2E] rounded px-1 py-0.5 transition group/check"
+              >
+                <span className={`flex-shrink-0 text-[11px] leading-none mt-px ${isChecked ? 'text-[#22C55E]' : 'text-[#6B6B8A] group-hover/check:text-[#A100FF]'}`}>
+                  {isChecked ? '☑' : '☐'}
+                </span>
+                <span className={`leading-snug ${isChecked ? 'text-[#4A4A6A] line-through' : 'text-[#9B9BB0]'}`}>{text}</span>
+              </button>
+            );
+          }
+          if (line.trim() === 'CHECKLIST:') {
+            return <p key={i} className="text-[9px] font-bold uppercase tracking-wider text-[#A100FF] mt-2 mb-1">{line}</p>;
+          }
+          if (line.trim() === '') return <div key={i} className="h-1" />;
+          return <p key={i} className="text-[10px] text-[#6B6B8A] leading-snug">{line}</p>;
+        })}
+      </div>
+    );
+  };
 
-      {/* Lines */}
-      {lines.map((line, i) => {
-        const isUnchecked = line.startsWith('☐');
-        const isChecked = line.startsWith('☑');
-
-        if (isUnchecked || isChecked) {
-          const text = line.slice(1).trim();
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleChecklistItem(task, i);
-              }}
-              className="flex items-start gap-1.5 text-[10px] w-full text-left hover:bg-[#1A1A2E] rounded px-1 py-0.5 transition group/check"
-            >
-              <span className={`flex-shrink-0 text-[11px] leading-none mt-px ${isChecked ? 'text-[#22C55E]' : 'text-[#6B6B8A] group-hover/check:text-[#A100FF]'}`}>
-                {isChecked ? '☑' : '☐'}
-              </span>
-              <span className={`leading-snug ${isChecked ? 'text-[#4A4A6A] line-through' : 'text-[#9B9BB0]'}`}>
-                {text}
-              </span>
-            </button>
-          );
-        }
-
-        if (line.trim() === 'CHECKLIST:') {
-          return (
-            <p key={i} className="text-[9px] font-bold uppercase tracking-wider text-[#A100FF] mt-2 mb-1">
-              {line}
-            </p>
-          );
-        }
-
-        if (line.trim() === '') return <div key={i} className="h-1" />;
-
-        return (
-          <p key={i} className="text-[10px] text-[#6B6B8A] leading-snug">
-            {line}
-          </p>
-        );
-      })}
-    </div>
-  );
-};
   const renderCard = (t) => {
     if (editingId === t.id) return (
       <form key={t.id} onSubmit={(e) => saveEdit(e, t.id)} className="bg-[#0D0D15] border border-[#A100FF] rounded-xl p-3 space-y-2 anim-in">
@@ -616,48 +597,35 @@ const renderDetails = (task) => {
         </div>
       </form>
     );
+
     return (
       <div key={t.id} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3.5 group hover:border-[#A100FF]/40 transition">
         <div className="flex justify-between items-start mb-2">
           <p className="text-xs font-bold text-white leading-snug">{t.title}</p>
-          <button onClick={() => del(t.id)} className="text-[#2A2A3E] group-hover:text-red-400 transition"><Trash2 size={12}/></button>
+          <button onClick={() => del(t.id)} className="text-[#2A2A3E] group-hover:text-red-400 transition"><Trash2 size={12} /></button>
         </div>
         {t.details && renderDetails(t)}
         <div className="bg-[#111119] rounded-lg p-2 space-y-1 text-[9px] font-bold text-[#6B6B8A] mb-2">
-          <div className="flex items-center gap-1">
-            <User size={9} className="text-[#A100FF]"/> {t.assignee || 'Unassigned'}
-          </div>
-        
+          <div className="flex items-center gap-1"><User size={9} className="text-[#A100FF]" /> {t.assignee || 'Unassigned'}</div>
           {t.linkedEvent && (
-            <div className="flex items-center gap-1 text-[#A100FF]">
-              <ClipboardList size={9}/> {t.linkedEvent}
-            </div>
+            <div className="flex items-center gap-1 text-[#A100FF]"><ClipboardList size={9} /> {t.linkedEvent}</div>
           )}
-        
           {t.source && (
-            <div className="flex items-center gap-1">
-              <Zap size={9}/> {t.source}
-            </div>
+            <div className="flex items-center gap-1"><Zap size={9} /> {t.source}</div>
           )}
-        
           {t.dueDate && (
-            <div className="flex items-center gap-1">
-              <CalendarDays size={9}/> {t.dueDate}
-            </div>
+            <div className="flex items-center gap-1"><CalendarDays size={9} /> {t.dueDate}</div>
           )}
-        
           {t.timeSpent && (
-            <div className="flex items-center gap-1">
-              <Clock size={9}/> {t.timeSpent}
-            </div>
+            <div className="flex items-center gap-1"><Clock size={9} /> {t.timeSpent}</div>
           )}
         </div>
         <div className="flex justify-between opacity-0 group-hover:opacity-100 transition">
           <div className="flex gap-1">
-            {t.status !== 'todo' && <button onClick={() => move(t.id, t.status === 'complete' ? 'doing' : 'todo')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronLeft size={12}/></button>}
-            {t.status !== 'complete' && <button onClick={() => move(t.id, t.status === 'todo' ? 'doing' : 'complete')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronRight size={12}/></button>}
+            {t.status !== 'todo' && <button onClick={() => move(t.id, t.status === 'complete' ? 'doing' : 'todo')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronLeft size={12} /></button>}
+            {t.status !== 'complete' && <button onClick={() => move(t.id, t.status === 'todo' ? 'doing' : 'complete')} className="p-1 rounded bg-[#1A1A2E] text-[#6B6B8A] hover:text-white"><ChevronRight size={12} /></button>}
           </div>
-          <button onClick={() => setEditingId(t.id)} className="text-[9px] text-[#A100FF] font-bold uppercase flex items-center gap-0.5"><Edit3 size={9}/> Edit</button>
+          <button onClick={() => setEditingId(t.id)} className="text-[9px] text-[#A100FF] font-bold uppercase flex items-center gap-0.5"><Edit3 size={9} /> Edit</button>
         </div>
       </div>
     );
@@ -665,11 +633,19 @@ const renderDetails = (task) => {
 
   const filterByStatus = (t, key) => {
     const s = String(t.status || 'todo').toLowerCase().replace(/[\s-_]+/g, '');
-    const map = { todo: 'todo', backlog: 'todo', '': 'todo',
-                  doing: 'doing', active: 'doing', progress: 'doing', inprogress: 'doing',
-                  complete: 'complete', done: 'complete', delivered: 'complete', completed: 'complete' };
+    const map = {
+      todo: 'todo', backlog: 'todo', '': 'todo',
+      doing: 'doing', active: 'doing', progress: 'doing', inprogress: 'doing',
+      complete: 'complete', done: 'complete', delivered: 'complete', completed: 'complete',
+    };
     return (map[s] || s) === key;
   };
+
+  const statuses = [
+    { key: 'todo', label: 'To Do', color: '#6B6B8A' },
+    { key: 'doing', label: 'Doing', color: '#F59E0B' },
+    { key: 'complete', label: 'Complete', color: '#22C55E' },
+  ];
 
   return (
     <div className="anim-in space-y-5">
@@ -682,7 +658,8 @@ const renderDetails = (task) => {
         </div>
         <div className="grid md:grid-cols-2 gap-3 mt-3">
           <input name="du" placeholder="Time spent (hrs)" className={DK} />
-          <input name="det" placeholder="Quick notes..." className={DK} />
+          {/* FIX: textarea name="det" confirmed consistent with saveEdit handler */}
+          <textarea name="det" placeholder="Quick notes..." rows="1" className={`resize-none ${DK}`} />
         </div>
       </form>
       <div className="grid md:grid-cols-3 gap-4">
@@ -690,7 +667,9 @@ const renderDetails = (task) => {
           <div key={key} className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4 min-h-[400px]">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-[11px] font-bold uppercase tracking-wider" style={{ color }}>{label}</h3>
-              <span className="text-[10px] font-bold bg-[#0D0D15] border border-[#2A2A3E] px-2 py-0.5 rounded" style={{ color }}>{tasks.filter(t => filterByStatus(t, key)).length}</span>
+              <span className="text-[10px] font-bold bg-[#0D0D15] border border-[#2A2A3E] px-2 py-0.5 rounded" style={{ color }}>
+                {tasks.filter(t => filterByStatus(t, key)).length}
+              </span>
             </div>
             <div className="space-y-3">{tasks.filter(t => filterByStatus(t, key)).map(renderCard)}</div>
           </div>
@@ -699,6 +678,10 @@ const renderDetails = (task) => {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEDULE PAGE
+// ─────────────────────────────────────────────────────────────────────────────
 
 function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
@@ -721,7 +704,9 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
 
   const filteredEvents = useMemo(() => events.filter((e) => {
     const h = [e.eventName, e.eventPoc, e.selectPoc, e.demo, e.eventLocation, e.selectResources, e.notes, e.supportTeam, e.source, e.classification].join(' ').toLowerCase();
-    return (!searchTerm || h.includes(searchTerm.toLowerCase())) && (!classificationFilter || e.classification === classificationFilter) && (!sourceFilter || (e.source || 'Manual') === sourceFilter);
+    return (!searchTerm || h.includes(searchTerm.toLowerCase())) &&
+      (!classificationFilter || e.classification === classificationFilter) &&
+      (!sourceFilter || (e.source || 'Manual') === sourceFilter);
   }), [events, searchTerm, classificationFilter, sourceFilter]);
 
   const updateField = (key, value) => setFormData((p) => ({
@@ -733,7 +718,12 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
 
   const openFullIntel = (e) => {
     const c = `Event: ${e.eventName || ''}\nWRES: ${e.notes?.match?.(/WRES\d+/)?.[0] || ''}\nStart: ${e.startDate || ''}\nEnd: ${e.endDate || ''}\nPOC: ${e.eventPoc || ''}\nSELECT POC: ${e.selectPoc || ''}\nLocation: ${e.location || 'NYIH'}\nRoom: ${e.eventLocation || ''}\nClassification: ${e.classification || ''}\nType: ${e.sessionType || ''}\nAttendees: ${e.attendees || ''}\nDemo/Equipment: ${e.demo || ''}\nResources: ${e.selectResources || ''}\nNotes: ${e.notes || ''}`;
-    setModal({ title: "Event Details", content: c, actionLabel: "Copy", action: () => { navigator.clipboard.writeText(c); showMsg("Copied."); } });
+    setModal({
+      title: "Event Details",
+      content: c,
+      actionLabel: "Copy",
+      action: () => { navigator.clipboard.writeText(c); showMsg("Copied."); },
+    });
   };
 
   const startEdit = (e) => {
@@ -751,45 +741,34 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   };
 
   const handleCommit = async (e) => {
-  e.preventDefault();
-
-  const automation = buildAutomationSummary(formData);
-
-  const d = sanitizeEventData({
-    ...formData,
-    ...automation,
-    selectPoc: formData.selectPoc || inferSelectOwner(formData),
-    source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
-    weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
-  });
-
-  if (!d.eventName || !d.eventPoc) {
-    showMsg("Event name and POC required.", true);
-    return;
-  }
-
-  try {
-    if (editingId) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
-      setEditingId(null);
-      showMsg("Event updated.");
-    } else {
-      const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
-        ...d,
-        timestamp: new Date().toISOString(),
-      });
-
-      await createTasksForEvent(ref.id, d, showMsg);
-      showMsg("Event saved and SELECT task checklist created.");
+    e.preventDefault();
+    const automation = buildAutomationSummary(formData);
+    const d = sanitizeEventData({
+      ...formData,
+      ...automation,
+      selectPoc: formData.selectPoc || inferSelectOwner(formData),
+      source: formData.source || (editingId ? (events.find(x => x.id === editingId)?.source || 'Manual') : 'Manual'),
+      weekOf: formData.weekOf || weekOfFromDateTime(formData.startDate),
+    });
+    if (!d.eventName || !d.eventPoc) { showMsg("Event name and POC required.", true); return; }
+    try {
+      if (editingId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', editingId), d);
+        setEditingId(null);
+        showMsg("Event updated.");
+      } else {
+        const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
+          ...d, timestamp: new Date().toISOString(),
+        });
+        await createTasksForEvent(ref.id, d, showMsg);
+        showMsg("Event saved and SELECT task checklist created.");
+      }
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      showMsg("Save failed.", true);
     }
-
-    resetForm();
-  } catch (err) {
-    console.error(err);
-    showMsg("Save failed.", true);
-  }
-};
-
+  };
 
   const handleSmartImport = async () => {
     try {
@@ -826,16 +805,17 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
         return;
       }
 
+      // FIX: clearer message when PDF appears to be image-scanned
       if (text.trim().length < 50) {
-        showMsg('Text too short. PDF may be image-based.', true);
-        setImportBanner('Extracted text was too short.');
+        const msg = 'This PDF appears to be image-scanned and has no readable text layer. Try copying and pasting the BEO text directly instead.';
+        showMsg(msg, true);
+        setImportBanner(msg);
         return;
       }
 
       setAiLoading(true);
       setImportBanner(`Sending ${text.length.toLocaleString()} chars to AI...`);
 
-      
       const aiPrompt = `You are an event data extraction specialist for the Accenture NYIH SELECT team.
       
       You will read a Daily BEO and extract SELECT-relevant events using a structured reasoning process.
@@ -927,21 +907,6 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
       STEP 5 — EXTRACT EQUIPMENT
       Pull every piece of equipment mentioned. Be specific.
       
-      Equipment categories to look for:
-        - Audio: mics, microphones, speakers, music, background music
-        - Display: Surface Hub, Cyviz, Vu AI, video wall, monitors, screens
-        - Specialty: Proto, hologram, Spot, robot, Hypervsn, CecoCeco, Alleo
-        - Presentation: clickers, loaner laptops, screen connection, MTR, Cisco
-        - Production: broadcast, broadcasting, Liquid Studios, Makers Lab
-        - Signage: digital signage, lobby signage
-        
-      Examples:
-        - "2 mics + 2 surface hubs" → "2 mics, 2 Surface Hubs"
-        - "Music: classic jazz" → "Background music: classic jazz"
-        - "Screen Connection Help" → "Screen connection support"
-        - "loaner laptop (WBS: CXFNR003)" → "Loaner laptop (WBS: CXFNR003)"
-        - "Microphones (max amount), clicker" → "Multiple mics, clicker"
-      
       STEP 6 — MAP CLASSIFICATION
       "CLIENT VISIT" / "BUSINESS DEV" / "CLIENT PREP" → "Client"
       "INTERNAL" / "TRAINING" → "Internal"
@@ -951,40 +916,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
       
       STEP 7 — CONSTRUCT NOTES FIELD
       Use this exact format with pipe separators:
-      "WRES: <id> | Host: <name> | S&E: <name> | Equipment: <full list> | Setup: <catering/signage/furniture/rope details> | Special: <multi-day info, VIP names, timing notes, specific instructions>"
-      
-      ═══ WORKED EXAMPLE ═══
-      
-      INPUT BLOCK:
-      "WRES19421611  Host: john.beyan  S&E: jia.b.gao  TXA  *TXA Required  Support at 8am each day with presentations and Teams call. Microphones (max amount), clicker, loaner laptop (WBS: CXFNR003) POC: carmen.guevara, john.beyan  FACILITIES  Catering Table: 4 OUTSIDE BC hallway  Clusters/Pods: Day 1 of 8 (6/16-6/25) Homeroom ABC combined 10 Pods of 8 for 80 ppl..."
-      
-      My reasoning:
-      - Step 1: Date = 2026-06-18 (from header)
-      - Step 2: Says "*TXA Required" BUT mentions microphones + clicker + loaner laptop + Teams call → CROSSOVER. INCLUDE as SELECT (rule F)
-      - Step 3: Nearby named event "Regeneron End to End Summit - Week 1  421 W61 Homeroom C  08:00 AM - 06:00 PM  CLIENT VISIT" matches
-      - Step 4: Start = 08:00, End = 18:00, multi-day 6/16-6/25
-      - Step 5: Equipment = "Multiple mics, clicker, loaner laptop (WBS: CXFNR003), Teams call support"
-      - Step 6: CLIENT VISIT → "Client"
-      - Step 7: Build notes
-      
-      OUTPUT:
-      {
-        "eventName": "Regeneron End to End Summit - Week 1",
-        "startDate": "2026-06-18T08:00",
-        "endDate": "2026-06-18T18:00",
-        "eventPoc": "carmen.guevara, john.beyan",
-        "selectPoc": "",
-        "location": "NYIH",
-        "eventLocation": "421 W61 Homeroom C",
-        "classification": "Client",
-        "sessionType": "Workshop",
-        "attendees": "80",
-        "demo": "Multiple mics, clicker, loaner laptop, Teams call support",
-        "selectResources": "Multiple mics, clicker, loaner laptop, Teams call support",
-        "supportTeam": "NYIH SELECT",
-        "sessionDays": "Day 1 of 8 (6/16-6/25)",
-        "notes": "WRES: WRES19421611 | Host: john.beyan | S&E: jia.b.gao | Equipment: max microphones, clicker, loaner laptop (WBS: CXFNR003) | Setup: 4 catering tables OUTSIDE BC hallway, 10 Pods of 8 for 80 ppl, Registration table by reception on 6/16 only +2 chairs, Jia provides ACN tablecloth | Special: Day 1 of 8 (6/16-6/25), Regeneron VIP leadership attending: Mark Volpe SVP Tax, Jai Gulati Global Head G&A IT, Mack MacKenzie SVP Commercial, Hakan Franson, 8am support each day, breakfast 8:30am meeting 9am, 47 external + 32 internal registered ~60/day expected"
-      }
+      "WRES: <id> | Host: <name> | S&E: <name> | Equipment: <full list> | Setup: <details> | Special: <notes>"
       
       ═══ OUTPUT INSTRUCTIONS ═══
       Apply steps 1-7 to every WRES block silently. Then return ONLY a JSON array of all qualifying events.
@@ -1023,7 +955,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
 
       if (!parsed.length) {
         setAiLoading(false);
-        setImportBanner(`No SELECT events found in this BEO.`);
+        setImportBanner('No SELECT events found in this BEO.');
         showMsg('No SELECT events detected.', true);
         return;
       }
@@ -1051,20 +983,16 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
         if (isDupe) { skipped++; continue; }
 
         const automation = buildAutomationSummary(evt);
-
         const finalEvt = sanitizeEventData({
           ...evt,
           ...automation,
           selectPoc: evt.selectPoc || inferSelectOwner(evt),
         });
-        
+
         const eventRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_events'), {
-          ...finalEvt,
-          timestamp: new Date().toISOString(),
+          ...finalEvt, timestamp: new Date().toISOString(),
         });
-        
         await createTasksForEvent(eventRef.id, finalEvt);
-        
         saved++;
       }
 
@@ -1087,12 +1015,12 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   return (
     <div className="space-y-5 anim-in">
       <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]"/> Smart BEO Import</h2>
+        <h2 className="text-base font-bold text-white flex items-center gap-2 mb-1"><Upload size={16} className="text-[#A100FF]" /> Smart BEO Import</h2>
         <p className="text-[11px] text-[#6B6B8A] mb-4">Upload a Daily BEO PDF or paste the text. AI extracts <span className="text-[#A100FF] font-bold">SELECT</span> events.</p>
 
         {importBanner && (
           <div className="bg-[#A100FF]/10 border border-[#A100FF]/30 rounded-xl p-3 text-xs text-[#C0C0D8] font-bold mb-4 flex items-center gap-2">
-            {aiLoading ? <RefreshCcw size={13} className="animate-spin text-[#A100FF]"/> : <CheckCircle2 size={13} className="text-[#A100FF]"/>}
+            {aiLoading ? <RefreshCcw size={13} className="animate-spin text-[#A100FF]" /> : <CheckCircle2 size={13} className="text-[#A100FF]" />}
             {importBanner}
           </div>
         )}
@@ -1112,7 +1040,9 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
             disabled={aiLoading || pdfLoading}
             className="bg-[#A100FF] text-white px-8 py-4 rounded-xl text-sm font-bold uppercase tracking-wider hover:bg-[#B733FF] transition disabled:opacity-50 flex items-center gap-2 h-fit whitespace-nowrap"
           >
-            {pdfLoading ? (<><RefreshCcw size={14} className="animate-spin"/> Reading...</>) : aiLoading ? (<><BrainCircuit size={14} className="animate-spin"/> Extracting...</>) : (<><Zap size={14}/> Import SELECT</>)}
+            {pdfLoading ? (<><RefreshCcw size={14} className="animate-spin" /> Reading...</>) :
+              aiLoading ? (<><BrainCircuit size={14} className="animate-spin" /> Extracting...</>) :
+                (<><Zap size={14} /> Import SELECT</>)}
           </button>
         </div>
       </div>
@@ -1121,11 +1051,11 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
           <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
             <div>
-              <h2 className="text-base font-bold text-white flex items-center gap-2"><ClipboardList size={16} className="text-[#A100FF]"/> {editingId ? 'Edit Event' : 'New Event'}</h2>
+              <h2 className="text-base font-bold text-white flex items-center gap-2"><ClipboardList size={16} className="text-[#A100FF]" /> {editingId ? 'Edit Event' : 'New Event'}</h2>
               <p className="text-[11px] text-[#6B6B8A] mt-0.5">{editingId ? 'Editing event' : 'Add manually or import above'}</p>
             </div>
             <div className="flex gap-1.5 flex-wrap">
-              {['Demo','Client','Leadership','Workshop'].map(t => (
+              {['Demo', 'Client', 'Leadership', 'Workshop'].map(t => (
                 <button key={t} type="button" onClick={() => updateField('sessionType', t)}
                   className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${formData.sessionType === t ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>
                   {t}
@@ -1136,7 +1066,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
 
           <div className="grid grid-cols-3 gap-2 mb-4">
             {QUICK_FILL_CARDS.map(c => (
-              <button key={c.name} type="button" onClick={() => setFormData(p => ({...p, demo: c.demo, sessionType: c.sessionType}))}
+              <button key={c.name} type="button" onClick={() => setFormData(p => ({ ...p, demo: c.demo, sessionType: c.sessionType }))}
                 className="text-left p-3 rounded-xl bg-[#0D0D15] border border-[#2A2A3E] hover:border-[#A100FF]/50 transition">
                 <div className="text-[11px] font-bold text-white">{c.name}</div>
                 <div className="text-[9px] text-[#6B6B8A]">{c.note}</div>
@@ -1176,34 +1106,45 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
             </div>
             <textarea value={formData.notes} onChange={e => updateField('notes', e.target.value)} placeholder="Notes..." rows="3" className={`w-full resize-none ${DK}`} />
             <div className="flex gap-2">
-              <button type="submit" className={`flex-1 font-bold py-3 rounded-xl text-sm uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>{editingId ? 'Update Event' : 'Save Event'}</button>
-              {editingId && <button type="button" onClick={resetForm} className="px-5 bg-[#1A1A2E] text-[#6B6B8A] font-bold py-3 rounded-xl text-sm uppercase hover:text-white transition flex items-center gap-1"><RefreshCcw size={13}/> Cancel</button>}
+              <button type="submit" className={`flex-1 font-bold py-3 rounded-xl text-sm uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>
+                {editingId ? 'Update Event' : 'Save Event'}
+              </button>
+              {editingId && (
+                <button type="button" onClick={resetForm} className="px-5 bg-[#1A1A2E] text-[#6B6B8A] font-bold py-3 rounded-xl text-sm uppercase hover:text-white transition flex items-center gap-1">
+                  <RefreshCcw size={13} /> Cancel
+                </button>
+              )}
             </div>
           </form>
         </div>
 
         <div className="space-y-5">
           <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><BarChart3 size={14} className="text-[#A100FF]"/> Stats</h2>
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><BarChart3 size={14} className="text-[#A100FF]" /> Stats</h2>
             <div className="grid grid-cols-2 gap-2.5">
-              <StatCard icon={<ClipboardList size={16}/>} value={totalStats.events} label="Events"/>
-              <StatCard icon={<Upload size={16}/>} value={totalStats.imported} label="Imported"/>
-              <StatCard icon={<Users size={16}/>} value={totalStats.attendees} label="Attendees"/>
-              <StatCard icon={<TrendingUp size={16}/>} value={totalStats.high} label="High Priority"/>
+              <StatCard icon={<ClipboardList size={16} />} value={totalStats.events} label="Events" />
+              <StatCard icon={<Upload size={16} />} value={totalStats.imported} label="Imported" />
+              <StatCard icon={<Users size={16} />} value={totalStats.attendees} label="Attendees" />
+              <StatCard icon={<TrendingUp size={16} />} value={totalStats.high} label="High Priority" />
             </div>
           </div>
 
           <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><Search size={14} className="text-[#A100FF]"/> Event Queue</h2>
+            <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-3"><Search size={14} className="text-[#A100FF]" /> Event Queue</h2>
             <div className="space-y-2.5 mb-3">
               <div className="flex items-center gap-2 rounded-xl bg-[#0D0D15] border border-[#2A2A3E] p-2.5 focus-within:border-[#A100FF] transition">
-                <Search size={13} className="text-[#4A4A6A]"/>
-                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="w-full bg-transparent outline-none text-sm text-[#E8E8F0] placeholder-[#4A4A6A]"/>
+                <Search size={13} className="text-[#4A4A6A]" />
+                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search..." className="w-full bg-transparent outline-none text-sm text-[#E8E8F0] placeholder-[#4A4A6A]" />
               </div>
               <div className="flex gap-1.5 flex-wrap">
-                <select value={classificationFilter} onChange={e => setClassificationFilter(e.target.value)} className={`flex-1 min-w-[140px] text-xs ${DK}`}><option value="">All types</option>{CLASSIFICATIONS.map(c => <option key={c} value={c}>{c}</option>)}</select>
-                {['','Imported','Manual'].map(s => (
-                  <button key={s || 'all'} onClick={() => setSourceFilter(s)} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${sourceFilter === s ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>{s || 'All'}</button>
+                <select value={classificationFilter} onChange={e => setClassificationFilter(e.target.value)} className={`flex-1 min-w-[140px] text-xs ${DK}`}>
+                  <option value="">All types</option>{CLASSIFICATIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {['', 'Imported', 'Manual'].map(s => (
+                  <button key={s || 'all'} onClick={() => setSourceFilter(s)}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition ${sourceFilter === s ? 'bg-[#A100FF] text-white' : 'bg-[#0D0D15] border border-[#2A2A3E] text-[#6B6B8A] hover:border-[#A100FF]'}`}>
+                    {s || 'All'}
+                  </button>
                 ))}
               </div>
             </div>
@@ -1211,9 +1152,7 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
 
           <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
             {!filteredEvents.length && (
-              <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
-                No events yet.
-              </div>
+              <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">No events yet.</div>
             )}
             {filteredEvents.map(entry => {
               const bc = classBadgeColor(entry.classification);
@@ -1223,40 +1162,22 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
                     <div className="flex-1 pr-3">
                       <p className="text-xs font-bold text-white mb-1.5">{entry.eventName}</p>
                       <div className="flex flex-wrap gap-1 mb-2">
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${bc}20`, color: bc }}>
-                          {entry.classification || 'TBD'}
-                        </span>
-                        
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">
-                          {entry.sessionType || 'Session'}
-                        </span>
-                        
-                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">
-                          {entry.source || 'Manual'}
-                        </span>
-                        
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${bc}20`, color: bc }}>{entry.classification || 'TBD'}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.sessionType || 'Session'}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#0D0D15] text-[#6B6B8A]">{entry.source || 'Manual'}</span>
                         {entry.riskLevel && (
-                          <span
-                            className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase"
-                            style={{
-                              background: `${getRiskColor(entry.riskLevel)}20`,
-                              color: getRiskColor(entry.riskLevel),
-                            }}
-                          >
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase" style={{ background: `${getRiskColor(entry.riskLevel)}20`, color: getRiskColor(entry.riskLevel) }}>
                             {entry.riskLevel} Risk
                           </span>
                         )}
-                        
                         {entry.automationSummary && (
-                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#A100FF]/10 text-[#A100FF]">
-                            Auto-Planned
-                          </span>
+                          <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-[#A100FF]/10 text-[#A100FF]">Auto-Planned</span>
                         )}
                       </div>
                       <div className="space-y-0.5 text-[10px] text-[#6B6B8A]">
-                        <p className="flex items-center gap-1"><CalendarDays size={9}/> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
-                        <p className="flex items-center gap-1"><User size={9}/> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
-                        <p className="flex items-center gap-1"><MapPin size={9}/> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room'}</p>
+                        <p className="flex items-center gap-1"><CalendarDays size={9} /> {entry.startDate || '—'} {entry.endDate ? `→ ${entry.endDate}` : ''}</p>
+                        <p className="flex items-center gap-1"><User size={9} /> {entry.eventPoc || 'No POC'} | SELECT: {entry.selectPoc || 'TBD'}</p>
+                        <p className="flex items-center gap-1"><MapPin size={9} /> {entry.location || 'NYIH'} • {entry.eventLocation || 'No room'}</p>
                       </div>
                       {(entry.demo || entry.selectResources) && (
                         <p className="text-[10px] text-[#A100FF] mt-1.5 line-clamp-1">Equipment: {entry.demo || entry.selectResources || '—'}</p>
@@ -1264,27 +1185,21 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
                       {entry.notes && <p className="text-[10px] text-[#4A4A6A] mt-1 line-clamp-2">{entry.notes}</p>}
                       {entry.automationSummary && (
                         <div className="mt-2 bg-[#0D0D15] border border-[#2A2A3E] rounded-lg p-2">
-                          <p className="text-[9px] text-[#A100FF] font-bold uppercase tracking-wider mb-1">
-                            Automation Readiness
-                          </p>
-                          <p className="text-[10px] text-[#9B9BB0]">
-                            {entry.automationSummary}
-                          </p>
+                          <p className="text-[9px] text-[#A100FF] font-bold uppercase tracking-wider mb-1">Automation Readiness</p>
+                          <p className="text-[10px] text-[#9B9BB0]">{entry.automationSummary}</p>
                           {Array.isArray(entry.riskReasons) && entry.riskReasons.length > 0 && (
                             <ul className="mt-1 space-y-0.5">
                               {entry.riskReasons.slice(0, 3).map((r, idx) => (
-                                <li key={idx} className="text-[9px] text-[#F59E0B]">
-                                  ⚠ {r}
-                                </li>
+                                <li key={idx} className="text-[9px] text-[#F59E0B]">⚠ {r}</li>
                               ))}
                             </ul>
                           )}
                         </div>
                       )}
                       <div className="flex gap-3 mt-2.5">
-                        <button onClick={() => startEdit(entry)} className="text-[10px] text-[#A100FF] font-bold uppercase flex items-center gap-1 hover:text-[#B733FF] transition"><Edit3 size={10}/> Edit</button>
-                        <button onClick={() => openFullIntel(entry)} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-white transition"><FileText size={10}/> Details</button>
-                        <button onClick={async () => { if (window.confirm("Delete this event?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); showMsg("Event deleted."); } }} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-red-400 transition"><Trash2 size={10}/> Delete</button>
+                        <button onClick={() => startEdit(entry)} className="text-[10px] text-[#A100FF] font-bold uppercase flex items-center gap-1 hover:text-[#B733FF] transition"><Edit3 size={10} /> Edit</button>
+                        <button onClick={() => openFullIntel(entry)} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-white transition"><FileText size={10} /> Details</button>
+                        <button onClick={async () => { if (window.confirm("Delete this event?")) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_events', entry.id)); showMsg("Event deleted."); } }} className="text-[10px] text-[#6B6B8A] font-bold uppercase flex items-center gap-1 hover:text-red-400 transition"><Trash2 size={10} /> Delete</button>
                       </div>
                     </div>
                   </div>
@@ -1298,7 +1213,11 @@ function SchedulePage({ events, showMsg, fetchGemini, setModal }) {
   );
 }
 
-function IssuesPage({ issues, showMsg, fetchGemini }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// ISSUES PAGE — FIX: replaced alert() with modal; added setModal prop
+// ─────────────────────────────────────────────────────────────────────────────
+
+function IssuesPage({ issues, showMsg, fetchGemini, setModal }) {
   const [aiLoading, setAiLoading] = useState(false);
 
   const handleAdd = async (e) => {
@@ -1334,6 +1253,7 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
     }
   };
 
+  // FIX: replaced alert() with the app's modal system
   const aiSuggest = async (issue) => {
     setAiLoading(true);
     const result = await fetchGemini(
@@ -1341,8 +1261,18 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
       `Title: ${issue.title}\nDevice: ${issue.device}\nLocation: ${issue.location}\nNotes: ${issue.notes}`
     );
     setAiLoading(false);
-    showMsg('AI suggestion ready.');
-    alert(result);
+
+    if (!result || (typeof result === 'string' && result.startsWith('AI Error:'))) {
+      showMsg(result || 'AI returned no suggestion.', true);
+      return;
+    }
+
+    setModal({
+      title: `AI Fix: ${issue.title}`,
+      content: result,
+      actionLabel: 'Copy',
+      action: () => { navigator.clipboard.writeText(result); showMsg('Copied to clipboard.'); },
+    });
   };
 
   const urgencyColor = (u) => u === 'Urgent' ? '#EF4444' : u === 'High' ? '#F59E0B' : u === 'Low' ? '#22C55E' : '#6B6B8A';
@@ -1410,7 +1340,11 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
                 {i.status !== 'Resolved' && (
                   <button onClick={() => updateStatus(i.id, 'Resolved')} className="text-[10px] bg-[#1A1A2E] text-[#22C55E] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#2A2A3E] transition">Mark Resolved</button>
                 )}
-                <button onClick={() => aiSuggest(i)} disabled={aiLoading} className="text-[10px] bg-[#A100FF]/10 text-[#A100FF] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#A100FF]/20 transition flex items-center gap-1 disabled:opacity-50">
+                <button
+                  onClick={() => aiSuggest(i)}
+                  disabled={aiLoading}
+                  className="text-[10px] bg-[#A100FF]/10 text-[#A100FF] font-bold px-3 py-1.5 rounded-lg uppercase hover:bg-[#A100FF]/20 transition flex items-center gap-1 disabled:opacity-50"
+                >
                   <Zap size={10} /> {aiLoading ? 'Thinking...' : 'AI Suggest Fix'}
                 </button>
               </div>
@@ -1422,16 +1356,13 @@ function IssuesPage({ issues, showMsg, fetchGemini }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOM STATUS PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
 function RoomStatusPage({ rooms, showMsg }) {
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({
-    title: '',
-    owner: '',
-    backupOwner: '',
-    status: 'Operational',
-    devices: '',
-    notes: '',
-  });
+  const [form, setForm] = useState({ title: '', owner: '', backupOwner: '', status: 'Operational', devices: '', notes: '' });
 
   const statusColor = (status) => {
     if (status === 'Operational') return '#22C55E';
@@ -1441,258 +1372,95 @@ function RoomStatusPage({ rooms, showMsg }) {
   };
 
   const getInitials = (name = '') =>
-    String(name)
-      .split('.')
-      .map((p) => p[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
+    String(name).split('.').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 
   const resetForm = () => {
     setEditingId(null);
-    setForm({
-      title: '',
-      owner: '',
-      backupOwner: '',
-      status: 'Operational',
-      devices: '',
-      notes: '',
-    });
+    setForm({ title: '', owner: '', backupOwner: '', status: 'Operational', devices: '', notes: '' });
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-
-    if (!form.title) {
-      showMsg('Room / device name required.', true);
-      return;
-    }
-
-    const payload = {
-      ...form,
-      lastUpdated: new Date().toISOString(),
-      updatedBy: auth.currentUser?.email || 'unknown',
-      timestamp: new Date().toISOString(),
-    };
-
+    if (!form.title) { showMsg('Room / device name required.', true); return; }
+    const payload = { ...form, lastUpdated: new Date().toISOString(), updatedBy: auth.currentUser?.email || 'unknown', timestamp: new Date().toISOString() };
     try {
       if (editingId) {
-        await updateDoc(
-          doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', editingId),
-          payload
-        );
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', editingId), payload);
         showMsg('Room updated.');
       } else {
-        await addDoc(
-          collection(db, 'artifacts', appId, 'public', 'data', 'shared_rooms'),
-          payload
-        );
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_rooms'), payload);
         showMsg('Room added.');
       }
-
       resetForm();
-    } catch (err) {
-      console.error(err);
-      showMsg('Room save failed.', true);
-    }
+    } catch (err) { console.error(err); showMsg('Room save failed.', true); }
   };
 
   const updateRoomStatus = async (room, status) => {
     try {
-      await updateDoc(
-        doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', room.id),
-        {
-          status,
-          lastUpdated: new Date().toISOString(),
-          updatedBy: auth.currentUser?.email || 'unknown',
-        }
-      );
-
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', room.id), {
+        status, lastUpdated: new Date().toISOString(), updatedBy: auth.currentUser?.email || 'unknown',
+      });
       showMsg(`${room.title} marked ${status}.`);
-    } catch (err) {
-      console.error(err);
-      showMsg('Status update failed.', true);
-    }
+    } catch (err) { console.error(err); showMsg('Status update failed.', true); }
   };
 
   const editRoom = (room) => {
     setEditingId(room.id);
-    setForm({
-      title: room.title || '',
-      owner: room.owner || '',
-      backupOwner: room.backupOwner || '',
-      status: room.status || 'Operational',
-      devices: room.devices || '',
-      notes: room.notes || '',
-    });
-
+    setForm({ title: room.title || '', owner: room.owner || '', backupOwner: room.backupOwner || '', status: room.status || 'Operational', devices: room.devices || '', notes: room.notes || '' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteRoom = async (id) => {
     if (!window.confirm('Delete this room/device?')) return;
-
     try {
-      await deleteDoc(
-        doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', id)
-      );
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_rooms', id));
       showMsg('Room deleted.');
-    } catch (err) {
-      console.error(err);
-      showMsg('Delete failed.', true);
-    }
+    } catch (err) { console.error(err); showMsg('Delete failed.', true); }
   };
 
   const seedDefaultRooms = async () => {
     const defaults = [
-      {
-        title: 'Vision Room',
-        owner: 'Donald.Salazar',
-        backupOwner: 'Eric.Guzman',
-        status: 'Operational',
-        devices: 'Cyviz, Vu',
-        notes: 'Primary experience room / client support',
-      },
-      {
-        title: 'Broadcast Cyviz',
-        owner: 'Donald.Salazar',
-        backupOwner: 'Eric.Guzman',
-        status: 'Operational',
-        devices: 'Cyviz, Vu, Broadcast',
-        notes: 'Broadcast-enabled Cyviz space',
-      },
-      {
-        title: '65th Floor',
-        owner: 'Mistral.Rojas',
-        backupOwner: 'Eric.Guzman',
-        status: 'Operational',
-        devices: 'Cyviz, Audio, Video, Britelite, Target Screen',
-        notes: '65th floor readiness and maintenance',
-      },
-      {
-        title: 'CIC Space',
-        owner: 'Eric.Guzman',
-        backupOwner: 'Donald.Salazar',
-        status: 'Operational',
-        devices: 'Cyviz, Kiosk, Projection / experience tech',
-        notes: 'CIC readiness and vendor coordination',
-      },
-      {
-        title: 'Proto',
-        owner: 'Eric.Guzman',
-        backupOwner: 'Donald.Salazar',
-        status: 'Operational',
-        devices: 'Proto hologram',
-        notes: 'Proto sessions and content readiness',
-      },
-      {
-        title: 'Hypervsn',
-        owner: 'Eric.Guzman',
-        backupOwner: 'Donald.Salazar',
-        status: 'Monitor',
-        devices: 'Hypervsn display',
-        notes: 'Monitor content and hardware status',
-      },
-      {
-        title: 'Surface Hubs',
-        owner: 'Travis.Alexander',
-        backupOwner: 'Eric.Guzman',
-        status: 'Monitor',
-        devices: 'Surface Hub fleet',
-        notes: 'Offline hubs / remediation tracking',
-      },
-      {
-        title: 'Vestaboard',
-        owner: 'Wilson.Ferreira',
-        backupOwner: 'Eric.Guzman',
-        status: 'Operational',
-        devices: 'Vestaboard coding project',
-        notes: 'Wilson development ownership',
-      },
-      {
-        title: 'Alleo',
-        owner: 'Mistral.Rojas',
-        backupOwner: 'Donald.Salazar',
-        status: 'Operational',
-        devices: 'Alleo',
-        notes: 'Documentation and support readiness',
-      },
-      {
-        title: 'Ceco Ceco',
-        owner: 'Mistral.Rojas',
-        backupOwner: 'Donald.Salazar',
-        status: 'Operational',
-        devices: 'Ceco Ceco',
-        notes: 'Documentation and support readiness',
-      },
+      { title: 'Vision Room', owner: 'Donald.Salazar', backupOwner: 'Eric.Guzman', status: 'Operational', devices: 'Cyviz, Vu', notes: 'Primary experience room / client support' },
+      { title: 'Broadcast Cyviz', owner: 'Donald.Salazar', backupOwner: 'Eric.Guzman', status: 'Operational', devices: 'Cyviz, Vu, Broadcast', notes: 'Broadcast-enabled Cyviz space' },
+      { title: '65th Floor', owner: 'Mistral.Rojas', backupOwner: 'Eric.Guzman', status: 'Operational', devices: 'Cyviz, Audio, Video, Britelite, Target Screen', notes: '65th floor readiness and maintenance' },
+      { title: 'CIC Space', owner: 'Eric.Guzman', backupOwner: 'Donald.Salazar', status: 'Operational', devices: 'Cyviz, Kiosk, Projection / experience tech', notes: 'CIC readiness and vendor coordination' },
+      { title: 'Proto', owner: 'Eric.Guzman', backupOwner: 'Donald.Salazar', status: 'Operational', devices: 'Proto hologram', notes: 'Proto sessions and content readiness' },
+      { title: 'Hypervsn', owner: 'Eric.Guzman', backupOwner: 'Donald.Salazar', status: 'Monitor', devices: 'Hypervsn display', notes: 'Monitor content and hardware status' },
+      { title: 'Surface Hubs', owner: 'Travis.Alexander', backupOwner: 'Eric.Guzman', status: 'Monitor', devices: 'Surface Hub fleet', notes: 'Offline hubs / remediation tracking' },
+      { title: 'Vestaboard', owner: 'Wilson.Ferreira', backupOwner: 'Eric.Guzman', status: 'Operational', devices: 'Vestaboard coding project', notes: 'Wilson development ownership' },
+      { title: 'Alleo', owner: 'Mistral.Rojas', backupOwner: 'Donald.Salazar', status: 'Operational', devices: 'Alleo', notes: 'Documentation and support readiness' },
+      { title: 'Ceco Ceco', owner: 'Mistral.Rojas', backupOwner: 'Donald.Salazar', status: 'Operational', devices: 'Ceco Ceco', notes: 'Documentation and support readiness' },
     ];
-
     try {
       for (const room of defaults) {
-        await addDoc(
-          collection(db, 'artifacts', appId, 'public', 'data', 'shared_rooms'),
-          {
-            ...room,
-            lastUpdated: new Date().toISOString(),
-            updatedBy: auth.currentUser?.email || 'seed',
-            timestamp: new Date().toISOString(),
-          }
-        );
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_rooms'), {
+          ...room, lastUpdated: new Date().toISOString(), updatedBy: auth.currentUser?.email || 'seed', timestamp: new Date().toISOString(),
+        });
       }
-
       showMsg('Default room ownership loaded.');
-    } catch (err) {
-      console.error(err);
-      showMsg('Seed failed.', true);
-    }
+    } catch (err) { console.error(err); showMsg('Seed failed.', true); }
   };
 
-  const stats = useMemo(
-    () => ({
-      total: rooms.length,
-      operational: rooms.filter((r) => r.status === 'Operational').length,
-      monitor: rooms.filter((r) => r.status === 'Monitor').length,
-      escalate: rooms.filter((r) => r.status === 'Escalate').length,
-    }),
-    [rooms]
-  );
+  const stats = useMemo(() => ({
+    total: rooms.length,
+    operational: rooms.filter((r) => r.status === 'Operational').length,
+    monitor: rooms.filter((r) => r.status === 'Monitor').length,
+    escalate: rooms.filter((r) => r.status === 'Escalate').length,
+  }), [rooms]);
 
   const ownershipRows = useMemo(() => {
     const people = {};
-
     rooms.forEach((room) => {
       const owner = room.owner || 'Unassigned';
-
-      if (!people[owner]) {
-        people[owner] = {
-          owner,
-          primary: [],
-          backup: [],
-          monitor: 0,
-          escalate: 0,
-        };
-      }
-
+      if (!people[owner]) people[owner] = { owner, primary: [], backup: [], monitor: 0, escalate: 0 };
       people[owner].primary.push(room.title);
-
       if (room.status === 'Monitor') people[owner].monitor += 1;
       if (room.status === 'Escalate') people[owner].escalate += 1;
-
       if (room.backupOwner) {
-        if (!people[room.backupOwner]) {
-          people[room.backupOwner] = {
-            owner: room.backupOwner,
-            primary: [],
-            backup: [],
-            monitor: 0,
-            escalate: 0,
-          };
-        }
-
+        if (!people[room.backupOwner]) people[room.backupOwner] = { owner: room.backupOwner, primary: [], backup: [], monitor: 0, escalate: 0 };
         people[room.backupOwner].backup.push(room.title);
       }
     });
-
     return Object.values(people);
   }, [rooms]);
 
@@ -1708,21 +1476,11 @@ function RoomStatusPage({ rooms, showMsg }) {
       <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
         <div className="flex justify-between items-start flex-wrap gap-3 mb-4">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Layout size={16} className="text-[#A100FF]" />
-              {editingId ? 'Edit Room / Device' : 'Add Room / Device'}
-            </h2>
-            <p className="text-[11px] text-[#6B6B8A] mt-0.5">
-              Track ownership, room health, backup coverage, and device notes.
-            </p>
+            <h2 className="text-base font-bold text-white flex items-center gap-2"><Layout size={16} className="text-[#A100FF]" />{editingId ? 'Edit Room / Device' : 'Add Room / Device'}</h2>
+            <p className="text-[11px] text-[#6B6B8A] mt-0.5">Track ownership, room health, backup coverage, and device notes.</p>
           </div>
-
           {!rooms.length && (
-            <button
-              type="button"
-              onClick={seedDefaultRooms}
-              className="bg-[#A100FF] text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase hover:bg-[#B733FF] transition"
-            >
+            <button type="button" onClick={seedDefaultRooms} className="bg-[#A100FF] text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase hover:bg-[#B733FF] transition">
               Load Default Matrix
             </button>
           )}
@@ -1730,186 +1488,70 @@ function RoomStatusPage({ rooms, showMsg }) {
 
         <form onSubmit={handleSave} className="space-y-3">
           <div className="grid md:grid-cols-4 gap-3">
-            <input
-              value={form.title}
-              onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-              placeholder="Room / Device name *"
-              className={`md:col-span-2 ${DK}`}
-              required
-            />
-
-            <select
-              value={form.owner}
-              onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))}
-              className={DK}
-            >
-              <option value="">Primary owner...</option>
-              {TEAM_MEMBERS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
+            <input value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Room / Device name *" className={`md:col-span-2 ${DK}`} required />
+            <select value={form.owner} onChange={(e) => setForm((p) => ({ ...p, owner: e.target.value }))} className={DK}>
+              <option value="">Primary owner...</option>{TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
-
-            <select
-              value={form.backupOwner}
-              onChange={(e) => setForm((p) => ({ ...p, backupOwner: e.target.value }))}
-              className={DK}
-            >
-              <option value="">Backup owner...</option>
-              {TEAM_MEMBERS.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
+            <select value={form.backupOwner} onChange={(e) => setForm((p) => ({ ...p, backupOwner: e.target.value }))} className={DK}>
+              <option value="">Backup owner...</option>{TEAM_MEMBERS.map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
-
           <div className="grid md:grid-cols-4 gap-3">
-            <select
-              value={form.status}
-              onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
-              className={DK}
-            >
+            <select value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))} className={DK}>
               <option value="Operational">Operational</option>
               <option value="Monitor">Monitor</option>
               <option value="Escalate">Escalate</option>
             </select>
-
-            <input
-              value={form.devices}
-              onChange={(e) => setForm((p) => ({ ...p, devices: e.target.value }))}
-              placeholder="Devices / systems"
-              className={`md:col-span-2 ${DK}`}
-            />
-
-            <button
-              type="submit"
-              className={`font-bold py-3 rounded-xl text-xs uppercase transition ${
-                editingId
-                  ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]'
-                  : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'
-              }`}
-            >
+            <input value={form.devices} onChange={(e) => setForm((p) => ({ ...p, devices: e.target.value }))} placeholder="Devices / systems" className={`md:col-span-2 ${DK}`} />
+            <button type="submit" className={`font-bold py-3 rounded-xl text-xs uppercase transition ${editingId ? 'bg-[#A3E635] text-[#0A0A0F] hover:bg-[#8CD02F]' : 'bg-[#A100FF] text-white hover:bg-[#B733FF]'}`}>
               {editingId ? 'Update' : 'Add'}
             </button>
           </div>
-
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            placeholder="Notes / support details..."
-            rows="2"
-            className={`w-full resize-none ${DK}`}
-          />
-
+          <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Notes / support details..." rows="2" className={`w-full resize-none ${DK}`} />
           {editingId && (
-            <button
-              type="button"
-              onClick={resetForm}
-              className="bg-[#1A1A2E] text-[#6B6B8A] px-4 py-2 rounded-lg text-[10px] font-bold uppercase hover:text-white transition"
-            >
-              Cancel Edit
-            </button>
+            <button type="button" onClick={resetForm} className="bg-[#1A1A2E] text-[#6B6B8A] px-4 py-2 rounded-lg text-[10px] font-bold uppercase hover:text-white transition">Cancel Edit</button>
           )}
         </form>
       </div>
 
       <div className="grid lg:grid-cols-[1.5fr,.9fr] gap-5">
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-            <MapPin size={16} className="text-[#A100FF]" />
-            Live Room Status
-          </h2>
-
+          <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4"><MapPin size={16} className="text-[#A100FF]" />Live Room Status</h2>
           {!rooms.length && (
             <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
-              No rooms loaded yet. Use “Load Default Matrix” or add a room above.
+              No rooms loaded yet. Use "Load Default Matrix" or add a room above.
             </div>
           )}
-
           <div className="grid md:grid-cols-2 gap-4">
             {rooms.map((room) => {
               const color = statusColor(room.status);
-
               return (
-                <div
-                  key={room.id}
-                  className="bg-[#0D0D15] rounded-2xl border border-[#2A2A3E] p-4 border-l-4 hover:border-[#A100FF]/50 transition group"
-                  style={{ borderLeftColor: color }}
-                >
+                <div key={room.id} className="bg-[#0D0D15] rounded-2xl border border-[#2A2A3E] p-4 border-l-4 hover:border-[#A100FF]/50 transition group" style={{ borderLeftColor: color }}>
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="text-sm font-black text-white">{room.title}</h3>
-                      <p className="text-[10px] text-[#6B6B8A] mt-1">
-                        Owner:{' '}
-                        <span className="text-[#C0C0D8] font-bold">
-                          {room.owner || 'Unassigned'}
-                        </span>
-                      </p>
-                      <p className="text-[10px] text-[#6B6B8A]">
-                        Backup:{' '}
-                        <span className="text-[#C0C0D8] font-bold">
-                          {room.backupOwner || 'None'}
-                        </span>
-                      </p>
+                      <p className="text-[10px] text-[#6B6B8A] mt-1">Owner: <span className="text-[#C0C0D8] font-bold">{room.owner || 'Unassigned'}</span></p>
+                      <p className="text-[10px] text-[#6B6B8A]">Backup: <span className="text-[#C0C0D8] font-bold">{room.backupOwner || 'None'}</span></p>
                     </div>
-
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button
-                        onClick={() => editRoom(room)}
-                        className="p-1.5 rounded-lg bg-[#1A1A2E] text-[#A100FF] hover:bg-[#2A2A3E]"
-                      >
-                        <Edit3 size={12} />
-                      </button>
-
-                      <button
-                        onClick={() => deleteRoom(room.id)}
-                        className="p-1.5 rounded-lg bg-[#1A1A2E] text-red-400 hover:bg-[#2A2A3E]"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <button onClick={() => editRoom(room)} className="p-1.5 rounded-lg bg-[#1A1A2E] text-[#A100FF] hover:bg-[#2A2A3E]"><Edit3 size={12} /></button>
+                      <button onClick={() => deleteRoom(room.id)} className="p-1.5 rounded-lg bg-[#1A1A2E] text-red-400 hover:bg-[#2A2A3E]"><Trash2 size={12} /></button>
                     </div>
                   </div>
-
-                  {room.devices && (
-                    <p className="text-[10px] text-[#A100FF] mb-2 line-clamp-1">
-                      Devices: {room.devices}
-                    </p>
-                  )}
-
-                  {room.notes && (
-                    <p className="text-[10px] text-[#6B6B8A] mb-3 line-clamp-2">
-                      {room.notes}
-                    </p>
-                  )}
-
+                  {room.devices && <p className="text-[10px] text-[#A100FF] mb-2 line-clamp-1">Devices: {room.devices}</p>}
+                  {room.notes && <p className="text-[10px] text-[#6B6B8A] mb-3 line-clamp-2">{room.notes}</p>}
                   <div className="grid grid-cols-3 gap-2">
                     {['Operational', 'Monitor', 'Escalate'].map((s) => {
                       const active = room.status === s;
-
                       return (
-                        <button
-                          key={s}
-                          onClick={() => updateRoomStatus(room, s)}
-                          className="py-2 rounded-lg text-[10px] font-bold uppercase transition border"
-                          style={{
-                            background: active ? statusColor(s) : '#111119',
-                            borderColor: active ? statusColor(s) : '#2A2A3E',
-                            color: active ? '#FFFFFF' : '#8A8AA3',
-                          }}
-                        >
+                        <button key={s} onClick={() => updateRoomStatus(room, s)} className="py-2 rounded-lg text-[10px] font-bold uppercase transition border"
+                          style={{ background: active ? statusColor(s) : '#111119', borderColor: active ? statusColor(s) : '#2A2A3E', color: active ? '#FFFFFF' : '#8A8AA3' }}>
                           {s}
                         </button>
                       );
                     })}
                   </div>
-
-                  {room.lastUpdated && (
-                    <p className="text-[9px] text-[#4A4A6A] mt-3">
-                      Updated: {new Date(room.lastUpdated).toLocaleString()}
-                    </p>
-                  )}
+                  {room.lastUpdated && <p className="text-[9px] text-[#4A4A6A] mt-3">Updated: {new Date(room.lastUpdated).toLocaleString()}</p>}
                 </div>
               );
             })}
@@ -1917,83 +1559,42 @@ function RoomStatusPage({ rooms, showMsg }) {
         </div>
 
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-            <Users size={16} className="text-[#A100FF]" />
-            Device Ownership Matrix
-          </h2>
-
+          <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4"><Users size={16} className="text-[#A100FF]" />Device Ownership Matrix</h2>
           {!ownershipRows.length && (
             <div className="text-center text-[#4A4A6A] text-xs font-bold py-8 border border-dashed border-[#2A2A3E] rounded-xl">
               Ownership matrix will appear after rooms are added.
             </div>
           )}
-
           <div className="space-y-3">
             {ownershipRows.map((row) => (
-              <div
-                key={row.owner}
-                className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3"
-              >
+              <div key={row.owner} className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-3">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#A100FF]/20 text-[#A100FF] flex items-center justify-center text-[10px] font-black">
-                    {getInitials(row.owner)}
-                  </div>
+                  <div className="w-8 h-8 rounded-lg bg-[#A100FF]/20 text-[#A100FF] flex items-center justify-center text-[10px] font-black">{getInitials(row.owner)}</div>
                   <div>
                     <p className="text-xs font-bold text-white">{row.owner}</p>
-                    <p className="text-[9px] text-[#6B6B8A]">
-                      Primary: {row.primary.length} • Backup: {row.backup.length}
-                    </p>
+                    <p className="text-[9px] text-[#6B6B8A]">Primary: {row.primary.length} • Backup: {row.backup.length}</p>
                   </div>
                 </div>
-
                 {!!row.primary.length && (
                   <div className="mb-2">
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#A100FF] mb-1">
-                      Primary
-                    </p>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#A100FF] mb-1">Primary</p>
                     <div className="flex flex-wrap gap-1">
-                      {row.primary.map((item) => (
-                        <span
-                          key={item}
-                          className="px-2 py-1 rounded bg-[#1A1A2E] text-[#C0C0D8] text-[9px] font-bold"
-                        >
-                          {item}
-                        </span>
-                      ))}
+                      {row.primary.map((item) => <span key={item} className="px-2 py-1 rounded bg-[#1A1A2E] text-[#C0C0D8] text-[9px] font-bold">{item}</span>)}
                     </div>
                   </div>
                 )}
-
                 {!!row.backup.length && (
                   <div>
-                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#6B6B8A] mb-1">
-                      Backup
-                    </p>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#6B6B8A] mb-1">Backup</p>
                     <div className="flex flex-wrap gap-1">
-                      {row.backup.map((item) => (
-                        <span
-                          key={item}
-                          className="px-2 py-1 rounded bg-[#111119] border border-[#2A2A3E] text-[#6B6B8A] text-[9px] font-bold"
-                        >
-                          {item}
-                        </span>
-                      ))}
+                      {row.backup.map((item) => <span key={item} className="px-2 py-1 rounded bg-[#111119] border border-[#2A2A3E] text-[#6B6B8A] text-[9px] font-bold">{item}</span>)}
                     </div>
                   </div>
                 )}
-
                 {(row.monitor > 0 || row.escalate > 0) && (
                   <div className="mt-3 flex gap-2">
-                    {row.monitor > 0 && (
-                      <span className="text-[9px] font-bold px-2 py-1 rounded bg-[#F59E0B]/10 text-[#F59E0B]">
-                        {row.monitor} Monitor
-                      </span>
-                    )}
-                    {row.escalate > 0 && (
-                      <span className="text-[9px] font-bold px-2 py-1 rounded bg-[#EF4444]/10 text-[#EF4444]">
-                        {row.escalate} Escalate
-                      </span>
-                    )}
+                    {row.monitor > 0 && <span className="text-[9px] font-bold px-2 py-1 rounded bg-[#F59E0B]/10 text-[#F59E0B]">{row.monitor} Monitor</span>}
+                    {row.escalate > 0 && <span className="text-[9px] font-bold px-2 py-1 rounded bg-[#EF4444]/10 text-[#EF4444]">{row.escalate} Escalate</span>}
                   </div>
                 )}
               </div>
@@ -2005,78 +1606,42 @@ function RoomStatusPage({ rooms, showMsg }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ANALYTICS DASHBOARD
+// ─────────────────────────────────────────────────────────────────────────────
+
 function AnalyticsDashboard({ events, tasks }) {
   const stats = useMemo(() => {
-  const totalAttendees = events.reduce((s, e) => {
-    return s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0);
-  }, 0);
-
-  const byClass = {};
-  const bySession = {};
-  const bySource = {};
-  const byRoom = {};
-
-  events.forEach(e => {
-    const c = e.classification || 'TBD';
-    const t = e.sessionType || 'Other';
-    const s = e.source || 'Manual';
-    const r = e.eventLocation || 'Unknown';
-
-    byClass[c] = (byClass[c] || 0) + 1;
-    bySession[t] = (bySession[t] || 0) + 1;
-    bySource[s] = (bySource[s] || 0) + 1;
-    byRoom[r] = (byRoom[r] || 0) + 1;
-  });
-
-  const norm = (t) => {
-    const s = String(t.status || 'todo').toLowerCase().replace(/[\s-_]+/g, '');
-    const map = {
-      todo: 'todo',
-      backlog: 'todo',
-      '': 'todo',
-      doing: 'doing',
-      active: 'doing',
-      progress: 'doing',
-      inprogress: 'doing',
-      complete: 'complete',
-      done: 'complete',
-      delivered: 'complete',
-      completed: 'complete',
+    const totalAttendees = events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0);
+    const byClass = {}; const bySession = {}; const bySource = {}; const byRoom = {};
+    events.forEach(e => {
+      const c = e.classification || 'TBD'; const t = e.sessionType || 'Other';
+      const s = e.source || 'Manual'; const r = e.eventLocation || 'Unknown';
+      byClass[c] = (byClass[c] || 0) + 1; bySession[t] = (bySession[t] || 0) + 1;
+      bySource[s] = (bySource[s] || 0) + 1; byRoom[r] = (byRoom[r] || 0) + 1;
+    });
+    const norm = (t) => {
+      const s = String(t.status || 'todo').toLowerCase().replace(/[\s-_]+/g, '');
+      const map = { todo: 'todo', backlog: 'todo', '': 'todo', doing: 'doing', active: 'doing', progress: 'doing', inprogress: 'doing', complete: 'complete', done: 'complete', delivered: 'complete', completed: 'complete' };
+      return map[s] || s;
     };
-    return map[s] || s;
-  };
-
-  const taskByStatus = {
-    todo: tasks.filter(t => norm(t) === 'todo').length,
-    doing: tasks.filter(t => norm(t) === 'doing').length,
-    complete: tasks.filter(t => norm(t) === 'complete').length,
-  };
-
-  const highRiskEvents = events.filter(e => e.riskLevel === 'High').length;
-  const mediumRiskEvents = events.filter(e => e.riskLevel === 'Medium').length;
-  const autoPlannedEvents = events.filter(e => e.automationSummary).length;
-  const autoGeneratedTasks = tasks.filter(t => t.source === 'Auto-generated').length;
-
-  return {
-    totalAttendees,
-    byClass,
-    bySession,
-    bySource,
-    byRoom,
-    taskByStatus,
-    highRiskEvents,
-    mediumRiskEvents,
-    autoPlannedEvents,
-    autoGeneratedTasks,
-  };
-}, [events, tasks]);
+    const taskByStatus = {
+      todo: tasks.filter(t => norm(t) === 'todo').length,
+      doing: tasks.filter(t => norm(t) === 'doing').length,
+      complete: tasks.filter(t => norm(t) === 'complete').length,
+    };
+    return {
+      totalAttendees, byClass, bySession, bySource, byRoom, taskByStatus,
+      highRiskEvents: events.filter(e => e.riskLevel === 'High').length,
+      mediumRiskEvents: events.filter(e => e.riskLevel === 'Medium').length,
+      autoPlannedEvents: events.filter(e => e.automationSummary).length,
+      autoGeneratedTasks: tasks.filter(t => t.source === 'Auto-generated').length,
+    };
+  }, [events, tasks]);
 
   const Bar = ({ label, value, max, color }) => (
     <div className="mb-2">
-      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1">
-        <span>{label}</span>
-        <span style={{ color }}>{value}</span>
-      </div>
+      <div className="flex justify-between text-[10px] font-bold text-[#9B9BB0] mb-1"><span>{label}</span><span style={{ color }}>{value}</span></div>
       <div className="h-2 bg-[#0D0D15] rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
       </div>
@@ -2098,39 +1663,21 @@ function AnalyticsDashboard({ events, tasks }) {
         <StatCard icon={<AlertCircle size={16} />} value={stats.highRiskEvents} label="High Risk" />
         <StatCard icon={<TrendingUp size={16} />} value={stats.autoGeneratedTasks} label="Auto Tasks" />
       </div>
-
       <div className="grid md:grid-cols-2 gap-5">
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <PieIcon size={14} className="text-[#A100FF]" /> Events by Classification
-          </h2>
-          {sortedClass.length ? sortedClass.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><PieIcon size={14} className="text-[#A100FF]" /> Events by Classification</h2>
+          {sortedClass.length ? sortedClass.map(([k, v]) => <Bar key={k} label={k} value={v} max={maxClass} color={classBadgeColor(k)} />) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
         </div>
-
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type
-          </h2>
-          {sortedSession.length ? sortedSession.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><BarChart3 size={14} className="text-[#A100FF]" /> Events by Session Type</h2>
+          {sortedSession.length ? sortedSession.map(([k, v]) => <Bar key={k} label={k} value={v} max={maxSession} color="#A100FF" />) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
         </div>
-
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations
-          </h2>
-          {sortedRoom.length ? sortedRoom.map(([k, v]) => (
-            <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />
-          )) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><MapPin size={14} className="text-[#A100FF]" /> Top Rooms / Locations</h2>
+          {sortedRoom.length ? sortedRoom.map(([k, v]) => <Bar key={k} label={k} value={v} max={maxRoom} color="#A3E635" />) : <p className="text-xs text-[#4A4A6A] text-center py-4">No data yet.</p>}
         </div>
-
         <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4">
-            <Layout size={14} className="text-[#A100FF]" /> Task Pipeline
-          </h2>
+          <h2 className="text-sm font-bold text-white flex items-center gap-2 mb-4"><Layout size={14} className="text-[#A100FF]" /> Task Pipeline</h2>
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-[#0D0D15] rounded-xl p-4 border border-[#2A2A3E]">
               <div className="text-2xl font-black text-[#6B6B8A]">{stats.taskByStatus.todo}</div>
@@ -2153,6 +1700,10 @@ function AnalyticsDashboard({ events, tasks }) {
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ROOT APP
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -2181,22 +1732,10 @@ export default function App() {
   useEffect(() => {
     if (!user || !firebaseConfig.apiKey) return;
     const p = (c) => collection(db, 'artifacts', appId, 'public', 'data', c);
-    const u1 = onSnapshot(query(p('shared_events'), orderBy('timestamp','desc')), (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const u2 = onSnapshot(query(p('shared_tasks'), orderBy('timestamp','desc')), (s) => setTasks(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    const u3 = onSnapshot(query(p('shared_issues'), orderBy('timestamp','desc')), (s) => setIssues(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
-   const u4 = onSnapshot(
-  query(
-    p('shared_rooms'),
-    orderBy('timestamp', 'desc')
-  ),
-  (s) =>
-    setRooms(
-      s.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }))
-    )
-);
+    const u1 = onSnapshot(query(p('shared_events'), orderBy('timestamp', 'desc')), (s) => setEvents(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u2 = onSnapshot(query(p('shared_tasks'), orderBy('timestamp', 'desc')), (s) => setTasks(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u3 = onSnapshot(query(p('shared_issues'), orderBy('timestamp', 'desc')), (s) => setIssues(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const u4 = onSnapshot(query(p('shared_rooms'), orderBy('timestamp', 'desc')), (s) => setRooms(s.docs.map((d) => ({ id: d.id, ...d.data() }))));
     return () => { u1(); u2(); u3(); u4(); };
   }, [user]);
 
@@ -2213,23 +1752,10 @@ export default function App() {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
       const body = {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 8192,
-          topP: 0.95,          // ← add this
-          topK: 40,            // ← add this
-          ...(json ? { responseMimeType: "application/json" } : {})
-        }
+        generationConfig: { temperature: 0.1, maxOutputTokens: 8192, topP: 0.95, topK: 40, ...(json ? { responseMimeType: "application/json" } : {}) },
       };
-      const r = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (!r.ok) {
-        const errText = await r.text();
-        throw new Error(`Gemini ${r.status}: ${errText.slice(0, 200)}`);
-      }
+      const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) { const errText = await r.text(); throw new Error(`Gemini ${r.status}: ${errText.slice(0, 200)}`); }
       const d = await r.json();
       if (d.error) throw new Error(d.error.message);
       const t = d.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -2240,16 +1766,40 @@ export default function App() {
     }
   };
 
+  // FIX: Leadership Brief now uses full event + issue data for richer output
   const generateLeadBriefing = async () => {
     if (!aiEnabled) return;
     setIsBriefingLoading(true);
-    const ec = events.slice(0,3).map((e) => e.eventName).join(', ');
-    const bc = issues.filter((i) => i.urgency === 'Urgent').map((i) => i.title).join(', ');
+
+    const upcomingEvents = events
+      .filter(e => e.startDate)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .slice(0, 5);
+
+    const highRisk = events.filter(e => e.riskLevel === 'High').map(e => e.eventName);
+    const urgentIssues = issues.filter(i => i.urgency === 'Urgent' || i.status === 'Open').map(i => i.title);
+    const tasksDoing = tasks.filter(t => String(t.status || '').toLowerCase().includes('doing')).length;
+    const tasksTotal = tasks.length;
+
+    const contextData = [
+      `Upcoming events (${upcomingEvents.length}): ${upcomingEvents.map(e => `${e.eventName} (${e.startDate?.slice(0, 10)}, ${e.classification})`).join('; ')}`,
+      `High-risk events: ${highRisk.join(', ') || 'None'}`,
+      `Open/urgent tech issues: ${urgentIssues.join(', ') || 'None'}`,
+      `Task pipeline: ${tasksDoing} in progress out of ${tasksTotal} total`,
+      `Total attendees across all events: ${events.reduce((s, e) => s + (parseInt(String(e.attendees || '').replace(/[^\d]/g, ''), 10) || 0), 0)}`,
+    ].join('\n');
+
     const briefing = await fetchGemini(
-      'Act as an Accenture PM. Provide exactly TWO high-impact bullet points for leadership update.',
-      `Events: ${ec}. Blockers: ${bc}.`
+      'Act as an Accenture SELECT team lead. Provide exactly THREE concise bullet points for a leadership status update. Each bullet should be specific, data-driven, and action-oriented. Cover: upcoming events & readiness, any risks or blockers, and task/team status.',
+      contextData
     );
-    setModal({ title: "Leadership Brief", content: briefing, actionLabel: "Copy", action: () => { navigator.clipboard.writeText(briefing); showMsg("Copied."); } });
+
+    setModal({
+      title: "Leadership Brief",
+      content: briefing,
+      actionLabel: "Copy",
+      action: () => { navigator.clipboard.writeText(briefing); showMsg("Copied."); },
+    });
     setIsBriefingLoading(false);
   };
 
@@ -2290,14 +1840,15 @@ export default function App() {
         <div className="w-full max-w-7xl bg-[#111119] rounded-2xl border border-[#2A2A3E] p-5 mb-5">
           <div className="flex justify-between items-center flex-wrap gap-3">
             <div>
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-                <span className="text-[#A100FF]">SELECT</span> Hub
-              </h1>
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight"><span className="text-[#A100FF]">SELECT</span> Hub</h1>
               <p className="text-[10px] text-[#6B6B8A] font-bold uppercase tracking-[.25em] mt-0.5">Powered by Accenture</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={generateLeadBriefing} disabled={isBriefingLoading}
-                className="bg-[#A100FF] text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-[#B733FF] transition disabled:opacity-50 flex items-center gap-1.5">
+              <button
+                onClick={generateLeadBriefing}
+                disabled={isBriefingLoading}
+                className="bg-[#A100FF] text-white px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-[#B733FF] transition disabled:opacity-50 flex items-center gap-1.5"
+              >
                 <Zap size={11} className={isBriefingLoading ? 'animate-spin' : ''} />
                 {isBriefingLoading ? 'Working...' : 'Lead Brief'}
               </button>
@@ -2307,23 +1858,18 @@ export default function App() {
             </div>
           </div>
           <div className="flex gap-1.5 mt-4 flex-wrap">
-            <NavBtn a={currentPage==='schedule'} o={() => setCurrentPage('schedule')} l="Events" i={<Calendar size={13}/>} />
-            <NavBtn a={currentPage==='calendar'} o={() => setCurrentPage('calendar')} l="Calendar" i={<CalendarDays size={13}/>} />
-            <NavBtn a={currentPage==='kanban'} o={() => setCurrentPage('kanban')} l="Tasks" i={<Layout size={13}/>} />
-            <NavBtn a={currentPage==='issues'} o={() => setCurrentPage('issues')} l="Tech Feed" i={<BrainCircuit size={13}/>} />
-            <NavBtn
-    a={currentPage === 'rooms'}
-    o={() => setCurrentPage('rooms')}
-    l="Rooms"
-    i={<MapPin size={13} />}
-/>
-            <NavBtn a={currentPage==='analytics'} o={() => setCurrentPage('analytics')} l="Insights" i={<BarChart3 size={13}/>} />
+            <NavBtn a={currentPage === 'schedule'} o={() => setCurrentPage('schedule')} l="Events" i={<Calendar size={13} />} />
+            <NavBtn a={currentPage === 'calendar'} o={() => setCurrentPage('calendar')} l="Calendar" i={<CalendarDays size={13} />} />
+            <NavBtn a={currentPage === 'kanban'} o={() => setCurrentPage('kanban')} l="Tasks" i={<Layout size={13} />} />
+            <NavBtn a={currentPage === 'issues'} o={() => setCurrentPage('issues')} l="Tech Feed" i={<BrainCircuit size={13} />} />
+            <NavBtn a={currentPage === 'rooms'} o={() => setCurrentPage('rooms')} l="Rooms" i={<MapPin size={13} />} />
+            <NavBtn a={currentPage === 'analytics'} o={() => setCurrentPage('analytics')} l="Insights" i={<BarChart3 size={13} />} />
           </div>
         </div>
 
         {message.text && (
           <div className={`w-full max-w-7xl p-3.5 mb-4 rounded-xl border-l-4 text-sm font-bold flex items-center gap-2 anim-in ${message.isError ? 'bg-red-500/10 border-red-500 text-red-300' : 'bg-[#A100FF]/10 border-[#A100FF] text-[#A100FF]'}`}>
-            {message.isError ? <AlertCircle size={15}/> : <CheckCircle2 size={15}/>}
+            {message.isError ? <AlertCircle size={15} /> : <CheckCircle2 size={15} />}
             {message.text}
           </div>
         )}
@@ -2332,23 +1878,23 @@ export default function App() {
           {currentPage === 'schedule' && <SchedulePage events={events} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} />}
           {currentPage === 'calendar' && <CalendarView events={events} />}
           {currentPage === 'kanban' && <KanbanPage tasks={tasks} showMsg={showMsg} />}
-          {currentPage === 'issues' && <IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} />}
-          {currentPage === 'rooms' && (
-    <RoomStatusPage
-        rooms={rooms}
-        showMsg={showMsg}
-    />
-)}
+          {/* FIX: setModal now passed to IssuesPage so AI suggestions use modal instead of alert() */}
+          {currentPage === 'issues' && <IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} />}
+          {currentPage === 'rooms' && <RoomStatusPage rooms={rooms} showMsg={showMsg} />}
           {currentPage === 'analytics' && <AnalyticsDashboard events={events} tasks={tasks} />}
         </div>
 
         {modal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 anim-in" onClick={() => setModal(null)}>
             <div className="bg-[#111119] rounded-2xl border border-[#2A2A3E] max-w-2xl w-full p-6" onClick={(e) => e.stopPropagation()}>
-              <h3 className="text-lg font-black text-white mb-4 flex items-center gap-2"><Zap size={16} className="text-[#A100FF]"/> {modal.title}</h3>
+              <h3 className="text-lg font-black text-white mb-4 flex items-center gap-2"><Zap size={16} className="text-[#A100FF]" /> {modal.title}</h3>
               <div className="bg-[#0D0D15] border border-[#2A2A3E] rounded-xl p-4 text-sm text-[#C0C0D8] whitespace-pre-wrap max-h-[50vh] overflow-y-auto font-mono leading-relaxed">{modal.content}</div>
               <div className="flex gap-2 mt-5">
-                {modal.action && <button onClick={modal.action} className="flex-1 bg-[#A100FF] text-white font-bold py-2.5 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition flex items-center justify-center gap-1.5"><Share2 size={12}/>{modal.actionLabel||'Copy'}</button>}
+                {modal.action && (
+                  <button onClick={modal.action} className="flex-1 bg-[#A100FF] text-white font-bold py-2.5 rounded-xl text-xs uppercase hover:bg-[#B733FF] transition flex items-center justify-center gap-1.5">
+                    <Share2 size={12} />{modal.actionLabel || 'Copy'}
+                  </button>
+                )}
                 <button onClick={() => setModal(null)} className="flex-1 bg-[#1A1A2E] text-[#6B6B8A] font-bold py-2.5 rounded-xl text-xs uppercase hover:bg-[#2A2A3E] hover:text-white transition">Close</button>
               </div>
             </div>
