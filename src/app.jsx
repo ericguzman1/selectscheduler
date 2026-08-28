@@ -10,8 +10,8 @@ import {
 } from 'firebase/firestore';
 
 // ── Constants ──
-const TEAM_MEMBERS = ["Eric.Guzman","Tommy.Flinch","Donald.Salazar","Mistral.Rojas"];
-const ROOMS = ["Interchange","Vision","Tank","Training Room","Meadow","Common Grounds","Ginsberg","Globe","Office Tour"];
+const DEFAULT_TEAM = ["Eric.Guzman","Tommy.Flinch","Donald.Salazar","Mistral.Rojas","Wilson.Ferreira"];
+const ROOMS = ["Interchange","Vision","Tank","Training Room","Meadow","Common Grounds","Ginsberg","Globe","Office Tour","Other"];
 const DURATION_OPTIONS = ["0.5 Hours","1 Hour","2 Hours","4 Hours","6 Hours","8 Hours","Full Day (10h)","Multi-Day (24h)"];
 const SUPPORT_TEAMS = ["NYIH SELECT","CIC","TXA Assist","Other"];
 const CLASSIFICATIONS = ["Internal","Client","Leadership","Community","Confidential","Public / External","TBD"];
@@ -535,13 +535,14 @@ function AuthPage({ showMsg }) {
 }
 // ── Sidebar nav ──
 const NAV = [
-  { key:'today',   icon:'☀',  label:'Today'    },
-  { key:'events',  icon:'📋', label:'Events'   },
-  { key:'tasks',   icon:'⬛', label:'Tasks'    },
-  { key:'issues',  icon:'⚠',  label:'Issues'   },
-  { key:'rooms',   icon:'📍', label:'Rooms'    },
-  { key:'export',  icon:'⬇',  label:'Export'   },
-  { key:'insights',icon:'📊', label:'Insights' },
+  { key:'today',    icon:'☀',  label:'Today'    },
+  { key:'events',   icon:'📋', label:'Events'   },
+  { key:'tasks',    icon:'⬛', label:'Tasks'    },
+  { key:'issues',   icon:'⚠',  label:'Issues'   },
+  { key:'rooms',    icon:'📍', label:'Rooms'    },
+  { key:'export',   icon:'⬇',  label:'Export'   },
+  { key:'insights', icon:'📊', label:'Insights' },
+  { key:'settings', icon:'⚙',  label:'Settings' },
 ];
 
 function Sidebar({ page, setPage }) {
@@ -565,6 +566,12 @@ function Sidebar({ page, setPage }) {
         >{n.icon}</button>
       ))}
       <div style={{flex:1}}/>
+      <button onClick={()=>setPage('settings')} title="Settings"
+        style={{width:36,height:36,borderRadius:8,border:'none',cursor:'pointer',
+          background: page==='settings' ? C.accentBg : 'transparent',
+          color: page==='settings' ? C.accent : C.textMuted,fontSize:16,marginBottom:2}}
+        onMouseEnter={e=>{ if(page!=='settings'){e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=C.textPrimary;} }}
+        onMouseLeave={e=>{ if(page!=='settings'){e.currentTarget.style.background='transparent';e.currentTarget.style.color=C.textMuted;} }}>⚙</button>
       <button onClick={()=>signOut(auth)} title="Sign out"
         style={{width:36,height:36,borderRadius:8,border:'none',cursor:'pointer',background:'transparent',color:C.textMuted,fontSize:15}}
         onMouseEnter={e=>{e.currentTarget.style.color=C.red;}}
@@ -606,9 +613,9 @@ function StatRow({ stats }) {
 }
 
 // ── TODAY PAGE ──
-function TodayPage({ events, handoffNotes, rooms, showMsg, currentUser, fetchGemini, setModal }) {
+function TodayPage({ events, handoffFeed, rooms, showMsg, currentUser, fetchGemini, setModal, teamMembers }) {
   const todayStr = getTodayStr();
-  const [handoff, setHandoff] = useState(handoffNotes?.notes||'');
+  const [handoffInput, setHandoffInput] = useState('');
   const [savingHandoff, setSavingHandoff] = useState(false);
   const [logTarget, setLogTarget] = useState(null);
   const [logHours, setLogHours] = useState('');
@@ -617,8 +624,6 @@ function TodayPage({ events, handoffNotes, rooms, showMsg, currentUser, fetchGem
   const [aiLoading, setAiLoading] = useState(false);
   const [showHandoff, setShowHandoff] = useState(false);
   const [showAi, setShowAi] = useState(false);
-
-  useEffect(()=>setHandoff(handoffNotes?.notes||''),[handoffNotes]);
 
   const todayEvents = useMemo(() => events.filter(e => {
     const sd = (e.startDate||'').slice(0,10);
@@ -641,12 +646,21 @@ function TodayPage({ events, handoffNotes, rooms, showMsg, currentUser, fetchGem
   };
 
   const saveHandoff = async () => {
+    if (!handoffInput.trim()) return;
     setSavingHandoff(true);
-    await setDoc(doc(db,'artifacts',appId,'public','data','shared_handoff',todayStr),{
-      notes:handoff,updatedBy:currentUser,updatedAt:new Date().toISOString(),date:todayStr,
+    await addDoc(col('shared_handoff'), {
+      note: handoffInput.trim(),
+      author: currentUser,
+      date: todayStr,
+      timestamp: new Date().toISOString(),
     });
-    await logActivity(`${currentUser} updated handoff notes`,currentUser);
-    setSavingHandoff(false); showMsg('Handoff saved.');
+    setHandoffInput('');
+    setSavingHandoff(false);
+    showMsg('Note added.');
+  };
+
+  const deleteHandoffEntry = async (id) => {
+    await deleteDoc(doc(db,'artifacts',appId,'public','data','shared_handoff',id));
   };
 
   const submitLog = async () => {
@@ -793,24 +807,59 @@ function TodayPage({ events, handoffNotes, rooms, showMsg, currentUser, fetchGem
           </div>
         </div>
 
-        {/* Handoff */}
+        {/* Handoff feed */}
         <div style={{padding:12,borderBottom:`1px solid ${C.border}`}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-            <Label style={{marginBottom:0}}>Handoff notes</Label>
-            <button onClick={()=>setShowHandoff(!showHandoff)} style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:C.accent}}>
-              {showHandoff?'Hide':'Edit'}
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <Label style={{marginBottom:0}}>Shift handoff</Label>
+            <button onClick={()=>setShowHandoff(!showHandoff)}
+              style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:C.accent}}>
+              {showHandoff?'Hide':'+ Add note'}
             </button>
           </div>
-          {handoffNotes?.notes && !showHandoff && <p style={{fontSize:11,color:C.textSecondary,lineHeight:1.5}}>{handoffNotes.notes}</p>}
-          {!handoffNotes?.notes && !showHandoff && <p style={{fontSize:11,color:C.textMuted,fontStyle:'italic'}}>No handoff notes yet.</p>}
+
+          {/* Today's feed entries */}
+          {handoffFeed.length===0 && (
+            <p style={{fontSize:11,color:C.textMuted,fontStyle:'italic',marginBottom:showHandoff?8:0}}>
+              No handoff notes yet today.
+            </p>
+          )}
+          <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:showHandoff?8:0}}>
+            {handoffFeed.map(entry=>(
+              <div key={entry.id} style={{background:'rgba(255,255,255,0.02)',border:`1px solid ${C.border}`,
+                borderRadius:7,padding:'7px 9px',position:'relative',group:'true'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:6}}>
+                  <div style={{flex:1}}>
+                    <p style={{fontSize:11,color:C.textSecondary,lineHeight:1.5,marginBottom:3}}>
+                      {entry.note}
+                    </p>
+                    <p style={{fontSize:10,color:C.textMuted}}>
+                      {entry.author?.split('@')[0] || entry.author}
+                      {' · '}
+                      {entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : ''}
+                    </p>
+                  </div>
+                  {entry.author===currentUser && (
+                    <button onClick={()=>deleteHandoffEntry(entry.id)}
+                      style={{background:'none',border:'none',cursor:'pointer',fontSize:12,
+                        color:C.textMuted,padding:0,flexShrink:0,lineHeight:1,opacity:0.5}}
+                      onMouseEnter={e=>e.target.style.opacity='1'}
+                      onMouseLeave={e=>e.target.style.opacity='0.5'}>✕</button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add note input */}
           {showHandoff && (
             <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              <textarea value={handoff} onChange={e=>setHandoff(e.target.value)} rows={4}
-                placeholder="Leave notes for the next shift..."
-                style={{width:'100%',background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:7,
-                  color:C.textPrimary,fontSize:11,padding:'7px 9px',outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
-              <Btn variant="amber" size="sm" onClick={saveHandoff} disabled={savingHandoff}>
-                {savingHandoff?'Saving...':'Save'}
+              <textarea value={handoffInput} onChange={e=>setHandoffInput(e.target.value)}
+                rows={3} placeholder="e.g. Proto rebooted at 10am — watch it this afternoon"
+                style={{width:'100%',background:'#0D0D17',border:`1px solid ${C.border}`,
+                  borderRadius:7,color:C.textPrimary,fontSize:11,padding:'7px 9px',
+                  outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
+              <Btn variant="amber" size="sm" onClick={saveHandoff} disabled={savingHandoff||!handoffInput.trim()}>
+                {savingHandoff?'Saving...':'Add note'}
               </Btn>
             </div>
           )}
@@ -858,7 +907,7 @@ function TodayPage({ events, handoffNotes, rooms, showMsg, currentUser, fetchGem
   );
 }
 // ── EVENTS PAGE ──
-function EventsPage({ events, showMsg, fetchGemini, setModal, currentUser }) {
+function EventsPage({ events, showMsg, fetchGemini, setModal, currentUser, teamMembers }) {
   const [view, setView] = useState('list'); // list | form | import
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -1151,8 +1200,24 @@ function EventsPage({ events, showMsg, fetchGemini, setModal, currentUser }) {
           <div><Label>End</Label><Input value={form.endDate} onChange={e=>uf('endDate',e.target.value)} type="datetime-local" required/></div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-          <div><Label>SELECT lead</Label><Select value={form.selectPoc} onChange={e=>uf('selectPoc',e.target.value)}><option value="">Auto-assign</option>{TEAM_MEMBERS.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
-          <div><Label>Room</Label><Select value={form.eventLocation} onChange={e=>uf('eventLocation',e.target.value)}><option value="">Select room</option>{ROOMS.map(r=><option key={r} value={r}>{r}</option>)}</Select></div>
+          <div><Label>SELECT lead</Label><Select value={form.selectPoc} onChange={e=>uf('selectPoc',e.target.value)}><option value="">Auto-assign</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
+          <div><Label>Room</Label>
+            <Select value={ROOMS.includes(form.eventLocation)||form.eventLocation==='' ? form.eventLocation : 'Other'} onChange={e=>{if(e.target.value!=='Other')uf('eventLocation',e.target.value);else uf('eventLocation','');}}>
+              <option value="">Select room</option>
+              {ROOMS.filter(r=>r!=='Other').map(r=><option key={r} value={r}>{r}</option>)}
+              <option value="Other">Other (specify below)</option>
+            </Select>
+            {(!ROOMS.filter(r=>r!=='Other').includes(form.eventLocation)&&form.eventLocation!=='')&&(
+              <input value={form.eventLocation} onChange={e=>uf('eventLocation',e.target.value)}
+                placeholder="Type room name..."
+                style={{marginTop:6,width:'100%',background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textPrimary,fontSize:13,padding:'9px 12px',outline:'none',fontFamily:'inherit'}}/>
+            )}
+            {(ROOMS.filter(r=>r!=='Other').includes(form.eventLocation)||form.eventLocation==='')&&form.eventLocation===''&&(
+              <input value={''} onChange={e=>uf('eventLocation',e.target.value)}
+                placeholder="Or type a custom room..."
+                style={{marginTop:6,width:'100%',background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textPrimary,fontSize:13,padding:'9px 12px',outline:'none',fontFamily:'inherit'}}/>
+            )}
+          </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           <div><Label>Classification</Label><Select value={form.classification} onChange={e=>uf('classification',e.target.value)}>{CLASSIFICATIONS.map(c=><option key={c} value={c}>{c}</option>)}</Select></div>
@@ -1253,7 +1318,7 @@ function EventsPage({ events, showMsg, fetchGemini, setModal, currentUser }) {
   );
 }
 // ── TASKS PAGE ──
-function TasksPage({ tasks, showMsg, currentUser }) {
+function TasksPage({ tasks, showMsg, currentUser, teamMembers }) {
   const [filterMember, setFilterMember] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -1328,7 +1393,7 @@ function TasksPage({ tasks, showMsg, currentUser }) {
         <textarea name="det" defaultValue={t.details} rows={3} placeholder="Checklist / notes..." style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:7,color:C.textPrimary,fontSize:12,padding:'8px 10px',outline:'none',fontFamily:'inherit',resize:'vertical'}}/>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
           <select name="a" defaultValue={t.assignee} style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:7,color:C.textPrimary,fontSize:12,padding:'7px 8px',outline:'none',fontFamily:'inherit'}}>
-            <option value="">Assign...</option>{TEAM_MEMBERS.map(m=><option key={m} value={m}>{m}</option>)}
+            <option value="">Assign...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
           </select>
           <input name="d" type="date" defaultValue={t.dueDate} style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:7,color:C.textPrimary,fontSize:12,padding:'7px 8px',outline:'none',fontFamily:'inherit'}}/>
         </div>
@@ -1409,7 +1474,7 @@ function TasksPage({ tasks, showMsg, currentUser }) {
           <input name="t" placeholder="Add a task..." required
             style={{flex:1,minWidth:160,background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textPrimary,fontSize:13,padding:'8px 12px',outline:'none',fontFamily:'inherit'}}/>
           <select name="a" style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textSecondary,fontSize:12,padding:'8px 10px',outline:'none',fontFamily:'inherit'}}>
-            <option value="">Assign...</option>{TEAM_MEMBERS.map(m=><option key={m} value={m}>{m}</option>)}
+            <option value="">Assign...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
           </select>
           <input name="d" type="date" style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textSecondary,fontSize:12,padding:'8px 10px',outline:'none',fontFamily:'inherit'}}/>
           <input name="det" placeholder="Notes..." style={{flex:1,minWidth:100,background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textSecondary,fontSize:12,padding:'8px 12px',outline:'none',fontFamily:'inherit'}}/>
@@ -1419,7 +1484,7 @@ function TasksPage({ tasks, showMsg, currentUser }) {
         <div style={{display:'flex',gap:6,marginTop:10,alignItems:'center'}}>
           <span style={{fontSize:11,color:C.textMuted}}>Filter:</span>
           <button onClick={()=>setFilterMember('')} style={{background:filterMember===''?C.accentBg:'transparent',border:`1px solid ${filterMember===''?C.accent:C.border}`,borderRadius:6,color:filterMember===''?C.accent:C.textMuted,fontSize:11,padding:'3px 8px',cursor:'pointer'}}>All</button>
-          {TEAM_MEMBERS.map(m=>(
+          {teamMembers.map(m=>(
             <button key={m} onClick={()=>setFilterMember(filterMember===m?'':m)} title={m}
               style={{width:28,height:28,borderRadius:'50%',border:`1px solid ${filterMember===m?C.accent:C.border}`,
                 background:filterMember===m?C.accentBg:'transparent',color:filterMember===m?C.accent:C.textMuted,
@@ -1603,7 +1668,7 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal, currentUser }) {
   );
 }
 // ── ROOMS PAGE ──
-function RoomsPage({ rooms, showMsg, currentUser }) {
+function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
   const [form, setForm] = useState({title:'',owner:'',backupOwner:'',status:'Operational',devices:'',notes:''});
   const [editingId, setEditingId] = useState(null);
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
@@ -1675,8 +1740,8 @@ function RoomsPage({ rooms, showMsg, currentUser }) {
         <form onSubmit={save} style={{display:'flex',flexDirection:'column',gap:10}}>
           <div style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:10}}>
             <div><Label>Name *</Label><Input value={form.title} onChange={e=>sf('title',e.target.value)} placeholder="Vision Room, Proto..." required/></div>
-            <div><Label>Primary owner</Label><Select value={form.owner} onChange={e=>sf('owner',e.target.value)}><option value="">Select...</option>{TEAM_MEMBERS.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
-            <div><Label>Backup owner</Label><Select value={form.backupOwner} onChange={e=>sf('backupOwner',e.target.value)}><option value="">Select...</option>{TEAM_MEMBERS.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
+            <div><Label>Primary owner</Label><Select value={form.owner} onChange={e=>sf('owner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
+            <div><Label>Backup owner</Label><Select value={form.backupOwner} onChange={e=>sf('backupOwner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10}}>
             <div><Label>Status</Label><Select value={form.status} onChange={e=>sf('status',e.target.value)}><option value="Operational">Operational</option><option value="Monitor">Monitor</option><option value="Escalate">Escalate</option></Select></div>
@@ -1948,6 +2013,98 @@ function InsightsPage({ events, tasks, issues }) {
   );
 }
 
+
+// ── SETTINGS PAGE ──
+function SettingsPage({ teamMembers, showMsg, currentUser }) {
+  const [members, setMembers] = useState([...teamMembers]);
+  const [newMember, setNewMember] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(()=>setMembers([...teamMembers]),[teamMembers]);
+
+  const save = async () => {
+    const cleaned = members.map(m=>m.trim()).filter(Boolean);
+    if (!cleaned.length){showMsg('Need at least one team member.',true);return;}
+    setSaving(true);
+    await setDoc(doc(db,'artifacts',appId,'public','data','shared_settings','team'),{
+      members: cleaned,
+      updatedBy: currentUser,
+      updatedAt: new Date().toISOString(),
+    });
+    setSaving(false);
+    showMsg('Team updated — changes apply everywhere immediately.');
+  };
+
+  const add = () => {
+    const v = newMember.trim();
+    if (!v) return;
+    if (members.includes(v)){showMsg('Already in the list.',true);return;}
+    setMembers(p=>[...p,v]);
+    setNewMember('');
+  };
+
+  const remove = (m) => setMembers(p=>p.filter(x=>x!==m));
+
+  const inputStyle = {
+    background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,
+    color:C.textPrimary,fontSize:13,padding:'9px 12px',outline:'none',
+    fontFamily:'inherit',width:'100%',
+  };
+
+  return (
+    <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:16,maxWidth:560}}>
+      <div style={{...card('pad')}}>
+        <p style={{fontSize:14,fontWeight:600,color:C.textPrimary,marginBottom:4}}>Team members</p>
+        <p style={{fontSize:12,color:C.textMuted,marginBottom:14,lineHeight:1.5}}>
+          Everyone listed here appears in the assignee dropdowns across the whole app — events, tasks, and rooms. Changes save instantly for the whole team.
+        </p>
+
+        {/* Current members */}
+        <div style={{display:'flex',flexDirection:'column',gap:6,marginBottom:14}}>
+          {members.map(m=>(
+            <div key={m} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',
+              background:'rgba(255,255,255,0.02)',border:`1px solid ${C.border}`,borderRadius:8}}>
+              <Avatar name={m} size={24}/>
+              <span style={{flex:1,fontSize:13,color:C.textPrimary}}>{m}</span>
+              <button onClick={()=>remove(m)}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:12,
+                  color:C.textMuted,padding:'2px 6px',borderRadius:4}}
+                onMouseEnter={e=>{e.currentTarget.style.color=C.red;e.currentTarget.style.background=C.redBg;}}
+                onMouseLeave={e=>{e.currentTarget.style.color=C.textMuted;e.currentTarget.style.background='none';}}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add new member */}
+        <Label>Add team member</Label>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          <input
+            value={newMember}
+            onChange={e=>setNewMember(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&add()}
+            placeholder="Firstname.Lastname (e.g. Wilson.Ferreira)"
+            style={inputStyle}
+          />
+          <Btn variant="subtle" size="sm" onClick={add} style={{whiteSpace:'nowrap'}}>+ Add</Btn>
+        </div>
+
+        <Btn variant="primary" size="md" onClick={save} disabled={saving}>
+          {saving?<><Spinner size={13}/>Saving...</>:'Save team'}
+        </Btn>
+      </div>
+
+      <div style={{...card('pad')}}>
+        <p style={{fontSize:13,fontWeight:500,color:C.textPrimary,marginBottom:4}}>Name format</p>
+        <p style={{fontSize:12,color:C.textMuted,lineHeight:1.6}}>
+          Use <span style={{color:C.accent,fontFamily:'monospace'}}>Firstname.Lastname</span> format so initials display correctly throughout the app. For example: <span style={{color:C.accent,fontFamily:'monospace'}}>Wilson.Ferreira</span>, <span style={{color:C.accent,fontFamily:'monospace'}}>Eric.Guzman</span>.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── ROOT APP ──
 export default function App() {
   const [user, setUser] = useState(null);
@@ -1961,7 +2118,8 @@ export default function App() {
   const [issues, setIssues] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [activity, setActivity] = useState([]);
-  const [handoffNotes, setHandoffNotes] = useState(null);
+  const [handoffFeed, setHandoffFeed] = useState([]);
+  const [teamMembers, setTeamMembers] = useState(DEFAULT_TEAM);
 
   useEffect(()=>{
     if (!firebaseConfig.apiKey){setLoading(false);return;}
@@ -1976,8 +2134,18 @@ export default function App() {
     const u3=onSnapshot(query(col('shared_issues'),orderBy('timestamp','desc')),s=>setIssues(s.docs.map(d=>({id:d.id,...d.data()}))));
     const u4=onSnapshot(query(col('shared_rooms'),orderBy('timestamp','desc')),s=>setRooms(s.docs.map(d=>({id:d.id,...d.data()}))));
     const u5=onSnapshot(query(col('shared_activity'),orderBy('timestamp','desc')),s=>setActivity(s.docs.slice(0,50).map(d=>({id:d.id,...d.data()}))));
-    const u6=onSnapshot(doc(db,'artifacts',appId,'public','data','shared_handoff',getTodayStr()),s=>setHandoffNotes(s.exists()?s.data():null));
-    return ()=>{u1();u2();u3();u4();u5();u6();};
+    const u6=onSnapshot(
+      query(col('shared_handoff'),orderBy('timestamp','asc')),
+      s=>setHandoffFeed(s.docs.map(d=>({id:d.id,...d.data()})).filter(e=>e.date===getTodayStr()))
+    );
+    const u7=onSnapshot(doc(db,'artifacts',appId,'public','data','shared_settings','team'),s=>{
+      if (s.exists()&&Array.isArray(s.data().members)&&s.data().members.length>0) {
+        setTeamMembers(s.data().members);
+      } else {
+        setTeamMembers(DEFAULT_TEAM);
+      }
+    });
+    return ()=>{u1();u2();u3();u4();u5();u6();u7();};
   },[user]);
 
   const showMsg = useCallback((text,isError=false)=>{
@@ -2013,7 +2181,7 @@ export default function App() {
 
   const currentUser = user?.email||'Unknown';
 
-  const pageTitle = {today:'Today',events:'Events',tasks:'Tasks',issues:'Tech issues',rooms:'Rooms',export:'Export',insights:'Insights'};
+  const pageTitle = {today:'Today',events:'Events',tasks:'Tasks',issues:'Tech issues',rooms:'Rooms',export:'Export',insights:'Insights',settings:'Settings'};
   const pageSub = {
     today: getTodayStr(),
     events: `${events.length} event${events.length!==1?'s':''}`,
@@ -2022,6 +2190,7 @@ export default function App() {
     rooms: `${rooms.length} configured`,
     export: 'Excel + AI report',
     insights: 'Analytics',
+    settings: 'Manage team & preferences',
   };
 
   if (loading) return (
@@ -2062,13 +2231,14 @@ export default function App() {
             }
           />
           <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
-            {page==='today'&&<TodayPage events={events} handoffNotes={handoffNotes} rooms={rooms} showMsg={showMsg} currentUser={currentUser} fetchGemini={fetchGemini} setModal={setModal}/>}
-            {page==='events'&&<EventsPage events={events} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
-            {page==='tasks'&&<TasksPage tasks={tasks} showMsg={showMsg} currentUser={currentUser}/>}
+            {page==='today'&&<TodayPage events={events} handoffFeed={handoffFeed} rooms={rooms} showMsg={showMsg} currentUser={currentUser} fetchGemini={fetchGemini} setModal={setModal} teamMembers={teamMembers}/>}
+            {page==='events'&&<EventsPage events={events} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser} teamMembers={teamMembers}/>}
+            {page==='tasks'&&<TasksPage tasks={tasks} showMsg={showMsg} currentUser={currentUser} teamMembers={teamMembers}/>}
             {page==='issues'&&<IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
-            {page==='rooms'&&<RoomsPage rooms={rooms} showMsg={showMsg} currentUser={currentUser}/>}
+            {page==='rooms'&&<RoomsPage rooms={rooms} showMsg={showMsg} currentUser={currentUser} teamMembers={teamMembers}/>}
             {page==='export'&&<ExportPage events={events} tasks={tasks} issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
             {page==='insights'&&<InsightsPage events={events} tasks={tasks} issues={issues}/>}
+            {page==='settings'&&<SettingsPage teamMembers={teamMembers} showMsg={showMsg} currentUser={currentUser}/>}
           </div>
         </div>
       </div>
