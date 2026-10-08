@@ -71,11 +71,23 @@ const addDays = (dateStr, n) => {
 const localDate = (dateStr) => { const [y,m,d] = String(dateStr).split('-').map(Number); return new Date(y,m-1,d); };
 const fmtDay = (dateStr) => localDate(dateStr).toLocaleDateString([], {month:'short', day:'numeric'});
 const fmtWeekday = (dateStr) => localDate(dateStr).toLocaleDateString([], {weekday:'short'});
+const fmtMonth = (ym) => ym==='none' ? 'No date' : localDate(`${ym}-01`).toLocaleDateString([], {month:'long', year:'numeric'});
+const shiftMonth = (ym, n) => {
+  const [y,m] = String(ym).split('-').map(Number);
+  const d = new Date(y, m-1+n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+};
 const fmtTime = (dt) => {
   if (!dt) return '';
   const d = new Date(dt);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+};
+const eventTimeRange = (e) => {
+  if (!e.startDate || !String(e.startDate).includes('T')) return 'Time TBD';
+  if (!e.endDate) return fmtTime(e.startDate);
+  const sd = String(e.startDate).slice(0,10), ed = String(e.endDate).slice(0,10);
+  return ed!==sd ? `${fmtTime(e.startDate)} – ${fmtDay(ed)}, ${fmtTime(e.endDate)}` : `${fmtTime(e.startDate)}–${fmtTime(e.endDate)}`;
 };
 const weekOfFromDateTime = (v) => {
   if (!v) return '';
@@ -1224,14 +1236,44 @@ function EventsPage({ events, showMsg, fetchGemini, currentUser, teamMembers }) 
   const [importBanner, setImportBanner] = useState('');
   const [saving, setSaving] = useState(false);
   const [logTarget, setLogTarget] = useState(null);
+  const [month, setMonth] = useState(()=>getTodayStr().slice(0,7));
   const fileRef = useRef(null);
 
   const uf = (k,v) => setForm(p=>({...p,[k]:v,...(k==='startDate'&&!p.weekOf?{weekOf:weekOfFromDateTime(v)}:{})}));
 
-  const filtered = useMemo(()=>events.filter(e=>{
+  // Month view: one month at a time. Searching looks across every month.
+  const todayStr = getTodayStr();
+  const currentMonth = todayStr.slice(0,7);
+  const searching = search.trim().length>0;
+  const monthOf = (e) => String(e.startDate||'').slice(0,7) || 'none';
+  const monthCounts = {};
+  events.forEach(e=>{ const k=monthOf(e); monthCounts[k]=(monthCounts[k]||0)+1; });
+  const monthOptions = [...new Set([...Object.keys(monthCounts).filter(k=>k!=='none'), currentMonth, ...(month!=='none'?[month]:[])])].sort().reverse();
+  const nextWithEvents = monthOptions.filter(k=>k>month&&monthCounts[k]).pop();
+  const prevWithEvents = monthOptions.find(k=>k<month&&monthCounts[k]);
+
+  const needle = search.trim().toLowerCase();
+  const filtered = events.filter(e=>{
     const h=[e.eventName,e.eventPoc,e.selectPoc,e.demo,e.eventLocation,e.notes,e.classification].join(' ').toLowerCase();
-    return (!search||h.includes(search.toLowerCase()))&&(!filterClass||e.classification===filterClass)&&(!filterStatus||e.eventStatus===filterStatus);
-  }),[events,search,filterClass,filterStatus]);
+    return (!searching||h.includes(needle))
+      && (!filterClass||e.classification===filterClass)
+      && (!filterStatus||e.eventStatus===filterStatus)
+      && (searching||monthOf(e)===month);
+  }).sort((a,b)=>String(a.startDate||'\uffff').localeCompare(String(b.startDate||'\uffff')));
+
+  // Group by day within a month; by month when searching.
+  const groups = [];
+  filtered.forEach(e=>{
+    const key = searching ? monthOf(e) : (String(e.startDate||'').slice(0,10)||'none');
+    let g = groups[groups.length-1];
+    if (!g||g.key!==key) { g={key,items:[]}; groups.push(g); }
+    g.items.push(e);
+  });
+  const groupLabel = (key) => searching ? fmtMonth(key)
+    : key==='none' ? 'No date'
+    : `${localDate(key).toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'})}${key===todayStr?' · Today':''}`;
+  const highRiskCount = filtered.filter(e=>e.riskLevel==='High').length;
+  const attendeeTotal = filtered.reduce((s,e)=>s+getAttendeeCount(e.attendees),0);
 
   const resetForm = () => { setEditingId(null); setForm(blankEventForm()); setView('list'); };
 
@@ -1275,6 +1317,8 @@ function EventsPage({ events, showMsg, fetchGemini, currentUser, teamMembers }) 
         if (d.riskLevel==='High') await sendSlackAlert(`🔴 High-risk event: ${d.eventName} | ${d.eventLocation||'TBD'} | SELECT: ${d.selectPoc||'TBD'}`);
         showMsg('Event saved + support task created.');
       }
+      if (d.startDate) setMonth(String(d.startDate).slice(0,7)); // show the month the event landed in
+      setSearch('');
       resetForm();
     } catch(err) { console.error(err); showMsg('Save failed.',true); }
     setSaving(false);
@@ -1342,6 +1386,7 @@ function EventsPage({ events, showMsg, fetchGemini, currentUser, teamMembers }) 
   const commitPreview = async () => {
     let saved=0,skipped=0;
     setSaving(true);
+    let firstMonth = '';
     try {
       for (const evt of previewEvents) {
         if (evt._isDupe||evt._skip){skipped++;continue;}
@@ -1352,10 +1397,13 @@ function EventsPage({ events, showMsg, fetchGemini, currentUser, teamMembers }) 
         const ref = await addDoc(col('shared_events'),{...final,timeLogs:[],timestamp:new Date().toISOString()});
         await createSupportTask(ref.id,final);
         saved++;
+        const m = String(final.startDate||'').slice(0,7);
+        if (m && (!firstMonth || m<firstMonth)) firstMonth = m;
       }
       await logActivity(`${currentUser} imported ${saved} events`,currentUser);
       setPreviewEvents(null);setBeoText('');if(fileRef.current)fileRef.current.value='';
-      setImportBanner(`Saved ${saved}${skipped>0?` (${skipped} skipped)`:''}.`);
+      if (firstMonth) setMonth(firstMonth);
+      setImportBanner(`Saved ${saved}${skipped>0?` (${skipped} skipped)`:''}.${firstMonth?` They're under ${fmtMonth(firstMonth)}.`:''}`);
       showMsg(`Imported ${saved} event(s).`);
     } catch(err) {
       console.error(err);
@@ -1373,125 +1421,165 @@ function EventsPage({ events, showMsg, fetchGemini, currentUser, teamMembers }) 
   const clsBadgeColor = (c) => c==='Leadership'?'amber':c==='Client'?'green':c==='Confidential'?'red':'default';
   const statusDotColor = (s) => s==='Wrapped'?C.green:s==='In Progress'?C.accent:C.textMuted;
 
-  // ── List view ──
-  const renderList = () => (
-    <div style={{display:'flex',flexDirection:'column',gap:12,padding:16}}>
-      {/* Toolbar */}
-      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-        <div style={{flex:1,minWidth:180,display:'flex',alignItems:'center',gap:8,background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,padding:'0 12px'}}>
-          <span style={{color:C.textMuted,fontSize:13}}>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search events..."
-            style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.textPrimary,fontSize:13,padding:'8px 0',fontFamily:'inherit'}}/>
+  // ── List view (one month at a time, grouped by day) ──
+  const navBtnStyle = {background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textSecondary,cursor:'pointer',
+    fontSize:16,width:34,height:34,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,lineHeight:1};
+  const filterSelectStyle = {background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,padding:'8px 10px',fontFamily:'inherit'};
+
+  const renderEventCard = (e) => {
+    const isExp = expandedId===e.id;
+    const { done, total } = checklistProgress(e.checklist);
+    const totalHours = sumHours(e.timeLogs);
+    return (
+      <div key={e.id} data-event={e.id} style={{...card(),overflow:'hidden',transition:'border-color 0.15s'}}
+        onMouseEnter={ev=>ev.currentTarget.style.borderColor=C.borderHover}
+        onMouseLeave={ev=>ev.currentTarget.style.borderColor=C.border}>
+        {/* Card header */}
+        <div style={{padding:'12px 14px',display:'flex',gap:12,alignItems:'flex-start',cursor:'pointer'}} onClick={()=>setExpandedId(isExp?null:e.id)}>
+          <div style={{width:3,background:statusDotColor(e.eventStatus),borderRadius:2,alignSelf:'stretch',flexShrink:0,minHeight:40}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
+              <span style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{e.eventName}</span>
+              <Badge color={clsBadgeColor(e.classification)} size="xs">{e.classification||'TBD'}</Badge>
+              {e.riskLevel&&e.riskLevel!=='Low'&&<Badge color={e.riskLevel==='High'?'red':'amber'} size="xs">{e.riskLevel} risk</Badge>}
+              {e.eventStatus&&e.eventStatus!=='Not Started'&&<Badge color={e.eventStatus==='Wrapped'?'green':'accent'} size="xs">{e.eventStatus}</Badge>}
+            </div>
+            <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+              <span style={{fontSize:12,color:C.textSecondary}}>🕐 {eventTimeRange(e)}{searching&&e.startDate?` · ${fmtDay(e.startDate.slice(0,10))}`:''}</span>
+              <span style={{fontSize:12,color:C.textSecondary}}>📍 {e.eventLocation||'No room'}</span>
+              <span style={{fontSize:12,color:C.textSecondary}}>👤 SELECT: {e.selectPoc||'TBD'}</span>
+              {e.demo&&<span style={{fontSize:12,color:C.accent}}>⚡ {e.demo.slice(0,40)}{e.demo.length>40?'…':''}</span>}
+            </div>
+            {total>0&&<div style={{marginTop:6}}><ProgressBar done={done} total={total}/></div>}
+            {totalHours>0&&<p style={{fontSize:11,color:C.green,marginTop:4}}>⏱ {totalHours.toFixed(1)}h total logged</p>}
+          </div>
+          <div style={{display:'flex',gap:4,flexShrink:0,alignItems:'center'}}>
+            <span style={{fontSize:11,color:C.textSecondary}}>{isExp?'▲':'▼'}</span>
+          </div>
         </div>
-        <select value={filterClass} onChange={e=>setFilterClass(e.target.value)}
-          style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:filterClass?C.textPrimary:C.textMuted,fontSize:12,padding:'8px 10px',fontFamily:'inherit'}}>
-          <option value="">All types</option>
-          {CLASSIFICATIONS.map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
-          style={{background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:filterStatus?C.textPrimary:C.textMuted,fontSize:12,padding:'8px 10px',fontFamily:'inherit'}}>
-          <option value="">All status</option>
-          {EVENT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
+
+        {/* Expanded */}
+        {isExp && (
+          <div style={{borderTop:`1px solid ${C.border}`,padding:'14px',display:'flex',flexDirection:'column',gap:14,background:'rgba(0,0,0,0.15)'}} className="fade-in">
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <Btn variant="subtle" size="sm" onClick={()=>setLogTarget(e)}>⏱ Log time</Btn>
+              <Btn variant="ghost" size="sm" onClick={()=>startEdit(e)}>✏ Edit</Btn>
+              <Btn variant="ghost" size="sm" onClick={()=>duplicate(e)}>⎘ Duplicate</Btn>
+              <Btn variant="ghost" size="sm" onClick={()=>{const c=`Event: ${e.eventName}\nStart: ${e.startDate}\nEnd: ${e.endDate}\nRoom: ${e.eventLocation}\nPOC: ${e.eventPoc}\nSELECT: ${e.selectPoc}\nEquipment: ${e.demo}\nRun of show: ${e.runOfShow}\nNotes: ${e.notes}\nPost-event: ${e.postEventNotes}`;navigator.clipboard.writeText(c);showMsg('Copied.');}}>⎘ Copy details</Btn>
+              <Btn variant="ghost" size="sm" onClick={()=>del(e.id)} style={{color:C.red,marginLeft:'auto'}}>🗑 Delete</Btn>
+            </div>
+            {e.runOfShow&&<div><Label>Run of show</Label><p style={{fontSize:12,color:C.textSecondary,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{e.runOfShow}</p></div>}
+            {e.notes&&<div><Label>Notes</Label><p style={{fontSize:12,color:C.textSecondary,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{e.notes}</p></div>}
+            <div>
+              <Label>Event checklist</Label>
+              <div style={{background:'rgba(0,0,0,0.2)',border:`1px solid ${C.border}`,borderRadius:8,padding:12}}>
+                <ChecklistEditor key={e.id} value={e.checklist||buildDefaultChecklist(e)}
+                  onChange={v=>updateDoc(docRef('shared_events',e.id),{checklist:v.slice(0,LONG_TEXT_LIMIT)}).catch(()=>showMsg('Checklist save failed.',true))}/>
+              </div>
+            </div>
+            <div>
+              <Label>Post-event notes {e.eventStatus==='Wrapped'&&<span style={{color:C.accent,fontWeight:400,textTransform:'none',letterSpacing:0}}> — add debrief</span>}</Label>
+              <textarea defaultValue={e.postEventNotes||''} rows={3} maxLength={LONG_TEXT_LIMIT}
+                onBlur={ev=>savePostNotes(e, ev.target.value)}
+                placeholder="What happened? Issues, lessons learned, follow-ups..."
+                style={{width:'100%',background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textPrimary,fontSize:12,padding:'9px 12px',fontFamily:'inherit',resize:'vertical'}}/>
+            </div>
+            {(e.timeLogs||[]).length>0&&(
+              <div>
+                <Label>Time logged</Label>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  {(e.timeLogs||[]).map((l,i)=>(
+                    <div key={i} style={{display:'flex',gap:10,fontSize:11,color:C.textSecondary,padding:'4px 8px',background:'rgba(255,255,255,0.02)',borderRadius:6,flexWrap:'wrap'}}>
+                      <span style={{color:C.green,fontWeight:500}}>{l.hours}h</span>
+                      <span>{l.user}</span>
+                      {l.note&&<span>— {l.note}</span>}
+                      <span style={{marginLeft:'auto'}}>{l.date}</span>
+                    </div>
+                  ))}
+                  <div style={{fontSize:12,fontWeight:500,color:C.green,paddingTop:4}}>Total: {totalHours.toFixed(1)}h</div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const filtersActive = !!(filterClass||filterStatus);
+  const renderList = () => (
+    <div style={{display:'flex',flexDirection:'column',gap:14,padding:16,maxWidth:980,width:'100%',margin:'0 auto'}}>
+      {/* Month picker + actions */}
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:6,alignItems:'center',opacity:searching?0.45:1,transition:'opacity 0.15s'}}>
+          {month!=='none'&&<button type="button" aria-label="Previous month" onClick={()=>setMonth(shiftMonth(month,-1))} style={navBtnStyle}>‹</button>}
+          <select value={month} onChange={e=>setMonth(e.target.value)} aria-label="Month"
+            style={{...filterSelectStyle,fontSize:14,fontWeight:600,color:C.textPrimary,padding:'7px 10px',minWidth:200,cursor:'pointer'}}>
+            {monthOptions.map(k=><option key={k} value={k}>{fmtMonth(k)}{monthCounts[k]?` · ${monthCounts[k]} event${monthCounts[k]!==1?'s':''}`:''}</option>)}
+            {monthCounts.none>0&&<option value="none">No date · {monthCounts.none}</option>}
+          </select>
+          {month!=='none'&&<button type="button" aria-label="Next month" onClick={()=>setMonth(shiftMonth(month,1))} style={navBtnStyle}>›</button>}
+          {month!==currentMonth&&!searching&&(
+            <button type="button" onClick={()=>setMonth(currentMonth)} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.accent,padding:'0 4px'}}>This month</button>
+          )}
+        </div>
         <div style={{display:'flex',gap:6,marginLeft:'auto'}}>
           <Btn variant="ghost" size="sm" onClick={()=>setView('import')}>⬆ Import BEO</Btn>
           <Btn variant="primary" size="sm" onClick={()=>{setEditingId(null);setForm(blankEventForm());setView('form');}}>+ New event</Btn>
         </div>
       </div>
 
-      {/* Summary strip */}
-      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-        {[{v:events.length,l:'Total'},{v:events.filter(e=>e.riskLevel==='High').length,l:'High risk',c:C.red},{v:events.filter(e=>e.source==='Imported').length,l:'Imported'},{v:events.reduce((s,e)=>s+getAttendeeCount(e.attendees),0),l:'Attendees'}].map((s,i)=>(
-          <div key={i} style={{background:'rgba(255,255,255,0.02)',border:`1px solid ${C.border}`,borderRadius:8,padding:'7px 12px',display:'flex',gap:8,alignItems:'baseline'}}>
-            <span style={{fontSize:16,fontWeight:600,color:s.c||C.textPrimary}}>{s.v}</span>
-            <span style={{fontSize:11,color:C.textMuted}}>{s.l}</span>
-          </div>
-        ))}
+      {/* Search + filters */}
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <div style={{flex:1,minWidth:200,display:'flex',alignItems:'center',gap:8,background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,padding:'0 12px'}}>
+          <span style={{color:C.textSecondary,fontSize:13}}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all months" aria-label="Search events"
+            style={{flex:1,background:'transparent',border:'none',outline:'none',color:C.textPrimary,fontSize:13,padding:'8px 0',fontFamily:'inherit'}}/>
+          {searching&&<button type="button" onClick={()=>setSearch('')} aria-label="Clear search" style={{background:'none',border:'none',cursor:'pointer',color:C.textSecondary,fontSize:12}}>✕</button>}
+        </div>
+        <select value={filterClass} onChange={e=>setFilterClass(e.target.value)} aria-label="Filter by classification"
+          style={{...filterSelectStyle,color:filterClass?C.textPrimary:C.textSecondary}}>
+          <option value="">All types</option>
+          {CLASSIFICATIONS.map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)} aria-label="Filter by status"
+          style={{...filterSelectStyle,color:filterStatus?C.textPrimary:C.textSecondary}}>
+          <option value="">All status</option>
+          {EVENT_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
+        </select>
       </div>
 
-      {!filtered.length && <EmptyState icon="📋" title={events.length?'No events match these filters':'No events yet'} subtitle={events.length?'Clear the search or filters to see everything.':'Add an event with + New event or import one from a BEO.'}/>}
+      {/* One-line summary of what's shown */}
+      {filtered.length>0&&(
+        <p style={{fontSize:12,color:C.textSecondary}}>
+          {searching ? `${filtered.length} match${filtered.length!==1?'es':''} across all months` : `${filtered.length} event${filtered.length!==1?'s':''} in ${fmtMonth(month)}`}
+          {highRiskCount>0&&<> · <span style={{color:C.red}}>{highRiskCount} high risk</span></>}
+          {attendeeTotal>0&&` · ${attendeeTotal.toLocaleString()} attendees`}
+        </p>
+      )}
 
-      {filtered.map(e => {
-        const isExp = expandedId===e.id;
-        const { done, total } = checklistProgress(e.checklist);
-        const totalHours = sumHours(e.timeLogs);
-
-        return (
-          <div key={e.id} style={{...card(),overflow:'hidden',transition:'border-color 0.15s'}}
-            onMouseEnter={ev=>ev.currentTarget.style.borderColor=C.borderHover}
-            onMouseLeave={ev=>ev.currentTarget.style.borderColor=C.border}>
-            {/* Card header */}
-            <div style={{padding:'12px 14px',display:'flex',gap:12,alignItems:'flex-start',cursor:'pointer'}} onClick={()=>setExpandedId(isExp?null:e.id)}>
-              <div style={{width:3,background:statusDotColor(e.eventStatus),borderRadius:2,alignSelf:'stretch',flexShrink:0,minHeight:40}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:4}}>
-                  <span style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{e.eventName}</span>
-                  <Badge color={clsBadgeColor(e.classification)} size="xs">{e.classification||'TBD'}</Badge>
-                  {e.riskLevel&&e.riskLevel!=='Low'&&<Badge color={e.riskLevel==='High'?'red':'amber'} size="xs">{e.riskLevel} risk</Badge>}
-                  {e.eventStatus&&e.eventStatus!=='Not Started'&&<Badge color={e.eventStatus==='Wrapped'?'green':'accent'} size="xs">{e.eventStatus}</Badge>}
-                  {e.automationSummary&&<Badge color="purple" size="xs">Auto-planned</Badge>}
-                </div>
-                <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-                  <span style={{fontSize:11,color:C.textMuted}}>📅 {e.startDate?fmtTime(e.startDate):'TBD'}{e.startDate&&e.startDate.length>10?' · '+e.startDate.slice(0,10):''}</span>
-                  <span style={{fontSize:11,color:C.textMuted}}>📍 {e.eventLocation||'No room'}</span>
-                  <span style={{fontSize:11,color:C.textMuted}}>👤 SELECT: {e.selectPoc||'TBD'}</span>
-                  {e.demo&&<span style={{fontSize:11,color:C.accent}}>⚡ {e.demo.slice(0,40)}{e.demo.length>40?'…':''}</span>}
-                </div>
-                {total>0&&<div style={{marginTop:6}}><ProgressBar done={done} total={total}/></div>}
-                {totalHours>0&&<p style={{fontSize:11,color:C.green,marginTop:4}}>⏱ {totalHours.toFixed(1)}h total logged</p>}
-              </div>
-              <div style={{display:'flex',gap:4,flexShrink:0,alignItems:'center'}}>
-                <span style={{fontSize:11,color:C.textMuted}}>{isExp?'▲':'▼'}</span>
-              </div>
+      {!events.length && <EmptyState icon="📋" title="No events yet" subtitle="Add an event with + New event or import one from a BEO."/>}
+      {events.length>0&&!filtered.length&&(
+        <div style={{textAlign:'center',padding:'36px 16px',display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+          <p style={{fontSize:13,fontWeight:500,color:C.textSecondary}}>
+            {searching ? `No events match “${search.trim()}”` : filtersActive ? `No events match these filters in ${fmtMonth(month)}` : `No events in ${fmtMonth(month)}`}
+          </p>
+          {(searching||filtersActive) && <p style={{fontSize:12,color:C.textSecondary}}>Clear the search or filters to see everything.</p>}
+          {!searching&&!filtersActive&&(nextWithEvents||prevWithEvents)&&(
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',justifyContent:'center'}}>
+              {prevWithEvents&&<Btn variant="ghost" size="sm" onClick={()=>setMonth(prevWithEvents)}>‹ {fmtMonth(prevWithEvents)}</Btn>}
+              {nextWithEvents&&<Btn variant="ghost" size="sm" onClick={()=>setMonth(nextWithEvents)}>{fmtMonth(nextWithEvents)} ›</Btn>}
             </div>
+          )}
+        </div>
+      )}
 
-            {/* Expanded */}
-            {isExp && (
-              <div style={{borderTop:`1px solid ${C.border}`,padding:'14px',display:'flex',flexDirection:'column',gap:14,background:'rgba(0,0,0,0.15)'}} className="fade-in">
-                <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                  <Btn variant="subtle" size="sm" onClick={()=>setLogTarget(e)}>⏱ Log time</Btn>
-                  <Btn variant="ghost" size="sm" onClick={()=>startEdit(e)}>✏ Edit</Btn>
-                  <Btn variant="ghost" size="sm" onClick={()=>duplicate(e)}>⎘ Duplicate</Btn>
-                  <Btn variant="ghost" size="sm" onClick={()=>{const c=`Event: ${e.eventName}\nStart: ${e.startDate}\nEnd: ${e.endDate}\nRoom: ${e.eventLocation}\nPOC: ${e.eventPoc}\nSELECT: ${e.selectPoc}\nEquipment: ${e.demo}\nRun of show: ${e.runOfShow}\nNotes: ${e.notes}\nPost-event: ${e.postEventNotes}`;navigator.clipboard.writeText(c);showMsg('Copied.');}}>⎘ Copy details</Btn>
-                  <Btn variant="ghost" size="sm" onClick={()=>del(e.id)} style={{color:C.red,marginLeft:'auto'}}>🗑 Delete</Btn>
-                </div>
-                {e.runOfShow&&<div><Label>Run of show</Label><p style={{fontSize:12,color:C.textSecondary,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{e.runOfShow}</p></div>}
-                {e.notes&&<div><Label>Notes</Label><p style={{fontSize:12,color:C.textSecondary,lineHeight:1.6,whiteSpace:'pre-wrap'}}>{e.notes}</p></div>}
-                <div>
-                  <Label>Event checklist</Label>
-                  <div style={{background:'rgba(0,0,0,0.2)',border:`1px solid ${C.border}`,borderRadius:8,padding:12}}>
-                    <ChecklistEditor key={e.id} value={e.checklist||buildDefaultChecklist(e)}
-                      onChange={v=>updateDoc(docRef('shared_events',e.id),{checklist:v.slice(0,LONG_TEXT_LIMIT)}).catch(()=>showMsg('Checklist save failed.',true))}/>
-                  </div>
-                </div>
-                <div>
-                  <Label>Post-event notes {e.eventStatus==='Wrapped'&&<span style={{color:C.accent,fontWeight:400,textTransform:'none',letterSpacing:0}}> — add debrief</span>}</Label>
-                  <textarea defaultValue={e.postEventNotes||''} rows={3} maxLength={LONG_TEXT_LIMIT}
-                    onBlur={ev=>savePostNotes(e, ev.target.value)}
-                    placeholder="What happened? Issues, lessons learned, follow-ups..."
-                    style={{width:'100%',background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textPrimary,fontSize:12,padding:'9px 12px',fontFamily:'inherit',resize:'vertical'}}/>
-                </div>
-                {(e.timeLogs||[]).length>0&&(
-                  <div>
-                    <Label>Time logged</Label>
-                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                      {(e.timeLogs||[]).map((l,i)=>(
-                        <div key={i} style={{display:'flex',gap:10,fontSize:11,color:C.textSecondary,padding:'4px 8px',background:'rgba(255,255,255,0.02)',borderRadius:6,flexWrap:'wrap'}}>
-                          <span style={{color:C.green,fontWeight:500}}>{l.hours}h</span>
-                          <span>{l.user}</span>
-                          {l.note&&<span style={{color:C.textMuted}}>— {l.note}</span>}
-                          <span style={{marginLeft:'auto',color:C.textMuted}}>{l.date}</span>
-                        </div>
-                      ))}
-                      <div style={{fontSize:12,fontWeight:500,color:C.green,paddingTop:4}}>Total: {totalHours.toFixed(1)}h</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {groups.map(g=>(
+        <section key={g.key} data-group={g.key} style={{display:'flex',flexDirection:'column',gap:8}}>
+          <p style={{fontSize:12,fontWeight:600,color:!searching&&g.key===todayStr?C.accent:C.textSecondary,marginTop:4}}>{groupLabel(g.key)}</p>
+          {g.items.map(renderEventCard)}
+        </section>
+      ))}
     </div>
   );
 
@@ -2185,21 +2273,60 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal, currentUser }) {
 }
 
 // ── ROOMS PAGE ──
+// One compact list, problems first. Add/edit happens in a pop-up; "By owner" is a separate view.
+const ROOM_STATUSES = [
+  { key:'Operational', label:'OK',       color:C.green, bg:C.greenBg },
+  { key:'Monitor',     label:'Monitor',  color:C.amber, bg:C.amberBg },
+  { key:'Escalate',    label:'Escalate', color:C.red,   bg:C.redBg   },
+];
+const roomStatusMeta = (s) => ROOM_STATUSES.find(x=>x.key===s) || ROOM_STATUSES[0];
+const fmtWhen = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toDateString()===new Date().toDateString() ? fmtTime(iso) : d.toLocaleDateString([], {month:'short', day:'numeric'});
+};
+
+function RoomStatusSwitch({ value, onChange }) {
+  return (
+    <div role="radiogroup" aria-label="Room status" style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',flexShrink:0}}>
+      {ROOM_STATUSES.map(s=>{
+        const active = value===s.key;
+        return (
+          <button type="button" role="radio" aria-checked={active} key={s.key} data-status={s.key}
+            onClick={()=>{ if(!active) onChange(s.key); }}
+            style={{fontSize:11,fontWeight:600,padding:'5px 10px',border:'none',cursor:'pointer',
+              background:active?s.bg:'transparent',color:active?s.color:C.textSecondary}}>
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
   const blankRoom = {title:'',owner:'',backupOwner:'',status:'Operational',devices:'',notes:''};
   const [form, setForm] = useState(blankRoom);
-  const [editingId, setEditingId] = useState(null);
+  const [editing, setEditing] = useState(null); // null | 'new' | room id
+  const [filter, setFilter] = useState('all');
+  const [view, setView] = useState('rooms');
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
-  const reset = () => { setEditingId(null); setForm(blankRoom); };
+
+  const openNew = () => { setForm(blankRoom); setEditing('new'); };
+  const openEdit = (r) => { setForm({title:r.title||'',owner:r.owner||'',backupOwner:r.backupOwner||'',status:r.status||'Operational',devices:r.devices||'',notes:r.notes||''}); setEditing(r.id); };
+  const close = () => setEditing(null);
 
   const save = async (e) => {
     e.preventDefault();
-    if (!form.title){showMsg('Name required.',true);return;}
+    if (!form.title.trim()){showMsg('Give the room a name.',true);return;}
     const now = new Date().toISOString();
+    const prev = editing!=='new' ? rooms.find(r=>r.id===editing) : null;
     try {
-      if (editingId) { await updateDoc(docRef('shared_rooms',editingId),{...form,lastUpdated:now,updatedBy:currentUser}); showMsg('Room updated.'); }
-      else { await addDoc(col('shared_rooms'),{...form,lastUpdated:now,updatedBy:currentUser,timestamp:now}); showMsg('Room added.'); }
-      reset();
+      if (editing==='new') { await addDoc(col('shared_rooms'),{...form,lastUpdated:now,updatedBy:currentUser,timestamp:now}); showMsg('Room added.'); }
+      else { await updateDoc(docRef('shared_rooms',editing),{...form,lastUpdated:now,updatedBy:currentUser}); showMsg('Room updated.'); }
+      if (form.status==='Escalate' && prev?.status!=='Escalate') await sendSlackAlert(`🔴 Room escalated: ${form.title} | Owner: ${form.owner||'N/A'}`);
+      close();
     } catch(err) { console.error(err); showMsg('Save failed.',true); }
   };
 
@@ -2208,17 +2335,15 @@ function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
       await updateDoc(docRef('shared_rooms',room.id),{status,lastUpdated:new Date().toISOString(),updatedBy:currentUser});
       await logActivity(`${currentUser} set ${room.title} → ${status}`,currentUser);
       if (status==='Escalate') await sendSlackAlert(`🔴 Room escalated: ${room.title} | Owner: ${room.owner||'N/A'}`);
-      showMsg(`${room.title} → ${status}`);
+      showMsg(`${room.title} → ${roomStatusMeta(status).label}`);
     } catch(err) { console.error(err); showMsg('Could not update the room.',true); }
   };
 
   const del = async (id) => {
     if (!window.confirm('Delete this room?')) return;
-    try { await deleteDoc(docRef('shared_rooms',id)); showMsg('Room deleted.'); }
+    try { await deleteDoc(docRef('shared_rooms',id)); close(); showMsg('Room deleted.'); }
     catch(err) { console.error(err); showMsg('Delete failed.',true); }
   };
-
-  const editRoom = (r) => { setEditingId(r.id); setForm({title:r.title||'',owner:r.owner||'',backupOwner:r.backupOwner||'',status:r.status||'Operational',devices:r.devices||'',notes:r.notes||''}); };
 
   const seed = async () => {
     const defaults = [
@@ -2238,8 +2363,13 @@ function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
     } catch(err) { console.error(err); showMsg('Could not load defaults.',true); }
   };
 
-  const sc = (s) => s==='Operational'?C.green:s==='Monitor'?C.amber:C.red;
-  const stats = useMemo(()=>({total:rooms.length,ok:rooms.filter(r=>r.status==='Operational').length,mon:rooms.filter(r=>r.status==='Monitor').length,esc:rooms.filter(r=>r.status==='Escalate').length}),[rooms]);
+  const statusOf = (r) => r.status||'Operational';
+  const counts = { all: rooms.length };
+  ROOM_STATUSES.forEach(s=>{ counts[s.key] = rooms.filter(r=>statusOf(r)===s.key).length; });
+  const rank = { Escalate:0, Monitor:1, Operational:2 };
+  const shown = rooms
+    .filter(r=>filter==='all'||statusOf(r)===filter)
+    .sort((a,b)=>(rank[statusOf(a)]??2)-(rank[statusOf(b)]??2) || String(a.title||'').localeCompare(String(b.title||'')));
 
   const ownerMap = useMemo(()=>{
     const m = {};
@@ -2247,113 +2377,136 @@ function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
       const o = r.owner||'Unassigned';
       if(!m[o]) m[o]={owner:o,primary:[],backup:[],issues:0};
       m[o].primary.push(r.title);
-      if(r.status==='Escalate') m[o].issues++;
+      if((r.status||'Operational')!=='Operational') m[o].issues++;
       if(r.backupOwner){ if(!m[r.backupOwner]) m[r.backupOwner]={owner:r.backupOwner,primary:[],backup:[],issues:0}; m[r.backupOwner].backup.push(r.title); }
     });
-    return Object.values(m);
+    return Object.values(m).sort((a,b)=>b.primary.length-a.primary.length);
   },[rooms]);
 
+  const chip = (key, label, count, color) => {
+    const active = filter===key;
+    return (
+      <button type="button" key={key} data-filter={key} onClick={()=>setFilter(key)} aria-pressed={active}
+        style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,fontWeight:500,padding:'6px 10px',borderRadius:8,cursor:'pointer',
+          border:`1px solid ${active?C.borderHover:C.border}`,background:active?'rgba(255,255,255,0.06)':'transparent',color:active?C.textPrimary:C.textSecondary}}>
+        {color&&<span style={{width:7,height:7,borderRadius:'50%',background:color}}/>}
+        {label}<span style={{color:count&&key==='Escalate'?C.red:C.textSecondary,fontWeight:600}}>{count}</span>
+      </button>
+    );
+  };
+
   return (
-    <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      <StatRow stats={[{value:stats.total,label:'Rooms / devices'},{value:stats.ok,label:'Operational',color:C.green},{value:stats.mon,label:'Monitor',color:C.amber},{value:stats.esc,label:'Escalate',color:C.red}]}/>
-
-      {/* Add / edit form */}
-      <div style={{...card('pad')}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-          <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{editingId?'Edit room':'Add room or device'}</p>
-          {!rooms.length&&<Btn variant="subtle" size="sm" onClick={seed}>Load defaults</Btn>}
-        </div>
-        <form onSubmit={save} style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div className="grid-rooms" style={{display:'grid',gridTemplateColumns:'2fr 1fr 1fr',gap:10}}>
-            <div><Label>Name *</Label><Input value={form.title} onChange={e=>sf('title',e.target.value)} placeholder="Vision Room, Proto..." maxLength={200} required/></div>
-            <div><Label>Primary owner</Label><Select value={form.owner} onChange={e=>sf('owner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
-            <div><Label>Backup owner</Label><Select value={form.backupOwner} onChange={e=>sf('backupOwner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}</Select></div>
-          </div>
-          <div className="grid-2" style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10}}>
-            <div><Label>Status</Label><Select value={form.status} onChange={e=>sf('status',e.target.value)}><option value="Operational">Operational</option><option value="Monitor">Monitor</option><option value="Escalate">Escalate</option></Select></div>
-            <div><Label>Devices / systems</Label><Input value={form.devices} onChange={e=>sf('devices',e.target.value)} placeholder="Cyviz, Vu, Broadcast..." maxLength={700}/></div>
-          </div>
-          <Input value={form.notes} onChange={e=>sf('notes',e.target.value)} placeholder="Notes..." rows={2} maxLength={LONG_TEXT_LIMIT}/>
-          <div style={{display:'flex',gap:8}}>
-            <Btn type="submit" variant="primary" size="sm">{editingId?'Update room':'Add room'}</Btn>
-            {editingId&&<Btn variant="ghost" size="sm" onClick={reset}>Cancel</Btn>}
-          </div>
-        </form>
-      </div>
-
-      {/* Room grid */}
-      <div>
-        <p style={{fontSize:13,fontWeight:500,color:C.textPrimary,marginBottom:10}}>Live status</p>
-        {!rooms.length&&<EmptyState icon="📍" title="No rooms yet" subtitle="Add rooms above or load the default matrix."/>}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
-          {rooms.map(r=>(
-            <div key={r.id} style={{...card(),borderLeft:`3px solid ${sc(r.status)}`,borderRadius:'0 10px 10px 0',overflow:'hidden',transition:'border-color 0.15s'}}
-              onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 0 1px ${C.borderHover}`}
-              onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}>
-              <div style={{padding:'10px 12px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
-                  <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{r.title}</p>
-                  <div style={{display:'flex',gap:4,opacity:0.6}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.6'}>
-                    <button type="button" onClick={()=>editRoom(r)} aria-label="Edit room" style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.accent}}>✏</button>
-                    <button type="button" onClick={()=>del(r.id)} aria-label="Delete room" style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.textMuted}} onMouseEnter={e=>e.currentTarget.style.color=C.red} onMouseLeave={e=>e.currentTarget.style.color=C.textMuted}>✕</button>
-                  </div>
-                </div>
-                <p style={{fontSize:11,color:C.textMuted,marginBottom:2}}>Owner: <span style={{color:C.textSecondary}}>{r.owner||'Unassigned'}</span></p>
-                <p style={{fontSize:11,color:C.textMuted,marginBottom:6}}>Backup: <span style={{color:C.textSecondary}}>{r.backupOwner||'None'}</span></p>
-                {r.devices&&<p style={{fontSize:11,color:C.accent,marginBottom:4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.devices}</p>}
-                {r.notes&&<p style={{fontSize:11,color:C.textMuted,marginBottom:8,lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{r.notes}</p>}
-                <div style={{display:'flex',gap:5}}>
-                  {['Operational','Monitor','Escalate'].map(s=>(
-                    <button type="button" key={s} onClick={()=>setStatus(r,s)}
-                      style={{flex:1,fontSize:10,fontWeight:500,padding:'4px 0',borderRadius:6,cursor:'pointer',border:'none',
-                        background:r.status===s?sc(s):'rgba(255,255,255,0.04)',
-                        color:r.status===s?'#fff':C.textMuted,transition:'all 0.15s'}}>
-                      {s==='Operational'?'OK':s}
-                    </button>
-                  ))}
-                </div>
-                {r.lastUpdated&&<p style={{fontSize:10,color:C.textMuted,marginTop:5}}>Updated: {new Date(r.lastUpdated).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</p>}
-              </div>
+    <div style={{flex:1,overflow:'auto'}}>
+      <div style={{maxWidth:920,margin:'0 auto',padding:16,display:'flex',flexDirection:'column',gap:14}}>
+        {/* Toolbar */}
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          {view==='rooms'&&rooms.length>0&&(
+            <div role="group" aria-label="Filter by status" style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {chip('all','All',counts.all)}
+              {ROOM_STATUSES.map(s=>chip(s.key,s.label,counts[s.key],s.color))}
             </div>
-          ))}
+          )}
+          <div style={{display:'flex',gap:8,marginLeft:'auto',alignItems:'center'}}>
+            {rooms.length>0&&<Segmented label="View" value={view} onChange={setView} options={[{value:'rooms',label:'By room'},{value:'owners',label:'By owner'}]}/>}
+            <Btn variant="primary" size="sm" onClick={openNew}>+ Add room</Btn>
+          </div>
         </div>
-      </div>
 
-      {/* Ownership matrix */}
-      {ownerMap.length>0&&(
-        <div>
-          <p style={{fontSize:13,fontWeight:500,color:C.textPrimary,marginBottom:10}}>Ownership matrix</p>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+        {!rooms.length&&(
+          <div style={{textAlign:'center',padding:'40px 16px',display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
+            <p style={{fontSize:13,fontWeight:500,color:C.textSecondary}}>Set up your rooms and devices</p>
+            <p style={{fontSize:12,color:C.textSecondary,maxWidth:320,lineHeight:1.5}}>Track who owns each space and flag anything that needs watching. Start with the NYIH defaults or add your own.</p>
+            <Btn variant="subtle" size="sm" onClick={seed}>Load default rooms</Btn>
+          </div>
+        )}
+
+        {/* By room */}
+        {view==='rooms'&&rooms.length>0&&(
+          shown.length ? (
+            <div style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.surface}}>
+              {shown.map((r,i)=>{
+                const st = statusOf(r);
+                const meta = roomStatusMeta(st);
+                const problem = st!=='Operational';
+                const owners = r.owner ? `${r.owner}${r.backupOwner?`, backup ${r.backupOwner}`:''}` : 'No owner';
+                const updated = fmtWhen(r.lastUpdated);
+                return (
+                  <div key={r.id} data-room={r.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',borderTop:i?`1px solid ${C.border}`:'none',flexWrap:'wrap'}}>
+                    <span style={{width:8,height:8,borderRadius:'50%',background:meta.color,flexShrink:0}} aria-hidden="true"/>
+                    <div style={{flex:'1 1 220px',minWidth:0}}>
+                      <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{r.title}</p>
+                      <p style={{...ellipsis,fontSize:12,color:C.textSecondary,marginTop:2}}>{[r.devices,owners].filter(Boolean).join(' · ')}</p>
+                      {problem&&(r.notes||updated)&&(
+                        <p style={{fontSize:12,color:meta.color,marginTop:3,lineHeight:1.4}}>
+                          {[r.notes, updated?`updated ${updated}${r.updatedBy&&r.updatedBy!=='seed'?` by ${r.updatedBy}`:''}`:''].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                    <RoomStatusSwitch value={st} onChange={s=>setStatus(r,s)}/>
+                    <button type="button" onClick={()=>openEdit(r)} aria-label={`Edit ${r.title}`}
+                      style={{background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:500,color:C.accent,padding:'4px 2px'}}>Edit</button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p style={{fontSize:13,color:C.textSecondary,textAlign:'center',padding:'24px 0'}}>
+              No rooms marked {roomStatusMeta(filter).label}. <button type="button" onClick={()=>setFilter('all')} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:13}}>Show all</button>
+            </p>
+          )
+        )}
+
+        {/* By owner */}
+        {view==='owners'&&rooms.length>0&&(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
             {ownerMap.map(row=>(
               <div key={row.owner} style={{...card('pad')}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
                   <Avatar name={row.owner} size={28}/>
-                  <div>
-                    <p style={{fontSize:12,fontWeight:500,color:C.textPrimary}}>{row.owner}</p>
-                    <p style={{fontSize:10,color:C.textMuted}}>Primary: {row.primary.length} · Backup: {row.backup.length}</p>
+                  <div style={{flex:1,minWidth:0}}>
+                    <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{row.owner}</p>
+                    <p style={{fontSize:12,color:C.textSecondary}}>{row.primary.length} primary · {row.backup.length} backup</p>
                   </div>
+                  {row.issues>0&&<Badge color="amber" size="xs">{row.issues} flagged</Badge>}
                 </div>
                 {row.primary.length>0&&(
-                  <div style={{marginBottom:6}}>
-                    <Label style={{marginBottom:4}}>Primary</Label>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                      {row.primary.map((p,i)=><span key={p+i} style={{fontSize:10,background:'rgba(124,111,247,0.1)',color:C.accent,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
-                    </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:row.backup.length?6:0}}>
+                    {row.primary.map((p,i)=><span key={p+i} style={{fontSize:11,background:C.accentBg,color:C.accent,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
                   </div>
                 )}
                 {row.backup.length>0&&(
-                  <div>
-                    <Label style={{marginBottom:4}}>Backup</Label>
-                    <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                      {row.backup.map((p,i)=><span key={p+i} style={{fontSize:10,background:'rgba(255,255,255,0.04)',color:C.textMuted,border:`1px solid ${C.border}`,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
-                    </div>
+                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                    {row.backup.map((p,i)=><span key={p+i} style={{fontSize:11,color:C.textSecondary,border:`1px solid ${C.border}`,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
                   </div>
                 )}
-                {row.issues>0&&<Badge color="red" size="xs" style={{marginTop:8}}>{row.issues} escalated</Badge>}
               </div>
             ))}
           </div>
-        </div>
+        )}
+      </div>
+
+      {/* Add / edit pop-up */}
+      {editing&&(
+        <Overlay onClose={close} maxWidth={500}>
+          <form onSubmit={save} style={{display:'flex',flexDirection:'column',gap:12}}>
+            <p style={{fontSize:14,fontWeight:600,color:C.textPrimary}}>{editing==='new'?'Add room or device':'Edit room'}</p>
+            <div><Label>Name *</Label><Input value={form.title} onChange={e=>sf('title',e.target.value)} placeholder="Vision Room" maxLength={200} required autoFocus/></div>
+            <div className="grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div><Label>Primary owner</Label><Select value={form.owner} onChange={e=>sf('owner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}{form.owner&&!teamMembers.includes(form.owner)&&<option value={form.owner}>{form.owner}</option>}</Select></div>
+              <div><Label>Backup owner</Label><Select value={form.backupOwner} onChange={e=>sf('backupOwner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}{form.backupOwner&&!teamMembers.includes(form.backupOwner)&&<option value={form.backupOwner}>{form.backupOwner}</option>}</Select></div>
+            </div>
+            <div className="grid-2" style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10}}>
+              <div><Label>Status</Label><Select value={form.status} onChange={e=>sf('status',e.target.value)}>{ROOM_STATUSES.map(s=><option key={s.key} value={s.key}>{s.key==='Operational'?'OK':s.label}</option>)}</Select></div>
+              <div><Label>Devices / systems</Label><Input value={form.devices} onChange={e=>sf('devices',e.target.value)} placeholder="Cyviz, Vu, Broadcast" maxLength={700}/></div>
+            </div>
+            <div><Label>Notes</Label><Input value={form.notes} onChange={e=>sf('notes',e.target.value)} placeholder="What to watch for, who to call, known quirks" rows={3} maxLength={LONG_TEXT_LIMIT}/></div>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              <Btn type="submit" variant="primary" size="md">{editing==='new'?'Add room':'Save changes'}</Btn>
+              <Btn variant="ghost" size="md" onClick={close}>Cancel</Btn>
+              {editing!=='new'&&<Btn variant="ghost" size="sm" onClick={()=>del(editing)} style={{color:C.red,marginLeft:'auto'}}>Delete room</Btn>}
+            </div>
+          </form>
+        </Overlay>
       )}
     </div>
   );
