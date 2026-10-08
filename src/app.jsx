@@ -2273,13 +2273,23 @@ function IssuesPage({ issues, showMsg, fetchGemini, setModal, currentUser }) {
 }
 
 // ── ROOMS PAGE ──
-// One compact list, problems first. Add/edit happens in a pop-up; "By owner" is a separate view.
+// The original card layout, grouped by floor. Each room's floor is set in its edit form.
+//
+// Optional: pre-fill floors for rooms that don't have one saved yet, matched by room name.
+// A floor saved on the room itself always wins over this list.
+const DEFAULT_ROOM_FLOORS = {
+  // 'Vision Room': '65',
+};
 const ROOM_STATUSES = [
-  { key:'Operational', label:'OK',       color:C.green, bg:C.greenBg },
-  { key:'Monitor',     label:'Monitor',  color:C.amber, bg:C.amberBg },
-  { key:'Escalate',    label:'Escalate', color:C.red,   bg:C.redBg   },
+  { key:'Operational', label:'OK',       color:C.green },
+  { key:'Monitor',     label:'Monitor',  color:C.amber },
+  { key:'Escalate',    label:'Escalate', color:C.red   },
 ];
-const roomStatusMeta = (s) => ROOM_STATUSES.find(x=>x.key===s) || ROOM_STATUSES[0];
+// "Floor 65", "65th floor" and "65" all become "65"; names like "Lobby" are kept as typed.
+const normalizeFloor = (f) => String(f||'').trim().replace(/^floor\s+/i,'').replace(/^(\d+)(st|nd|rd|th)?(\s+floor)?$/i,'$1');
+const roomFloor = (r) => normalizeFloor(r.floor || DEFAULT_ROOM_FLOORS[r.title] || '');
+const floorLabel = (f) => !f ? 'No floor set' : /^\d+$/.test(f) ? `Floor ${f}` : f;
+const byFloor = (a,b) => !a ? 1 : !b ? -1 : a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'});
 const fmtWhen = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -2287,46 +2297,38 @@ const fmtWhen = (iso) => {
   return d.toDateString()===new Date().toDateString() ? fmtTime(iso) : d.toLocaleDateString([], {month:'short', day:'numeric'});
 };
 
-function RoomStatusSwitch({ value, onChange }) {
-  return (
-    <div role="radiogroup" aria-label="Room status" style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',flexShrink:0}}>
-      {ROOM_STATUSES.map(s=>{
-        const active = value===s.key;
-        return (
-          <button type="button" role="radio" aria-checked={active} key={s.key} data-status={s.key}
-            onClick={()=>{ if(!active) onChange(s.key); }}
-            style={{fontSize:11,fontWeight:600,padding:'5px 10px',border:'none',cursor:'pointer',
-              background:active?s.bg:'transparent',color:active?s.color:C.textSecondary}}>
-            {s.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
-  const blankRoom = {title:'',owner:'',backupOwner:'',status:'Operational',devices:'',notes:''};
+  const blankRoom = {title:'',floor:'',owner:'',backupOwner:'',status:'Operational',devices:'',notes:''};
   const [form, setForm] = useState(blankRoom);
-  const [editing, setEditing] = useState(null); // null | 'new' | room id
+  const [editingId, setEditingId] = useState(null);
+  const [formOpen, setFormOpen] = useState(false);
   const [filter, setFilter] = useState('all');
-  const [view, setView] = useState('rooms');
+  const [collapsed, setCollapsed] = useState({});
+  const [showOwners, setShowOwners] = useState(false);
+  const formRef = useRef(null);
   const sf = (k,v) => setForm(p=>({...p,[k]:v}));
 
-  const openNew = () => { setForm(blankRoom); setEditing('new'); };
-  const openEdit = (r) => { setForm({title:r.title||'',owner:r.owner||'',backupOwner:r.backupOwner||'',status:r.status||'Operational',devices:r.devices||'',notes:r.notes||''}); setEditing(r.id); };
-  const close = () => setEditing(null);
+  const scrollToForm = () => requestAnimationFrame(()=>formRef.current?.scrollIntoView({behavior:'smooth',block:'start'}));
+  const openNew = (floor='') => { setEditingId(null); setForm({...blankRoom,floor}); setFormOpen(true); scrollToForm(); };
+  const openEdit = (r) => {
+    setEditingId(r.id);
+    setForm({title:r.title||'',floor:roomFloor(r),owner:r.owner||'',backupOwner:r.backupOwner||'',status:r.status||'Operational',devices:r.devices||'',notes:r.notes||''});
+    setFormOpen(true); scrollToForm();
+  };
+  const reset = () => { setEditingId(null); setForm(blankRoom); setFormOpen(false); };
 
   const save = async (e) => {
     e.preventDefault();
     if (!form.title.trim()){showMsg('Give the room a name.',true);return;}
     const now = new Date().toISOString();
-    const prev = editing!=='new' ? rooms.find(r=>r.id===editing) : null;
+    const data = {...form, title:form.title.trim(), floor:normalizeFloor(form.floor)};
+    const prev = editingId ? rooms.find(r=>r.id===editingId) : null;
     try {
-      if (editing==='new') { await addDoc(col('shared_rooms'),{...form,lastUpdated:now,updatedBy:currentUser,timestamp:now}); showMsg('Room added.'); }
-      else { await updateDoc(docRef('shared_rooms',editing),{...form,lastUpdated:now,updatedBy:currentUser}); showMsg('Room updated.'); }
-      if (form.status==='Escalate' && prev?.status!=='Escalate') await sendSlackAlert(`🔴 Room escalated: ${form.title} | Owner: ${form.owner||'N/A'}`);
-      close();
+      if (editingId) { await updateDoc(docRef('shared_rooms',editingId),{...data,lastUpdated:now,updatedBy:currentUser}); showMsg('Room updated.'); }
+      else { await addDoc(col('shared_rooms'),{...data,lastUpdated:now,updatedBy:currentUser,timestamp:now}); showMsg('Room added.'); }
+      if (data.status==='Escalate' && prev?.status!=='Escalate') await sendSlackAlert(`🔴 Room escalated: ${data.title} | Owner: ${data.owner||'N/A'}`);
+      if (data.floor) setCollapsed(c=>({...c,[data.floor]:false})); // make sure you can see where it landed
+      reset();
     } catch(err) { console.error(err); showMsg('Save failed.',true); }
   };
 
@@ -2335,13 +2337,13 @@ function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
       await updateDoc(docRef('shared_rooms',room.id),{status,lastUpdated:new Date().toISOString(),updatedBy:currentUser});
       await logActivity(`${currentUser} set ${room.title} → ${status}`,currentUser);
       if (status==='Escalate') await sendSlackAlert(`🔴 Room escalated: ${room.title} | Owner: ${room.owner||'N/A'}`);
-      showMsg(`${room.title} → ${roomStatusMeta(status).label}`);
+      showMsg(`${room.title} → ${status}`);
     } catch(err) { console.error(err); showMsg('Could not update the room.',true); }
   };
 
   const del = async (id) => {
     if (!window.confirm('Delete this room?')) return;
-    try { await deleteDoc(docRef('shared_rooms',id)); close(); showMsg('Room deleted.'); }
+    try { await deleteDoc(docRef('shared_rooms',id)); if (editingId===id) reset(); showMsg('Room deleted.'); }
     catch(err) { console.error(err); showMsg('Delete failed.',true); }
   };
 
@@ -2358,18 +2360,24 @@ function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
       {title:'Ceco Ceco',owner:'Mistral.Rojas',backupOwner:'Donald.Salazar',status:'Operational',devices:'Ceco Ceco',notes:'Support readiness'},
     ];
     try {
-      for (const r of defaults) await addDoc(col('shared_rooms'),{...r,lastUpdated:new Date().toISOString(),updatedBy:'seed',timestamp:new Date().toISOString()});
+      for (const r of defaults) await addDoc(col('shared_rooms'),{...r,floor:normalizeFloor(DEFAULT_ROOM_FLOORS[r.title]||''),lastUpdated:new Date().toISOString(),updatedBy:'seed',timestamp:new Date().toISOString()});
       showMsg('Default rooms loaded.');
     } catch(err) { console.error(err); showMsg('Could not load defaults.',true); }
   };
 
+  const sc = (s) => s==='Operational'?C.green:s==='Monitor'?C.amber:C.red;
   const statusOf = (r) => r.status||'Operational';
-  const counts = { all: rooms.length };
-  ROOM_STATUSES.forEach(s=>{ counts[s.key] = rooms.filter(r=>statusOf(r)===s.key).length; });
-  const rank = { Escalate:0, Monitor:1, Operational:2 };
-  const shown = rooms
-    .filter(r=>filter==='all'||statusOf(r)===filter)
-    .sort((a,b)=>(rank[statusOf(a)]??2)-(rank[statusOf(b)]??2) || String(a.title||'').localeCompare(String(b.title||'')));
+  const stats = {total:rooms.length,ok:rooms.filter(r=>statusOf(r)==='Operational').length,mon:rooms.filter(r=>statusOf(r)==='Monitor').length,esc:rooms.filter(r=>statusOf(r)==='Escalate').length};
+
+  // Group the visible rooms by floor. Cards keep a stable A–Z order so they don't jump when a status changes.
+  const shown = rooms.filter(r=>filter==='all'||statusOf(r)===filter);
+  const floors = {};
+  shown.forEach(r=>{ const f=roomFloor(r); (floors[f]=floors[f]||[]).push(r); });
+  const floorKeys = Object.keys(floors).sort(byFloor);
+  floorKeys.forEach(k=>floors[k].sort((a,b)=>String(a.title||'').localeCompare(String(b.title||''))));
+  const knownFloors = [...new Set(rooms.map(roomFloor).filter(Boolean))].sort(byFloor);
+  const allCollapsed = floorKeys.length>0 && floorKeys.every(k=>collapsed[k]);
+  const setAll = (v) => setCollapsed(Object.fromEntries(floorKeys.map(k=>[k,v])));
 
   const ownerMap = useMemo(()=>{
     const m = {};
@@ -2377,136 +2385,195 @@ function RoomsPage({ rooms, showMsg, currentUser, teamMembers }) {
       const o = r.owner||'Unassigned';
       if(!m[o]) m[o]={owner:o,primary:[],backup:[],issues:0};
       m[o].primary.push(r.title);
-      if((r.status||'Operational')!=='Operational') m[o].issues++;
+      if((r.status||'Operational')==='Escalate') m[o].issues++;
       if(r.backupOwner){ if(!m[r.backupOwner]) m[r.backupOwner]={owner:r.backupOwner,primary:[],backup:[],issues:0}; m[r.backupOwner].backup.push(r.title); }
     });
-    return Object.values(m).sort((a,b)=>b.primary.length-a.primary.length);
+    return Object.values(m);
   },[rooms]);
 
-  const chip = (key, label, count, color) => {
-    const active = filter===key;
-    return (
-      <button type="button" key={key} data-filter={key} onClick={()=>setFilter(key)} aria-pressed={active}
-        style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,fontWeight:500,padding:'6px 10px',borderRadius:8,cursor:'pointer',
-          border:`1px solid ${active?C.borderHover:C.border}`,background:active?'rgba(255,255,255,0.06)':'transparent',color:active?C.textPrimary:C.textSecondary}}>
-        {color&&<span style={{width:7,height:7,borderRadius:'50%',background:color}}/>}
-        {label}<span style={{color:count&&key==='Escalate'?C.red:C.textSecondary,fontWeight:600}}>{count}</span>
-      </button>
-    );
-  };
+  const statCards = [
+    {key:'all',value:stats.total,label:'Rooms / devices'},
+    {key:'Operational',value:stats.ok,label:'Operational',color:C.green},
+    {key:'Monitor',value:stats.mon,label:'Monitor',color:C.amber},
+    {key:'Escalate',value:stats.esc,label:'Escalate',color:C.red},
+  ];
 
-  return (
-    <div style={{flex:1,overflow:'auto'}}>
-      <div style={{maxWidth:920,margin:'0 auto',padding:16,display:'flex',flexDirection:'column',gap:14}}>
-        {/* Toolbar */}
-        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          {view==='rooms'&&rooms.length>0&&(
-            <div role="group" aria-label="Filter by status" style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {chip('all','All',counts.all)}
-              {ROOM_STATUSES.map(s=>chip(s.key,s.label,counts[s.key],s.color))}
-            </div>
-          )}
-          <div style={{display:'flex',gap:8,marginLeft:'auto',alignItems:'center'}}>
-            {rooms.length>0&&<Segmented label="View" value={view} onChange={setView} options={[{value:'rooms',label:'By room'},{value:'owners',label:'By owner'}]}/>}
-            <Btn variant="primary" size="sm" onClick={openNew}>+ Add room</Btn>
+  const renderRoomCard = (r) => (
+    <div key={r.id} data-room={r.id} style={{...card(),borderLeft:`3px solid ${sc(statusOf(r))}`,borderRadius:'0 10px 10px 0',overflow:'hidden',transition:'box-shadow 0.15s',display:'flex',flexDirection:'column'}}
+      onMouseEnter={e=>e.currentTarget.style.boxShadow=`0 0 0 1px ${C.borderHover}`}
+      onMouseLeave={e=>e.currentTarget.style.boxShadow='none'}>
+      <div style={{padding:'10px 12px',display:'flex',flexDirection:'column',flex:1}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:6}}>
+          <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{r.title}</p>
+          <div style={{display:'flex',gap:4,opacity:0.7,flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.opacity='1'} onMouseLeave={e=>e.currentTarget.style.opacity='0.7'}>
+            <button type="button" onClick={()=>openEdit(r)} aria-label={`Edit ${r.title}`} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.accent}}>✏</button>
+            <button type="button" onClick={()=>del(r.id)} aria-label={`Delete ${r.title}`} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.textSecondary}} onMouseEnter={e=>e.currentTarget.style.color=C.red} onMouseLeave={e=>e.currentTarget.style.color=C.textSecondary}>✕</button>
           </div>
         </div>
+        <p style={{fontSize:11,color:C.textSecondary,marginBottom:2}}>Owner: <span style={{color:C.textPrimary}}>{r.owner||'Unassigned'}</span></p>
+        <p style={{fontSize:11,color:C.textSecondary,marginBottom:6}}>Backup: <span style={{color:C.textPrimary}}>{r.backupOwner||'None'}</span></p>
+        {r.devices&&<p style={{...ellipsis,fontSize:11,color:C.accent,marginBottom:4}}>{r.devices}</p>}
+        {r.notes&&<p style={{fontSize:11,color:C.textSecondary,marginBottom:8,lineHeight:1.4,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{r.notes}</p>}
+        <div style={{flex:1}}/>
+        <div style={{display:'flex',gap:5}}>
+          {ROOM_STATUSES.map(s=>(
+            <button type="button" key={s.key} data-status={s.key} onClick={()=>setStatus(r,s.key)} aria-pressed={statusOf(r)===s.key}
+              style={{flex:1,fontSize:10,fontWeight:500,padding:'4px 0',borderRadius:6,cursor:'pointer',border:'none',
+                background:statusOf(r)===s.key?sc(s.key):'rgba(255,255,255,0.04)',
+                color:statusOf(r)===s.key?'#fff':C.textSecondary,transition:'all 0.15s'}}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+        {r.lastUpdated&&<p style={{fontSize:10,color:C.textSecondary,marginTop:5}}>Updated: {fmtWhen(r.lastUpdated)}</p>}
+      </div>
+    </div>
+  );
 
-        {!rooms.length&&(
-          <div style={{textAlign:'center',padding:'40px 16px',display:'flex',flexDirection:'column',alignItems:'center',gap:10}}>
-            <p style={{fontSize:13,fontWeight:500,color:C.textSecondary}}>Set up your rooms and devices</p>
-            <p style={{fontSize:12,color:C.textSecondary,maxWidth:320,lineHeight:1.5}}>Track who owns each space and flag anything that needs watching. Start with the NYIH defaults or add your own.</p>
-            <Btn variant="subtle" size="sm" onClick={seed}>Load default rooms</Btn>
-          </div>
-        )}
+  const ownerSelect = (key) => (
+    <Select value={form[key]} onChange={e=>sf(key,e.target.value)}>
+      <option value="">Select...</option>
+      {teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
+      {form[key]&&!teamMembers.includes(form[key])&&<option value={form[key]}>{form[key]}</option>}
+    </Select>
+  );
 
-        {/* By room */}
-        {view==='rooms'&&rooms.length>0&&(
-          shown.length ? (
-            <div style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.surface}}>
-              {shown.map((r,i)=>{
-                const st = statusOf(r);
-                const meta = roomStatusMeta(st);
-                const problem = st!=='Operational';
-                const owners = r.owner ? `${r.owner}${r.backupOwner?`, backup ${r.backupOwner}`:''}` : 'No owner';
-                const updated = fmtWhen(r.lastUpdated);
-                return (
-                  <div key={r.id} data-room={r.id} style={{display:'flex',alignItems:'center',gap:12,padding:'11px 14px',borderTop:i?`1px solid ${C.border}`:'none',flexWrap:'wrap'}}>
-                    <span style={{width:8,height:8,borderRadius:'50%',background:meta.color,flexShrink:0}} aria-hidden="true"/>
-                    <div style={{flex:'1 1 220px',minWidth:0}}>
-                      <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{r.title}</p>
-                      <p style={{...ellipsis,fontSize:12,color:C.textSecondary,marginTop:2}}>{[r.devices,owners].filter(Boolean).join(' · ')}</p>
-                      {problem&&(r.notes||updated)&&(
-                        <p style={{fontSize:12,color:meta.color,marginTop:3,lineHeight:1.4}}>
-                          {[r.notes, updated?`updated ${updated}${r.updatedBy&&r.updatedBy!=='seed'?` by ${r.updatedBy}`:''}`:''].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                    </div>
-                    <RoomStatusSwitch value={st} onChange={s=>setStatus(r,s)}/>
-                    <button type="button" onClick={()=>openEdit(r)} aria-label={`Edit ${r.title}`}
-                      style={{background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:500,color:C.accent,padding:'4px 2px'}}>Edit</button>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p style={{fontSize:13,color:C.textSecondary,textAlign:'center',padding:'24px 0'}}>
-              No rooms marked {roomStatusMeta(filter).label}. <button type="button" onClick={()=>setFilter('all')} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:13}}>Show all</button>
-            </p>
-          )
-        )}
-
-        {/* By owner */}
-        {view==='owners'&&rooms.length>0&&(
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
-            {ownerMap.map(row=>(
-              <div key={row.owner} style={{...card('pad')}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
-                  <Avatar name={row.owner} size={28}/>
-                  <div style={{flex:1,minWidth:0}}>
-                    <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{row.owner}</p>
-                    <p style={{fontSize:12,color:C.textSecondary}}>{row.primary.length} primary · {row.backup.length} backup</p>
-                  </div>
-                  {row.issues>0&&<Badge color="amber" size="xs">{row.issues} flagged</Badge>}
-                </div>
-                {row.primary.length>0&&(
-                  <div style={{display:'flex',flexWrap:'wrap',gap:4,marginBottom:row.backup.length?6:0}}>
-                    {row.primary.map((p,i)=><span key={p+i} style={{fontSize:11,background:C.accentBg,color:C.accent,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
-                  </div>
-                )}
-                {row.backup.length>0&&(
-                  <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                    {row.backup.map((p,i)=><span key={p+i} style={{fontSize:11,color:C.textSecondary,border:`1px solid ${C.border}`,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+  return (
+    <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:16}}>
+      {/* Stats — click one to show only those rooms */}
+      <div className="stat-row" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+        {statCards.map(s=>{
+          const active = filter===s.key;
+          return (
+            <button type="button" key={s.key} data-filter={s.key} onClick={()=>setFilter(active&&s.key!=='all'?'all':s.key)} aria-pressed={active}
+              style={{...card(),padding:'10px 14px',textAlign:'left',cursor:'pointer',border:`1px solid ${active&&s.key!=='all'?(s.color||C.accent):C.border}`}}>
+              <div style={{fontSize:20,fontWeight:600,color:s.color||C.textPrimary}}>{s.value}</div>
+              <div style={{fontSize:11,color:C.textSecondary,marginTop:2}}>{s.label}</div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Add / edit pop-up */}
-      {editing&&(
-        <Overlay onClose={close} maxWidth={500}>
-          <form onSubmit={save} style={{display:'flex',flexDirection:'column',gap:12}}>
-            <p style={{fontSize:14,fontWeight:600,color:C.textPrimary}}>{editing==='new'?'Add room or device':'Edit room'}</p>
-            <div><Label>Name *</Label><Input value={form.title} onChange={e=>sf('title',e.target.value)} placeholder="Vision Room" maxLength={200} required autoFocus/></div>
+      {/* Actions */}
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        {filter!=='all'
+          ? <p style={{fontSize:12,color:C.textSecondary}}>Showing {filter==='Operational'?'operational':filter.toLowerCase()} rooms only · <button type="button" onClick={()=>setFilter('all')} style={{background:'none',border:'none',cursor:'pointer',color:C.accent,fontSize:12,padding:0}}>Show all</button></p>
+          : rooms.length>0 && <p style={{fontSize:12,color:C.textSecondary}}>{knownFloors.length} floor{knownFloors.length!==1?'s':''}</p>}
+        <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
+          {floorKeys.length>1&&(
+            <button type="button" onClick={()=>setAll(!allCollapsed)} style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.textSecondary}}>
+              {allCollapsed?'Expand all floors':'Collapse all floors'}
+            </button>
+          )}
+          {!rooms.length&&<Btn variant="subtle" size="sm" onClick={seed}>Load defaults</Btn>}
+          {!formOpen&&<Btn variant="primary" size="sm" onClick={()=>openNew('')}>+ Add room</Btn>}
+        </div>
+      </div>
+
+      {/* Add / edit form — same fields as before, now with Floor. Hidden until you need it. */}
+      {formOpen&&(
+        <div ref={formRef} style={{...card('pad'),border:`1px solid ${C.accentBorder}`,scrollMarginTop:12}} className="fade-in">
+          <p style={{fontSize:13,fontWeight:500,color:C.textPrimary,marginBottom:12}}>{editingId?`Edit ${form.title||'room'}`:'Add room or device'}</p>
+          <form onSubmit={save} style={{display:'flex',flexDirection:'column',gap:10}}>
+            <div className="grid-rooms" style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10}}>
+              <div><Label>Name *</Label><Input value={form.title} onChange={e=>sf('title',e.target.value)} placeholder="Vision Room, Proto..." maxLength={200} required autoFocus/></div>
+              <div><Label>Floor</Label>
+                <Input value={form.floor} onChange={e=>sf('floor',e.target.value)} placeholder="65, Lobby..." list="room-floor-options" maxLength={40}/>
+                <datalist id="room-floor-options">{knownFloors.map(f=><option key={f} value={f}/>)}</datalist>
+              </div>
+            </div>
             <div className="grid-2" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-              <div><Label>Primary owner</Label><Select value={form.owner} onChange={e=>sf('owner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}{form.owner&&!teamMembers.includes(form.owner)&&<option value={form.owner}>{form.owner}</option>}</Select></div>
-              <div><Label>Backup owner</Label><Select value={form.backupOwner} onChange={e=>sf('backupOwner',e.target.value)}><option value="">Select...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}{form.backupOwner&&!teamMembers.includes(form.backupOwner)&&<option value={form.backupOwner}>{form.backupOwner}</option>}</Select></div>
+              <div><Label>Primary owner</Label>{ownerSelect('owner')}</div>
+              <div><Label>Backup owner</Label>{ownerSelect('backupOwner')}</div>
             </div>
             <div className="grid-2" style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10}}>
-              <div><Label>Status</Label><Select value={form.status} onChange={e=>sf('status',e.target.value)}>{ROOM_STATUSES.map(s=><option key={s.key} value={s.key}>{s.key==='Operational'?'OK':s.label}</option>)}</Select></div>
-              <div><Label>Devices / systems</Label><Input value={form.devices} onChange={e=>sf('devices',e.target.value)} placeholder="Cyviz, Vu, Broadcast" maxLength={700}/></div>
+              <div><Label>Status</Label><Select value={form.status} onChange={e=>sf('status',e.target.value)}><option value="Operational">Operational</option><option value="Monitor">Monitor</option><option value="Escalate">Escalate</option></Select></div>
+              <div><Label>Devices / systems</Label><Input value={form.devices} onChange={e=>sf('devices',e.target.value)} placeholder="Cyviz, Vu, Broadcast..." maxLength={700}/></div>
             </div>
-            <div><Label>Notes</Label><Input value={form.notes} onChange={e=>sf('notes',e.target.value)} placeholder="What to watch for, who to call, known quirks" rows={3} maxLength={LONG_TEXT_LIMIT}/></div>
-            <div style={{display:'flex',gap:8,alignItems:'center'}}>
-              <Btn type="submit" variant="primary" size="md">{editing==='new'?'Add room':'Save changes'}</Btn>
-              <Btn variant="ghost" size="md" onClick={close}>Cancel</Btn>
-              {editing!=='new'&&<Btn variant="ghost" size="sm" onClick={()=>del(editing)} style={{color:C.red,marginLeft:'auto'}}>Delete room</Btn>}
+            <Input value={form.notes} onChange={e=>sf('notes',e.target.value)} placeholder="Notes..." rows={2} maxLength={LONG_TEXT_LIMIT}/>
+            <div style={{display:'flex',gap:8}}>
+              <Btn type="submit" variant="primary" size="sm">{editingId?'Update room':'Add room'}</Btn>
+              <Btn variant="ghost" size="sm" onClick={reset}>Cancel</Btn>
             </div>
           </form>
-        </Overlay>
+        </div>
+      )}
+
+      {!rooms.length&&<EmptyState icon="📍" title="No rooms yet" subtitle="Add rooms above or load the default matrix."/>}
+      {rooms.length>0&&!shown.length&&<p style={{fontSize:13,color:C.textSecondary,textAlign:'center',padding:'20px 0'}}>No rooms with that status right now.</p>}
+
+      {/* Floors */}
+      {floorKeys.map(f=>{
+        const list = floors[f];
+        const isCollapsed = !!collapsed[f];
+        const mon = list.filter(r=>statusOf(r)==='Monitor').length;
+        const esc = list.filter(r=>statusOf(r)==='Escalate').length;
+        return (
+          <section key={f||'none'} data-floor={f||'none'}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:isCollapsed?0:10}}>
+              <button type="button" onClick={()=>setCollapsed(c=>({...c,[f]:!isCollapsed}))} aria-expanded={!isCollapsed}
+                style={{display:'flex',alignItems:'center',gap:8,background:'none',border:'none',cursor:'pointer',padding:0,flexWrap:'wrap'}}>
+                <span style={{display:'inline-block',color:C.textSecondary,fontSize:13,transform:isCollapsed?'none':'rotate(90deg)',transition:'transform 0.15s'}}>›</span>
+                <span style={{fontSize:14,fontWeight:600,color:f?C.textPrimary:C.textSecondary}}>{floorLabel(f)}</span>
+                <span style={{fontSize:12,color:C.textSecondary}}>{list.length} room{list.length!==1?'s':''}</span>
+                {mon>0&&<Badge color="amber" size="xs">{mon} monitor</Badge>}
+                {esc>0&&<Badge color="red" size="xs">{esc} escalated</Badge>}
+              </button>
+              <div style={{flex:1,height:1,background:C.border,minWidth:20}}/>
+              <button type="button" onClick={()=>openNew(f)} aria-label={`Add room on ${floorLabel(f)}`}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.accent,whiteSpace:'nowrap'}}>+ Add room</button>
+            </div>
+            {!isCollapsed&&(
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:10}}>
+                {list.map(renderRoomCard)}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {/* Ownership matrix — tucked under a toggle so the floors stay front and center */}
+      {ownerMap.length>0&&(
+        <section style={{borderTop:`1px solid ${C.border}`,paddingTop:14}}>
+          <button type="button" onClick={()=>setShowOwners(!showOwners)} aria-expanded={showOwners}
+            style={{display:'flex',alignItems:'center',gap:8,background:'none',border:'none',cursor:'pointer',padding:0,marginBottom:showOwners?10:0}}>
+            <span style={{display:'inline-block',color:C.textSecondary,fontSize:13,transform:showOwners?'rotate(90deg)':'none',transition:'transform 0.15s'}}>›</span>
+            <span style={{fontSize:14,fontWeight:600,color:C.textPrimary}}>Ownership matrix</span>
+            <span style={{fontSize:12,color:C.textSecondary}}>{ownerMap.length} people</span>
+          </button>
+          {showOwners&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:10}}>
+              {ownerMap.map(row=>(
+                <div key={row.owner} style={{...card('pad')}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                    <Avatar name={row.owner} size={28}/>
+                    <div>
+                      <p style={{fontSize:12,fontWeight:500,color:C.textPrimary}}>{row.owner}</p>
+                      <p style={{fontSize:10,color:C.textSecondary}}>Primary: {row.primary.length} · Backup: {row.backup.length}</p>
+                    </div>
+                  </div>
+                  {row.primary.length>0&&(
+                    <div style={{marginBottom:6}}>
+                      <Label style={{marginBottom:4}}>Primary</Label>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                        {row.primary.map((p,i)=><span key={p+i} style={{fontSize:10,background:C.accentBg,color:C.accent,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {row.backup.length>0&&(
+                    <div>
+                      <Label style={{marginBottom:4}}>Backup</Label>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                        {row.backup.map((p,i)=><span key={p+i} style={{fontSize:10,background:'rgba(255,255,255,0.04)',color:C.textSecondary,border:`1px solid ${C.border}`,padding:'2px 7px',borderRadius:4}}>{p}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {row.issues>0&&<Badge color="red" size="xs" style={{marginTop:8}}>{row.issues} escalated</Badge>}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
