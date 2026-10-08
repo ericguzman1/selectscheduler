@@ -63,11 +63,19 @@ const getTodayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 };
+const addDays = (dateStr, n) => {
+  const [y,m,d] = String(dateStr).split('-').map(Number);
+  const dt = new Date(y,m-1,d+n);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+};
+const localDate = (dateStr) => { const [y,m,d] = String(dateStr).split('-').map(Number); return new Date(y,m-1,d); };
+const fmtDay = (dateStr) => localDate(dateStr).toLocaleDateString([], {month:'short', day:'numeric'});
+const fmtWeekday = (dateStr) => localDate(dateStr).toLocaleDateString([], {weekday:'short'});
 const fmtTime = (dt) => {
   if (!dt) return '';
   const d = new Date(dt);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  return d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 };
 const weekOfFromDateTime = (v) => {
   if (!v) return '';
@@ -323,7 +331,7 @@ const exportToExcel = async (events, tasks, month) => {
     'Post-Event Notes': e.postEventNotes||'',
     'Hours Logged': sumHours(e.timeLogs)||'',
   }));
-  const completedTasks = tasks.filter(t=>normStatus(t)==='complete' && inMonth(t.dueDate||t.timestamp)).map(t=>({
+  const completedTasks = tasks.filter(t=>normStatus(t)==='complete' && inMonth(t.completedAt||t.dueDate||t.timestamp)).map(t=>({
     'Task': t.title||'',
     'Assignee': t.assignee||'',
     'Status': t.status||'',
@@ -372,19 +380,15 @@ const STYLES = `
 
   /* ── Phone layout ── */
   @media (max-width: 760px) {
-    .app-shell { flex-direction: column-reverse !important; height: 100dvh !important; }
-    .sidebar { width: 100% !important; height: 56px; flex-direction: row !important; justify-content: space-around;
-      padding: 0 6px !important; border-right: none !important; border-top: 1px solid #1E1E2E; overflow-x: auto; }
-    .sidebar-logo, .sidebar-spacer { display: none !important; }
-    .topbar-sub { display: none; }
+    .app-shell { height: 100dvh !important; }
+    .nav-tabs { display: none !important; }
+    .bottom-nav { display: flex !important; }
     .today-layout { flex-direction: column !important; overflow: auto !important; }
     .today-main { flex: none !important; overflow: visible !important; }
     .today-side { width: 100% !important; border-left: none !important; border-top: 1px solid #1E1E2E; overflow: visible !important; }
     .stat-row { grid-template-columns: repeat(2, 1fr) !important; }
     .grid-2, .grid-rooms { grid-template-columns: 1fr !important; }
-    .kanban { grid-template-columns: 1fr !important; grid-auto-rows: max-content; align-content: start; overflow: auto !important; }
-    .kanban-col { border-right: none !important; border-bottom: 1px solid #1E1E2E; overflow: visible !important; }
-    .kanban-list { overflow: visible !important; }
+    .task-panel { position: fixed !important; inset: 0; width: 100% !important; z-index: 260; border-left: none !important; }
   }
 `;
 
@@ -752,63 +756,150 @@ function AccountGate({ user, reason, showMsg, onVerified }) {
   );
 }
 
-// ── Sidebar nav ──
+// ── Navigation ──
+// Text tabs across the top (desktop) and a labeled bottom bar (phones).
+// Settings and Sign out live in the account menu.
 const NAV = [
-  { key:'today',    icon:'☀',  label:'Today'    },
-  { key:'events',   icon:'📋', label:'Events'   },
-  { key:'tasks',    icon:'⬛', label:'Tasks'    },
-  { key:'issues',   icon:'⚠',  label:'Issues'   },
-  { key:'rooms',    icon:'📍', label:'Rooms'    },
-  { key:'export',   icon:'⬇',  label:'Export'   },
-  { key:'insights', icon:'📊', label:'Insights' },
-]; // Settings lives at the bottom of the sidebar
+  { key:'today',   label:'Today'   },
+  { key:'events',  label:'Events'  },
+  { key:'tasks',   label:'Tasks'   },
+  { key:'issues',  label:'Issues'  },
+  { key:'rooms',   label:'Rooms'   },
+  { key:'reports', label:'Reports' },
+];
 
-function NavBtn({ active, title, onClick, danger, children }) {
+const NAV_ICON_PATHS = {
+  today:   <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>,
+  events:  <><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></>,
+  tasks:   <><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></>,
+  issues:  <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></>,
+  rooms:   <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></>,
+  reports: <><path d="M18 20V10M12 20V4M6 20v-6"/></>,
+};
+
+function NavIcon({ name, size=20 }) {
   return (
-    <button type="button" onClick={onClick} title={title} aria-label={title}
-      style={{
-        width:36,height:36,borderRadius:8,border:'none',cursor:'pointer',flexShrink:0,
-        background: active ? C.accentBg : 'transparent',
-        color: active ? C.accent : C.textMuted,
-        fontSize:16,transition:'all 0.15s',display:'flex',alignItems:'center',justifyContent:'center',
-      }}
-      onMouseEnter={e=>{ if(!active){ e.currentTarget.style.background=danger?'transparent':'rgba(255,255,255,0.05)'; e.currentTarget.style.color=danger?C.red:C.textPrimary; } }}
-      onMouseLeave={e=>{ if(!active){ e.currentTarget.style.background='transparent'; e.currentTarget.style.color=C.textMuted; } }}
-    >{children}</button>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{NAV_ICON_PATHS[name]}</svg>
   );
 }
 
-function Sidebar({ page, setPage }) {
+function CountPill({ count }) {
   return (
-    <div className="sidebar" style={{
-      width:56,display:'flex',flexDirection:'column',alignItems:'center',
-      padding:'12px 0',gap:2,borderRight:`1px solid ${C.border}`,
-      background:C.surface,flexShrink:0,
-    }}>
-      <div className="sidebar-logo" style={{fontSize:18,fontWeight:700,color:C.accent,marginBottom:10,letterSpacing:-1}}>S</div>
-      {NAV.map(n => <NavBtn key={n.key} active={page===n.key} title={n.label} onClick={()=>setPage(n.key)}>{n.icon}</NavBtn>)}
-      <div className="sidebar-spacer" style={{flex:1}}/>
-      <NavBtn active={page==='settings'} title="Settings" onClick={()=>setPage('settings')}>⚙</NavBtn>
-      <NavBtn danger title="Sign out" onClick={()=>signOut(auth)}>↪</NavBtn>
+    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 5px',
+      borderRadius:9,background:C.redBg,color:C.red,fontSize:11,fontWeight:600,lineHeight:1}}>{count}</span>
+  );
+}
+
+function Segmented({ value, onChange, options, label }) {
+  return (
+    <div role="radiogroup" aria-label={label} style={{display:'inline-flex',border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',flexShrink:0}}>
+      {options.map(o=>{
+        const active = o.value===value;
+        return (
+          <button type="button" role="radio" aria-checked={active} key={o.value} data-seg={o.value} onClick={()=>onChange(o.value)}
+            style={{fontSize:12,fontWeight:500,padding:'7px 12px',border:'none',cursor:'pointer',whiteSpace:'nowrap',
+              background:active?'rgba(255,255,255,0.08)':'transparent',color:active?C.textPrimary:C.textSecondary}}>
+            {o.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-// ── Top bar ──
-function TopBar({ title, subtitle, actions, currentUser }) {
+function MenuItem({ onClick, danger, children }) {
   return (
-    <div style={{
-      height:48,display:'flex',alignItems:'center',padding:'0 16px',gap:12,
-      borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0,
-    }}>
-      <div>
-        <span style={{fontSize:14,fontWeight:600,color:C.textPrimary}}>{title}</span>
-        {subtitle && <span className="topbar-sub" style={{fontSize:12,color:C.textMuted,marginLeft:8}}>{subtitle}</span>}
+    <button type="button" role="menuitem" onClick={onClick}
+      style={{display:'block',width:'100%',textAlign:'left',background:'transparent',border:'none',borderRadius:6,
+        cursor:'pointer',padding:'8px 10px',fontSize:13,color:danger?C.red:C.textPrimary}}
+      onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,0.06)'}
+      onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+      {children}
+    </button>
+  );
+}
+
+function TopNav({ page, setPage, badges, currentUser, userEmail, onBrief, briefLoading }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  useEffect(()=>{
+    if (!menuOpen) return;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
+    const onKey = (e) => { if (e.key==='Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return ()=>{ document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  },[menuOpen]);
+
+  return (
+    <header style={{height:52,display:'flex',alignItems:'center',gap:20,padding:'0 16px',
+      borderBottom:`1px solid ${C.border}`,background:C.surface,flexShrink:0}}>
+      <button type="button" onClick={()=>setPage('today')}
+        style={{background:'none',border:'none',cursor:'pointer',fontSize:15,fontWeight:600,color:C.textPrimary,whiteSpace:'nowrap',padding:0}}>
+        <span style={{color:C.accent}}>SELECT</span> Hub
+      </button>
+      <nav className="nav-tabs" aria-label="Main" style={{display:'flex',gap:2,flex:1,minWidth:0,overflowX:'auto'}}>
+        {NAV.map(n=>{
+          const active = page===n.key;
+          const count = badges[n.key];
+          return (
+            <button type="button" key={n.key} data-nav={n.key} onClick={()=>setPage(n.key)} aria-current={active?'page':undefined}
+              style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:active?600:500,padding:'7px 12px',
+                borderRadius:8,border:'none',cursor:'pointer',whiteSpace:'nowrap',transition:'color 0.15s, background 0.15s',
+                background:active?'rgba(255,255,255,0.07)':'transparent',color:active?C.textPrimary:C.textSecondary}}
+              onMouseEnter={e=>{ if(!active) e.currentTarget.style.color=C.textPrimary; }}
+              onMouseLeave={e=>{ if(!active) e.currentTarget.style.color=C.textSecondary; }}>
+              {n.label}{count>0&&<CountPill count={count}/>}
+            </button>
+          );
+        })}
+      </nav>
+      <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+        <Btn variant="subtle" size="sm" onClick={onBrief} disabled={briefLoading}>
+          {briefLoading?<><Spinner size={11}/>Working…</>:'⚡ Lead brief'}
+        </Btn>
+        <div ref={menuRef} style={{position:'relative'}}>
+          <button type="button" aria-label="Account menu" aria-haspopup="menu" aria-expanded={menuOpen} onClick={()=>setMenuOpen(o=>!o)}
+            style={{background:'none',border:'none',padding:0,cursor:'pointer',borderRadius:'50%',display:'flex'}}>
+            <Avatar name={currentUser} size={30}/>
+          </button>
+          {menuOpen && (
+            <div role="menu" className="fade-in" style={{position:'absolute',right:0,top:'calc(100% + 8px)',minWidth:230,
+              background:'#16161F',border:`1px solid ${C.borderHover}`,borderRadius:10,padding:6,zIndex:250,
+              boxShadow:'0 8px 24px rgba(0,0,0,0.45)'}}>
+              <div style={{padding:'8px 10px 10px',borderBottom:`1px solid ${C.border}`,marginBottom:4}}>
+                <p style={{fontSize:13,fontWeight:500,color:C.textPrimary}}>{currentUser}</p>
+                {userEmail&&userEmail!==currentUser&&<p style={{fontSize:12,color:C.textSecondary,marginTop:2}}>{userEmail}</p>}
+              </div>
+              <MenuItem onClick={()=>{ setMenuOpen(false); setPage('settings'); }}>Team settings</MenuItem>
+              <MenuItem danger onClick={()=>signOut(auth)}>Sign out</MenuItem>
+            </div>
+          )}
+        </div>
       </div>
-      <div style={{flex:1}}/>
-      {actions}
-      <Avatar name={currentUser} size={26}/>
-    </div>
+    </header>
+  );
+}
+
+function BottomNav({ page, setPage, badges }) {
+  return (
+    <nav className="bottom-nav" aria-label="Main" style={{display:'none',borderTop:`1px solid ${C.border}`,background:C.surface,
+      flexShrink:0,padding:'4px 4px calc(4px + env(safe-area-inset-bottom))'}}>
+      {NAV.map(n=>{
+        const active = page===n.key;
+        const count = badges[n.key];
+        return (
+          <button type="button" key={n.key} data-bnav={n.key} onClick={()=>setPage(n.key)} aria-current={active?'page':undefined}
+            style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'6px 0',background:'none',
+              border:'none',cursor:'pointer',color:active?C.accent:C.textSecondary,fontSize:11,fontWeight:500,position:'relative'}}>
+            <NavIcon name={n.key}/>
+            {n.label}
+            {count>0&&<span style={{position:'absolute',top:3,left:'calc(50% + 6px)'}}><CountPill count={count}/></span>}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -1560,154 +1651,278 @@ function EventsPage({ events, showMsg, fetchGemini, currentUser, teamMembers }) 
 }
 
 // ── TASKS ──
-// Defined at the top level (not inside TasksPage) so cards keep their state and focus
-// when Firestore pushes updates.
-const moveBtnStyle = {background:'rgba(255,255,255,0.05)',border:'none',borderRadius:5,color:C.textSecondary,cursor:'pointer',fontSize:11,padding:'3px 8px'};
-const taskInputStyle = {background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:7,color:C.textPrimary,fontSize:12,padding:'7px 8px',fontFamily:'inherit'};
+// A list grouped by due date. Click the circle to finish a task; click the row for details.
+const TASK_GROUPS = [
+  { key:'overdue',  label:'Overdue', danger:true },
+  { key:'today',    label:'Today' },
+  { key:'tomorrow', label:'Tomorrow' },
+  { key:'week',     label:'Later this week' },
+  { key:'later',    label:'Later' },
+  { key:'nodate',   label:'No due date' },
+];
+const ellipsis = {overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'};
+const displayTaskTitle = (title) => String(title||'Untitled task').replace(/^SELECT support:\s*/i,'Support: ');
 
-function TaskCard({ t, teamMembers, expanded, editing, onToggleExpand, onStartEdit, onCancelEdit, onSaveEdit, onMove, onDelete, onLogTime, onChecklistChange }) {
-  const [logOpen, setLogOpen] = useState(false);
-  const [logH, setLogH] = useState('');
-  const [logN, setLogN] = useState('');
-  const [logging, setLogging] = useState(false);
-  const { done, total } = checklistProgress(t.details);
-  const hasChecklist = total>0;
-  const totalH = sumHours(t.timeLogs);
-  const shownH = totalH>0 ? totalH.toFixed(1) : t.timeSpent;
-  const st = normStatus(t);
-
-  const submitLog = async () => {
-    setLogging(true);
-    const ok = await onLogTime(t, logH, logN);
-    setLogging(false);
-    if (ok) { setLogH(''); setLogN(''); setLogOpen(false); }
-  };
-
-  if (editing) return (
-    <form onSubmit={e=>onSaveEdit(e,t)} style={{...card(),padding:12,display:'flex',flexDirection:'column',gap:8}}>
-      <input name="t" defaultValue={t.title} required maxLength={300} style={{...taskInputStyle,border:`1px solid ${C.accent}`,fontSize:13,padding:'8px 10px',width:'100%'}}/>
-      <textarea name="det" defaultValue={t.details} rows={4} maxLength={LONG_TEXT_LIMIT} placeholder="Checklist / notes..." style={{...taskInputStyle,padding:'8px 10px',resize:'vertical'}}/>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
-        <select name="a" defaultValue={t.assignee} style={taskInputStyle}>
-          <option value="">Assign...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
-        </select>
-        <input name="d" type="date" defaultValue={t.dueDate} style={taskInputStyle}/>
-      </div>
-      <div style={{display:'flex',gap:6}}>
-        <Btn type="submit" variant="primary" size="sm" style={{flex:1,justifyContent:'center'}}>Save</Btn>
-        <Btn variant="ghost" size="sm" onClick={onCancelEdit} style={{flex:1,justifyContent:'center'}}>Cancel</Btn>
-      </div>
-    </form>
-  );
-
+function CheckCircle({ done, onClick }) {
   return (
-    <div style={{...card(),overflow:'hidden',transition:'border-color 0.15s'}}
-      onMouseEnter={e=>e.currentTarget.style.borderColor=C.borderHover}
-      onMouseLeave={e=>e.currentTarget.style.borderColor=C.border}>
-      <div style={{padding:'10px 12px'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:6,marginBottom:6}}>
-          <p style={{fontSize:12,fontWeight:500,color:C.textPrimary,lineHeight:1.4,flex:1}}>{t.title}</p>
-          <button type="button" onClick={()=>onDelete(t)} aria-label="Delete task" style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:C.textMuted,padding:0,flexShrink:0,opacity:0.6}}
-            onMouseEnter={e=>e.currentTarget.style.color=C.red} onMouseLeave={e=>e.currentTarget.style.color=C.textMuted}>✕</button>
-        </div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:5,marginBottom:6}}>
-          {t.assignee&&<div style={{display:'flex',alignItems:'center',gap:4}}><Avatar name={t.assignee} size={16}/><span style={{fontSize:10,color:C.textMuted}}>{t.assignee.split('.')[0]}</span></div>}
-          {t.linkedEvent&&<Badge color="accent" size="xs">{t.linkedEvent.slice(0,20)}</Badge>}
-          {t.dueDate&&<span style={{fontSize:10,color:C.textMuted}}>📅 {t.dueDate}</span>}
-          {shownH&&<span style={{fontSize:10,color:C.green}}>⏱ {shownH}h</span>}
-        </div>
-        {hasChecklist&&(
-          <div style={{marginBottom:6}}>
-            <button type="button" onClick={onToggleExpand}
-              style={{display:'flex',alignItems:'center',gap:6,background:expanded?C.accentBg:'rgba(255,255,255,0.03)',border:`1px solid ${expanded?C.accentBorder:C.border}`,borderRadius:6,padding:'4px 8px',cursor:'pointer',width:'100%'}}>
-              <span style={{fontSize:10,color:expanded?C.accent:C.textMuted}}>☑ {done}/{total} items</span>
-              <div style={{flex:1,height:2,background:'rgba(255,255,255,0.05)',borderRadius:2,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${total?(done/total)*100:0}%`,background:done===total?C.green:C.accent,borderRadius:2}}/>
-              </div>
-              <span style={{fontSize:10,color:C.textMuted}}>{expanded?'▲':'▼'}</span>
-            </button>
-          </div>
-        )}
-        {expanded&&hasChecklist&&(
-          <div style={{background:'rgba(0,0,0,0.2)',border:`1px solid ${C.border}`,borderRadius:7,padding:10,marginBottom:6}} className="fade-in">
-            <ChecklistEditor value={t.details} onChange={v=>onChecklistChange(t,v)}/>
-          </div>
-        )}
-        {/* Time log inline */}
-        {!logOpen?(
-          <button type="button" onClick={()=>setLogOpen(true)} style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:C.textMuted,padding:0}}
-            onMouseEnter={e=>e.currentTarget.style.color=C.accent} onMouseLeave={e=>e.currentTarget.style.color=C.textMuted}>+ Log time</button>
-        ):(
-          <div style={{display:'flex',gap:5,alignItems:'center'}} className="fade-in">
-            <input value={logH} onChange={e=>setLogH(e.target.value)} type="number" min="0.25" step="0.25" placeholder="hrs" aria-label="Hours" autoFocus
-              style={{width:54,background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:6,color:C.textPrimary,fontSize:11,padding:'4px 7px',fontFamily:'inherit'}}/>
-            <input value={logN} onChange={e=>setLogN(e.target.value)} placeholder="note" aria-label="Note" maxLength={500}
-              onKeyDown={e=>{ if(e.key==='Enter') submitLog(); }}
-              style={{flex:1,minWidth:0,background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:6,color:C.textPrimary,fontSize:11,padding:'4px 7px',fontFamily:'inherit'}}/>
-            <button type="button" onClick={submitLog} disabled={logging}
-              style={{background:C.accent,border:'none',borderRadius:6,color:'#fff',fontSize:11,fontWeight:500,padding:'4px 8px',cursor:'pointer',opacity:logging?0.5:1}}>Log</button>
-            <button type="button" onClick={()=>setLogOpen(false)} aria-label="Cancel" style={{background:'none',border:'none',cursor:'pointer',color:C.textMuted,fontSize:12}}>✕</button>
-          </div>
-        )}
-        {/* Move + edit — always visible so they work on touch screens */}
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:8}}>
-          <div style={{display:'flex',gap:4}}>
-            {st!=='todo'&&<button type="button" title={st==='complete'?'Move to Doing':'Move to To do'} onClick={()=>onMove(t,st==='complete'?'doing':'todo')} style={moveBtnStyle}>←</button>}
-            {st!=='complete'&&<button type="button" title={st==='todo'?'Move to Doing':'Move to Done'} onClick={()=>onMove(t,st==='todo'?'doing':'complete')} style={moveBtnStyle}>→</button>}
-          </div>
-          <button type="button" onClick={onStartEdit} style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:C.accent,fontWeight:500}}>Edit</button>
-        </div>
+    <button type="button" aria-label={done?'Mark not done':'Mark done'} onClick={onClick}
+      style={{width:20,height:20,borderRadius:'50%',flexShrink:0,padding:0,cursor:'pointer',display:'flex',alignItems:'center',
+        justifyContent:'center',border:`1.5px solid ${done?C.green:C.textSecondary}`,background:done?C.green:'transparent',transition:'all 0.15s'}}>
+      {done&&<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>}
+    </button>
+  );
+}
+
+function TaskRow({ t, ev, showAssignee, selected, dueLabel, overdue, onToggle, onOpen }) {
+  const st = normStatus(t);
+  const done = st==='complete';
+  const meta = [];
+  if (ev) {
+    meta.push(ev.eventLocation||'No room');
+    if (ev.startDate) meta.push(`${fmtTime(ev.startDate)}${ev.endDate?`–${fmtTime(ev.endDate)}`:''}`);
+  }
+  const cl = checklistProgress(t.details);
+  if (cl.total) meta.push(`checklist ${cl.done}/${cl.total}`);
+  const hrs = sumHours(t.timeLogs);
+  if (hrs>0) meta.push(`${hrs.toFixed(1)}h logged`);
+  return (
+    <div role="button" tabIndex={0} data-task={t.id} onClick={onOpen}
+      onKeyDown={e=>{ if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); onOpen(); } }}
+      style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',cursor:'pointer',
+        background:selected?C.accentBg:'transparent',transition:'background 0.1s'}}
+      onMouseEnter={e=>{ if(!selected) e.currentTarget.style.background='rgba(255,255,255,0.03)'; }}
+      onMouseLeave={e=>{ if(!selected) e.currentTarget.style.background='transparent'; }}>
+      <CheckCircle done={done} onClick={e=>{ e.stopPropagation(); onToggle(); }}/>
+      <div style={{flex:1,minWidth:0}}>
+        <p style={{...ellipsis,fontSize:13,color:done?C.textSecondary:C.textPrimary,textDecoration:done?'line-through':'none'}}>{displayTaskTitle(t.title)}</p>
+        {meta.length>0&&<p style={{...ellipsis,fontSize:12,color:C.textSecondary,marginTop:2}}>{meta.join(' · ')}</p>}
       </div>
+      {st==='doing'&&<span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:6,background:C.amberBg,color:C.amber,flexShrink:0}}>Doing</span>}
+      {showAssignee&&t.assignee&&<span title={t.assignee} style={{flexShrink:0,display:'flex'}}><Avatar name={t.assignee} size={22}/></span>}
+      <span style={{fontSize:12,color:overdue?C.red:C.textSecondary,minWidth:56,textAlign:'right',flexShrink:0}}>{dueLabel}</span>
     </div>
   );
 }
 
-function TasksPage({ tasks, showMsg, currentUser, teamMembers }) {
-  const [filterMember, setFilterMember] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
+// Everything you'd do to one task: status, owner, date, checklist, time, delete. Changes save as you make them.
+function TaskPanel({ t, ev, teamMembers, showMsg, onClose, onUpdate, onSetStatus, onDelete, onLogTime }) {
+  const [title, setTitle] = useState(t.title||'');
+  const [hours, setHours] = useState('');
+  const [logDate, setLogDate] = useState(getTodayStr());
+  const [note, setNote] = useState('');
+  const [logging, setLogging] = useState(false);
+  const st = normStatus(t);
+  const logs = t.timeLogs||[];
+  const totalH = sumHours(logs);
 
-  const handleAdd = async (e) => {
+  const saveTitle = () => {
+    const v = title.trim();
+    if (!v) { setTitle(t.title||''); showMsg('A task needs a title.',true); return; }
+    if (v!==t.title) onUpdate(t,{title:v.slice(0,300)});
+  };
+  const submitLog = async () => {
+    setLogging(true);
+    const saved = await onLogTime(t, hours, note, logDate);
+    setLogging(false);
+    if (saved) { setHours(''); setNote(''); }
+  };
+
+  return (
+    <aside className="task-panel fade-in" aria-label="Task details"
+      style={{width:400,flexShrink:0,borderLeft:`1px solid ${C.border}`,background:C.surface,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 16px',borderBottom:`1px solid ${C.border}`}}>
+        <span style={{fontSize:12,fontWeight:500,color:C.textSecondary}}>Task details</span>
+        <button type="button" onClick={onClose} aria-label="Close task details"
+          style={{background:'none',border:'none',cursor:'pointer',color:C.textSecondary,fontSize:16,lineHeight:1,padding:4}}>✕</button>
+      </div>
+
+      <div style={{flex:1,overflow:'auto',padding:16,display:'flex',flexDirection:'column',gap:18}}>
+        <textarea value={title} onChange={e=>setTitle(e.target.value)} onBlur={e=>{ e.currentTarget.style.borderColor='transparent'; saveTitle(); }} rows={2} maxLength={300} aria-label="Task title"
+          onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); e.currentTarget.blur(); } }}
+          style={{width:'100%',background:'transparent',border:`1px solid transparent`,borderRadius:8,color:C.textPrimary,
+            fontSize:16,fontWeight:500,padding:'4px 6px',fontFamily:'inherit',resize:'none',lineHeight:1.4}}
+          onFocus={e=>e.currentTarget.style.borderColor=C.border}/>
+
+        <div>
+          <Label>Status</Label>
+          <Segmented label="Status" value={st} onChange={s=>onSetStatus(t,s)}
+            options={[{value:'todo',label:'To do'},{value:'doing',label:'Doing'},{value:'complete',label:'Done'}]}/>
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          <div>
+            <Label>Assignee</Label>
+            <Select value={t.assignee||''} onChange={e=>onUpdate(t,{assignee:e.target.value})} aria-label="Assignee">
+              <option value="">Unassigned</option>
+              {teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
+              {t.assignee&&!teamMembers.includes(t.assignee)&&<option value={t.assignee}>{t.assignee}</option>}
+            </Select>
+          </div>
+          <div>
+            <Label>Due date</Label>
+            <Input type="date" aria-label="Due date" value={t.dueDate||''} onChange={e=>onUpdate(t,{dueDate:e.target.value})}/>
+          </div>
+        </div>
+
+        {ev ? (
+          <div style={{background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 12px'}}>
+            <Label>Linked event</Label>
+            <p style={{fontSize:13,color:C.textPrimary}}>{ev.eventName}</p>
+            <p style={{fontSize:12,color:C.textSecondary,marginTop:3,lineHeight:1.5}}>
+              {[ev.eventLocation||'No room',
+                ev.startDate?`${String(ev.startDate).slice(0,10)}, ${fmtTime(ev.startDate)}${ev.endDate?`–${fmtTime(ev.endDate)}`:''}`:'',
+                ev.selectPoc?`Lead: ${ev.selectPoc}`:''].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        ) : t.linkedEvent ? (
+          <p style={{fontSize:12,color:C.textSecondary}}>Linked event: {t.linkedEvent} (no longer on the schedule)</p>
+        ) : null}
+
+        <div>
+          <Label>Checklist and notes</Label>
+          <div style={{background:'rgba(0,0,0,0.2)',border:`1px solid ${C.border}`,borderRadius:8,padding:12}}>
+            <ChecklistEditor value={t.details||''} onChange={v=>onUpdate(t,{details:v.slice(0,LONG_TEXT_LIMIT)})}/>
+          </div>
+        </div>
+
+        <div>
+          <Label>Time logged{totalH>0?` · ${totalH.toFixed(1)}h`:''}</Label>
+          {logs.length>0&&(
+            <div style={{display:'flex',flexDirection:'column',gap:4,marginBottom:8}}>
+              {logs.map((l,i)=>(
+                <div key={i} style={{display:'flex',gap:10,fontSize:12,color:C.textSecondary,padding:'5px 8px',background:'rgba(255,255,255,0.02)',borderRadius:6,flexWrap:'wrap'}}>
+                  <span style={{color:C.green,fontWeight:500}}>{l.hours}h</span>
+                  <span>{l.user}</span>
+                  {l.note&&<span>— {l.note}</span>}
+                  <span style={{marginLeft:'auto'}}>{l.date}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{display:'grid',gridTemplateColumns:'90px 1fr',gap:8}}>
+            <Input type="number" min="0" step="0.25" placeholder="Hours" aria-label="Hours" value={hours} onChange={e=>setHours(e.target.value)}/>
+            <Input type="date" aria-label="Date worked" value={logDate} onChange={e=>setLogDate(e.target.value)}/>
+          </div>
+          <div style={{display:'flex',gap:8,marginTop:8}}>
+            <Input placeholder="Note (optional)" aria-label="Time note" maxLength={500} value={note}
+              onChange={e=>setNote(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') submitLog(); }}/>
+            <Btn variant="subtle" size="md" onClick={submitLog} disabled={logging} style={{whiteSpace:'nowrap'}}>{logging?'Logging…':'Log time'}</Btn>
+          </div>
+        </div>
+      </div>
+
+      <div style={{padding:'12px 16px',borderTop:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}>
+        <span style={{fontSize:11,color:C.textSecondary}}>{t.source==='Auto-generated'?'Created automatically for its event':''}</span>
+        <Btn variant="ghost" size="sm" onClick={()=>onDelete(t)} style={{color:C.red}}>Delete task</Btn>
+      </div>
+    </aside>
+  );
+}
+
+function TasksPage({ tasks, events, showMsg, currentUser, teamMembers }) {
+  const onRoster = teamMembers.includes(currentUser);
+  const [scope, setScope] = useState(onRoster?'mine':'everyone');
+  const [person, setPerson] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+  const [showDone, setShowDone] = useState(false);
+  const [doneLimit, setDoneLimit] = useState(25);
+
+  const today = getTodayStr();
+  const yesterday = addDays(today,-1), tomorrow = addDays(today,1), weekEnd = addDays(today,7);
+  const eventsById = useMemo(()=>Object.fromEntries(events.map(e=>[e.id,e])),[events]);
+  const selected = selectedId ? tasks.find(t=>t.id===selectedId) : null;
+
+  useEffect(()=>{
+    if (!selectedId) return;
+    const onKey = (e) => { if (e.key==='Escape') setSelectedId(null); };
+    document.addEventListener('keydown',onKey);
+    return ()=>document.removeEventListener('keydown',onKey);
+  },[selectedId]);
+
+  const visible = tasks.filter(t =>
+    scope==='mine' ? t.assignee===currentUser
+    : !person ? true
+    : person==='__none' ? !t.assignee
+    : t.assignee===person);
+
+  const dueGroup = (d) => !d ? 'nodate' : d<today ? 'overdue' : d===today ? 'today' : d===tomorrow ? 'tomorrow' : d<=weekEnd ? 'week' : 'later';
+  const eventStart = (t) => String(eventsById[t.eventId]?.startDate||'');
+
+  const grouped = { overdue:[], today:[], tomorrow:[], week:[], later:[], nodate:[], done:[] };
+  for (const t of visible) {
+    const d = String(t.dueDate||'').slice(0,10);
+    if (normStatus(t)==='complete') {
+      // Finished today: stays in place, struck through, so checking it off doesn't make it vanish.
+      if (String(t.completedAt||'').slice(0,10)===today) { const k = dueGroup(d); grouped[k==='overdue'?'today':k].push(t); }
+      else grouped.done.push(t);
+    } else grouped[dueGroup(d)].push(t);
+  }
+  const byDue = (a,b) => {
+    const ad = normStatus(a)==='complete', bd = normStatus(b)==='complete';
+    if (ad!==bd) return ad?1:-1;
+    return String(a.dueDate||'').localeCompare(String(b.dueDate||''))
+      || eventStart(a).localeCompare(eventStart(b))
+      || String(a.timestamp||'').localeCompare(String(b.timestamp||''));
+  };
+  TASK_GROUPS.forEach(g=>grouped[g.key].sort(byDue));
+  grouped.done.sort((a,b)=>String(b.completedAt||b.dueDate||b.timestamp||'').localeCompare(String(a.completedAt||a.dueDate||a.timestamp||'')));
+  const openCount = (arr) => arr.filter(t=>normStatus(t)!=='complete').length;
+  const anyOpen = TASK_GROUPS.some(g=>openCount(grouped[g.key])>0);
+
+  const dueLabel = (t, group) => {
+    if (group==='done') return t.completedAt ? fmtDay(String(t.completedAt).slice(0,10)) : 'Done';
+    const d = String(t.dueDate||'').slice(0,10);
+    const ev = eventsById[t.eventId];
+    if (!d) return '';
+    if (d===yesterday) return 'Yesterday';
+    if (d<today) return fmtDay(d);
+    if (d===today||d===tomorrow) return ev?.startDate ? fmtTime(ev.startDate) : (d===today?'Today':'Tomorrow');
+    if (d<=weekEnd) return fmtWeekday(d);
+    return fmtDay(d);
+  };
+
+  const update = async (t, patch, activity) => {
+    try {
+      await updateDoc(docRef('shared_tasks',t.id),patch);
+      if (activity) await logActivity(activity,currentUser);
+    } catch(err) { console.error(err); showMsg('Could not save the task.',true); }
+  };
+  const setStatus = (t, s) => update(t,
+    { status:s, completedAt: s==='complete' ? new Date().toISOString() : '' },
+    `${currentUser} moved "${t.title}" to ${s}`);
+  const toggleDone = (t) => setStatus(t, normStatus(t)==='complete' ? 'todo' : 'complete');
+
+  const quickAdd = async (e) => {
     e.preventDefault();
     const formEl = e.target;
     const fd = new FormData(formEl);
-    const d = {title:String(fd.get('t')||'').trim(),assignee:fd.get('a')||'',dueDate:fd.get('d')||'',details:fd.get('det')||'',timeLogs:[],timeSpent:'',status:'todo',timestamp:new Date().toISOString()};
-    if (!d.title) return;
+    const title = String(fd.get('title')||'').trim();
+    if (!title) { showMsg('Type a task first.',true); return; }
+    const assignee = scope==='mine' ? currentUser
+      : (person && person!=='__none') ? person
+      : onRoster ? currentUser : '';
+    const d = { title:title.slice(0,300), assignee, dueDate:String(fd.get('due')||''), details:'', timeLogs:[], timeSpent:'',
+      status:'todo', source:'Manual', timestamp:new Date().toISOString() };
     try {
       await addDoc(col('shared_tasks'),d);
       await logActivity(`${currentUser} added task "${d.title}"`,currentUser);
-      formEl.reset(); showMsg('Task added.');
+      formEl.reset();
+      showMsg(assignee&&assignee!==currentUser ? `Task added for ${assignee}.` : 'Task added.');
     } catch(err) { console.error(err); showMsg('Could not add the task.',true); }
-  };
-
-  const move = async (t,s) => {
-    try {
-      await updateDoc(docRef('shared_tasks',t.id),{status:s});
-      await logActivity(`${currentUser} moved "${t.title}" to ${s}`,currentUser);
-    } catch(err) { console.error(err); showMsg('Could not move the task.',true); }
   };
 
   const del = async (t) => {
     if (!window.confirm(`Delete "${t.title}"?`)) return;
-    try { await deleteDoc(docRef('shared_tasks',t.id)); showMsg('Task deleted.'); }
+    try { await deleteDoc(docRef('shared_tasks',t.id)); setSelectedId(null); showMsg('Task deleted.'); }
     catch(err) { console.error(err); showMsg('Delete failed.',true); }
   };
 
-  const saveEdit = async (e,t) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    try {
-      await updateDoc(docRef('shared_tasks',t.id),{title:fd.get('t'),assignee:fd.get('a'),dueDate:fd.get('d'),details:fd.get('det')});
-      await logActivity(`${currentUser} updated "${t.title}"`,currentUser);
-      setEditingId(null); showMsg('Task updated.');
-    } catch(err) { console.error(err); showMsg('Could not save the task.',true); }
-  };
-
-  // Returns true on success so the card can clear its inputs.
-  const logTime = async (task,hours,note) => {
+  // Returns true on success so the panel can clear its inputs.
+  const logTime = async (task, hours, note, date) => {
     const hrs = parseFloat(hours);
     if (isNaN(hrs)||hrs<=0) { showMsg('Enter hours greater than 0.',true); return false; }
-    const entry = {user:currentUser,hours:hrs,note:String(note||'').trim(),date:getTodayStr(),timestamp:new Date().toISOString()};
+    if (!date) { showMsg('Pick the date you did the work.',true); return false; }
+    const entry = {user:currentUser,hours:hrs,note:String(note||'').trim(),date,timestamp:new Date().toISOString()};
     try {
       await updateDoc(docRef('shared_tasks',task.id),{
         timeLogs: arrayUnion(entry),
@@ -1719,75 +1934,93 @@ function TasksPage({ tasks, showMsg, currentUser, teamMembers }) {
     } catch(err) { console.error(err); showMsg('Could not log time.',true); return false; }
   };
 
-  const saveChecklist = (t,v) =>
-    updateDoc(docRef('shared_tasks',t.id),{details:v.slice(0,LONG_TEXT_LIMIT)}).catch(()=>showMsg('Checklist save failed.',true));
-
-  const visible = filterMember ? tasks.filter(t=>t.assignee===filterMember) : tasks;
-  const cols = [
-    {key:'todo',label:'To do',color:C.textMuted},
-    {key:'doing',label:'Doing',color:C.amber},
-    {key:'complete',label:'Done',color:C.green},
-  ];
-  const fieldStyle = {background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textSecondary,fontSize:12,padding:'8px 10px',fontFamily:'inherit'};
+  const fieldStyle = {background:'#0D0D17',border:`1px solid ${C.border}`,borderRadius:8,color:C.textPrimary,fontSize:13,padding:'8px 12px',fontFamily:'inherit'};
+  const renderRows = (list, groupKey) => (
+    <div style={{border:`1px solid ${C.border}`,borderRadius:10,overflow:'hidden',background:C.surface}}>
+      {list.map((t,i)=>(
+        <div key={t.id} style={{borderTop:i?`1px solid ${C.border}`:'none'}}>
+          <TaskRow t={t} ev={eventsById[t.eventId]} showAssignee={scope==='everyone'} selected={selectedId===t.id}
+            dueLabel={dueLabel(t,groupKey)} overdue={groupKey==='overdue'&&normStatus(t)!=='complete'}
+            onToggle={()=>toggleDone(t)} onOpen={()=>setSelectedId(t.id)}/>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
-    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-      {/* Add form */}
-      <div style={{borderBottom:`1px solid ${C.border}`,padding:'12px 16px',background:C.surface}}>
-        <form onSubmit={handleAdd} style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <input name="t" placeholder="Add a task..." required maxLength={300}
-            style={{...fieldStyle,flex:1,minWidth:160,color:C.textPrimary,fontSize:13,padding:'8px 12px'}}/>
-          <select name="a" style={fieldStyle}>
-            <option value="">Assign...</option>{teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
-          </select>
-          <input name="d" type="date" aria-label="Due date" style={fieldStyle}/>
-          <input name="det" placeholder="Notes..." maxLength={LONG_TEXT_LIMIT} style={{...fieldStyle,flex:1,minWidth:100,padding:'8px 12px'}}/>
-          <Btn type="submit" variant="primary" size="sm">+ Add</Btn>
-        </form>
-        {/* Assignee filter */}
-        <div style={{display:'flex',gap:6,marginTop:10,alignItems:'center',flexWrap:'wrap'}}>
-          <span style={{fontSize:11,color:C.textMuted}}>Filter:</span>
-          <button type="button" onClick={()=>setFilterMember('')} style={{background:filterMember===''?C.accentBg:'transparent',border:`1px solid ${filterMember===''?C.accent:C.border}`,borderRadius:6,color:filterMember===''?C.accent:C.textMuted,fontSize:11,padding:'3px 8px',cursor:'pointer'}}>All</button>
-          {teamMembers.map(m=>(
-            <button type="button" key={m} onClick={()=>setFilterMember(filterMember===m?'':m)} title={m} aria-label={`Show ${m}'s tasks`}
-              style={{width:28,height:28,borderRadius:'50%',border:`1px solid ${filterMember===m?C.accent:C.border}`,
-                background:filterMember===m?C.accentBg:'transparent',color:filterMember===m?C.accent:C.textMuted,
-                fontSize:10,fontWeight:600,cursor:'pointer'}}>
-              {initials(m)}
-            </button>
-          ))}
-          {filterMember&&<span style={{fontSize:11,color:C.accent}}>{filterMember} · {visible.length} task{visible.length!==1?'s':''}</span>}
+    <div style={{flex:1,display:'flex',overflow:'hidden'}}>
+      <div style={{flex:1,overflow:'auto',minWidth:0}}>
+        <div style={{maxWidth:820,margin:'0 auto',padding:16,display:'flex',flexDirection:'column',gap:18}}>
+          {/* Toolbar: whose tasks + quick add */}
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <Segmented label="Whose tasks" value={scope} onChange={setScope}
+              options={[{value:'mine',label:'Your tasks'},{value:'everyone',label:'Everyone'}]}/>
+            {scope==='everyone'&&(
+              <select value={person} onChange={e=>setPerson(e.target.value)} aria-label="Filter by person" style={{...fieldStyle,fontSize:12,color:C.textSecondary}}>
+                <option value="">Anyone</option>
+                {teamMembers.map(m=><option key={m} value={m}>{m}</option>)}
+                <option value="__none">Unassigned</option>
+              </select>
+            )}
+            <form onSubmit={quickAdd} style={{display:'flex',gap:8,flex:1,minWidth:280,flexWrap:'wrap'}}>
+              <input name="title" placeholder="Add a task, like Charge Spot battery before 2pm" maxLength={300} aria-label="New task"
+                style={{...fieldStyle,flex:1,minWidth:180}}/>
+              <input name="due" type="date" defaultValue={today} aria-label="Due date for new task" style={{...fieldStyle,fontSize:12,color:C.textSecondary}}/>
+              <Btn type="submit" variant="primary" size="md">Add task</Btn>
+            </form>
+          </div>
+
+          {!visible.length && (
+            <EmptyState icon="✓"
+              title={scope==='mine'?'Nothing on your list':'No tasks here'}
+              subtitle={scope==='mine'
+                ? (onRoster ? 'Add a task above, or switch to Everyone to see the team’s work.'
+                    : `You're signed in as ${currentUser}, which doesn't match a name on the team roster. Add yourself in Team settings to see your tasks here.`)
+                : 'Add a task above, or pick a different person.'}/>
+          )}
+          {visible.length>0&&!anyOpen&&<p style={{fontSize:13,color:C.green}}>All caught up.</p>}
+
+          {TASK_GROUPS.map(g=>{
+            const list = grouped[g.key];
+            if (!list.length) return null;
+            const open = openCount(list);
+            return (
+              <section key={g.key} data-group={g.key}>
+                <p style={{fontSize:12,fontWeight:600,color:g.danger?C.red:C.textSecondary,marginBottom:6}}>
+                  {g.label} <span style={{fontWeight:500,color:open?undefined:C.green}}>· {open||'done'}</span>
+                </p>
+                {renderRows(list,g.key)}
+              </section>
+            );
+          })}
+
+          {grouped.done.length>0&&(
+            <section data-group="done">
+              <button type="button" onClick={()=>setShowDone(!showDone)} aria-expanded={showDone}
+                style={{display:'flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:600,color:C.textSecondary,padding:0,marginBottom:showDone?6:0}}>
+                <span style={{display:'inline-block',transform:showDone?'rotate(90deg)':'none',transition:'transform 0.15s'}}>›</span>
+                Completed · {grouped.done.length}
+              </button>
+              {showDone&&(
+                <>
+                  {renderRows(grouped.done.slice(0,doneLimit),'done')}
+                  {grouped.done.length>doneLimit&&(
+                    <button type="button" onClick={()=>setDoneLimit(n=>n+50)}
+                      style={{marginTop:8,background:'none',border:'none',cursor:'pointer',fontSize:12,color:C.accent}}>
+                      Show more ({grouped.done.length-doneLimit} older)
+                    </button>
+                  )}
+                </>
+              )}
+            </section>
+          )}
         </div>
       </div>
-      {/* Kanban columns */}
-      <div className="kanban" style={{flex:1,display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:0,overflow:'hidden'}}>
-        {cols.map(({key,label,color})=>{
-          const colTasks = visible.filter(t=>normStatus(t)===key);
-          return (
-            <div key={key} className="kanban-col" style={{borderRight:key!=='complete'?`1px solid ${C.border}`:'none',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-              <div style={{padding:'10px 14px',borderBottom:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'0.06em',color}}>{label}</span>
-                <span style={{fontSize:11,color:C.textMuted,background:'rgba(255,255,255,0.04)',borderRadius:10,padding:'2px 7px'}}>{colTasks.length}</span>
-              </div>
-              <div className="kanban-list" style={{flex:1,overflow:'auto',padding:10,display:'flex',flexDirection:'column',gap:8}}>
-                {colTasks.map(t=>(
-                  <TaskCard key={t.id} t={t} teamMembers={teamMembers}
-                    expanded={expandedId===t.id} editing={editingId===t.id}
-                    onToggleExpand={()=>setExpandedId(expandedId===t.id?null:t.id)}
-                    onStartEdit={()=>setEditingId(t.id)} onCancelEdit={()=>setEditingId(null)}
-                    onSaveEdit={saveEdit} onMove={move} onDelete={del} onLogTime={logTime}
-                    onChecklistChange={saveChecklist}/>
-                ))}
-                {!colTasks.length&&(
-                  <div style={{textAlign:'center',padding:'20px 10px',color:C.textMuted,fontSize:11}}>
-                    {key==='todo'?'No tasks queued':'Empty'}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+
+      {selected&&(
+        <TaskPanel key={selected.id} t={selected} ev={eventsById[selected.eventId]} teamMembers={teamMembers} showMsg={showMsg}
+          onClose={()=>setSelectedId(null)} onUpdate={update} onSetStatus={setStatus} onDelete={del} onLogTime={logTime}/>
+      )}
     </div>
   );
 }
@@ -2133,7 +2366,7 @@ function ExportPage({ events, tasks, issues, showMsg, fetchGemini, setModal, cur
   const [aiLoading, setAiLoading] = useState(false);
 
   const filtered = events.filter(e=>(e.startDate||'').slice(0,7)===month);
-  const done = tasks.filter(t=>normStatus(t)==='complete'&&((t.dueDate||t.timestamp||'').slice(0,7)===month));
+  const done = tasks.filter(t=>normStatus(t)==='complete'&&((t.completedAt||t.dueDate||t.timestamp||'').slice(0,7)===month));
   const logs = useMemo(()=>monthLogs(events,tasks,month),[events,tasks,month]);
   const totalH = sumHours(logs); // only hours dated in the selected month
 
@@ -2305,6 +2538,22 @@ function InsightsPage({ events, tasks, issues }) {
           <BarChart data={stats.eqIssues} colorFn={(k)=>{const v=stats.eqIssues[k];return v>=3?C.red:v>=2?C.amber:C.textMuted;}}/>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── REPORTS (monthly export + analytics in one tab) ──
+function ReportsPage({ events, tasks, issues, showMsg, fetchGemini, setModal, currentUser }) {
+  const [view, setView] = useState('monthly');
+  return (
+    <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
+      <div style={{padding:'14px 16px 0'}}>
+        <Segmented label="Report type" value={view} onChange={setView}
+          options={[{value:'monthly',label:'Monthly report'},{value:'analytics',label:'Analytics'}]}/>
+      </div>
+      {view==='monthly'
+        ? <ExportPage events={events} tasks={tasks} issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>
+        : <InsightsPage events={events} tasks={tasks} issues={issues}/>}
     </div>
   );
 }
@@ -2511,16 +2760,10 @@ export default function App() {
     setModal({title:'Leadership brief',content:result,actionLabel:'Copy',action:()=>{navigator.clipboard.writeText(result);showMsg('Copied.');}});
   };
 
-  const pageTitle = {today:'Today',events:'Events',tasks:'Tasks',issues:'Tech issues',rooms:'Rooms',export:'Export',insights:'Insights',settings:'Settings'};
-  const pageSub = {
-    today: today,
-    events: `${events.length} event${events.length!==1?'s':''}`,
-    tasks: `${tasks.length} task${tasks.length!==1?'s':''}`,
-    issues: `${issues.filter(i=>i.status==='Open').length} open`,
-    rooms: `${rooms.length} configured`,
-    export: 'Excel + AI report',
-    insights: 'Analytics',
-    settings: 'Manage team & preferences',
+  // Small red counts on the nav: your overdue tasks, and issues not yet resolved.
+  const badges = {
+    tasks: tasks.filter(t=>t.assignee===currentUser&&normStatus(t)!=='complete'&&t.dueDate&&String(t.dueDate).slice(0,10)<today).length,
+    issues: issues.filter(i=>i.status!=='Resolved').length,
   };
 
   // Global styles and the toast render on every screen, including sign-in.
@@ -2547,39 +2790,26 @@ export default function App() {
 
   return shell(
     <>
-      <div className="app-shell" style={{display:'flex',height:'100vh',overflow:'hidden',background:C.bg}}>
-        <Sidebar page={page} setPage={setPage}/>
-        <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden',minWidth:0}}>
-          <TopBar
-            title={pageTitle[page]}
-            subtitle={pageSub[page]}
-            currentUser={currentUser}
-            actions={
-              <div style={{display:'flex',gap:6}}>
-                <Btn variant="subtle" size="sm" onClick={generateBrief} disabled={briefLoading}>
-                  {briefLoading?<><Spinner size={11}/>Working...</>:'⚡ Lead brief'}
-                </Btn>
-              </div>
-            }
-          />
-          {dataError && (
-            <div role="alert" style={{padding:'8px 16px',background:C.redBg,borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.red,lineHeight:1.5}}>
-              {dataError==='permission'
-                ? `Can't load team data: access denied. Sign in with a verified${ALLOWED_EMAIL_DOMAIN?` @${ALLOWED_EMAIL_DOMAIN}`:''} account, or ask the app owner to check the Firestore rules.`
-                : 'Having trouble loading data. Check your connection, then refresh.'}
-            </div>
-          )}
-          <div style={{flex:1,overflow:'hidden',display:'flex',flexDirection:'column'}}>
-            {page==='today'&&<TodayPage events={events} handoffFeed={handoffFeed} rooms={rooms} showMsg={showMsg} currentUser={currentUser} myIds={myIds} fetchGemini={fetchGemini} setModal={setModal}/>}
-            {page==='events'&&<EventsPage events={events} showMsg={showMsg} fetchGemini={fetchGemini} currentUser={currentUser} teamMembers={teamMembers}/>}
-            {page==='tasks'&&<TasksPage tasks={tasks} showMsg={showMsg} currentUser={currentUser} teamMembers={teamMembers}/>}
-            {page==='issues'&&<IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
-            {page==='rooms'&&<RoomsPage rooms={rooms} showMsg={showMsg} currentUser={currentUser} teamMembers={teamMembers}/>}
-            {page==='export'&&<ExportPage events={events} tasks={tasks} issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
-            {page==='insights'&&<InsightsPage events={events} tasks={tasks} issues={issues}/>}
-            {page==='settings'&&<SettingsPage teamMembers={teamMembers} showMsg={showMsg} currentUser={currentUser}/>}
+      <div className="app-shell" style={{display:'flex',flexDirection:'column',height:'100vh',overflow:'hidden',background:C.bg}}>
+        <TopNav page={page} setPage={setPage} badges={badges} currentUser={currentUser} userEmail={user?.email}
+          onBrief={generateBrief} briefLoading={briefLoading}/>
+        {dataError && (
+          <div role="alert" style={{padding:'8px 16px',background:C.redBg,borderBottom:`1px solid ${C.border}`,fontSize:12,color:C.red,lineHeight:1.5}}>
+            {dataError==='permission'
+              ? `Can't load team data: access denied. Sign in with a verified${ALLOWED_EMAIL_DOMAIN?` @${ALLOWED_EMAIL_DOMAIN}`:''} account, or ask the app owner to check the Firestore rules.`
+              : 'Having trouble loading data. Check your connection, then refresh.'}
           </div>
-        </div>
+        )}
+        <main style={{flex:1,minHeight:0,overflow:'hidden',display:'flex',flexDirection:'column'}}>
+          {page==='today'&&<TodayPage events={events} handoffFeed={handoffFeed} rooms={rooms} showMsg={showMsg} currentUser={currentUser} myIds={myIds} fetchGemini={fetchGemini} setModal={setModal}/>}
+          {page==='events'&&<EventsPage events={events} showMsg={showMsg} fetchGemini={fetchGemini} currentUser={currentUser} teamMembers={teamMembers}/>}
+          {page==='tasks'&&<TasksPage tasks={tasks} events={events} showMsg={showMsg} currentUser={currentUser} teamMembers={teamMembers}/>}
+          {page==='issues'&&<IssuesPage issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
+          {page==='rooms'&&<RoomsPage rooms={rooms} showMsg={showMsg} currentUser={currentUser} teamMembers={teamMembers}/>}
+          {page==='reports'&&<ReportsPage events={events} tasks={tasks} issues={issues} showMsg={showMsg} fetchGemini={fetchGemini} setModal={setModal} currentUser={currentUser}/>}
+          {page==='settings'&&<SettingsPage teamMembers={teamMembers} showMsg={showMsg} currentUser={currentUser}/>}
+        </main>
+        <BottomNav page={page} setPage={setPage} badges={badges}/>
       </div>
 
       {/* AI result modal */}
